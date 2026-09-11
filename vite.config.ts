@@ -10,6 +10,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "next/link": path.resolve(__dirname, "./src/lib/next-compat/link.tsx"),
+      "next/navigation": path.resolve(__dirname, "./src/lib/next-compat/navigation.ts"),
     },
   },
   build: {

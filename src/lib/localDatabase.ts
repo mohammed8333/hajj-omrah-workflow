@@ -726,17 +726,28 @@ class LocalDatabaseEngine {
     const count = this.requests.length + 1;
     const reqNumber = `REQ-2026-${String(count).padStart(3, "0")}`;
 
+    const gName =
+      data.groupName && data.groupName.trim()
+        ? data.groupName.trim()
+        : `معاملة جديدة - ${reqNumber}`;
+    const cPhone =
+      data.contactPhone && data.contactPhone.trim()
+        ? data.contactPhone.trim()
+        : data.hostPhone && data.hostPhone.trim()
+        ? data.hostPhone.trim()
+        : currentUser.phone || "05xxxxxxxx";
+
     const newReq: GroupRequestDetail = {
       id: "req-" + Date.now(),
       requestNumber: reqNumber,
-      groupName: data.groupName,
+      groupName: gName,
       senderId: currentUser.id,
       senderName: currentUser.fullName,
       status: "Draft",
       hasHosting: data.hasHosting,
-      contactPhone: data.contactPhone,
+      contactPhone: cPhone,
       travelDate: data.travelDate,
-      destination: data.destination,
+      destination: data.destination || "مكة المكرمة والمدينة المنورة",
       notes: data.notes,
       createdAt: now,
       updatedAt: now,

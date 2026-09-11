@@ -1,6 +1,8 @@
+"use client";
+
 import React, { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { ShieldCheck, UserCheck, AlertCircle, KeyRound, User, Globe } from "lucide-react";
+import { ShieldCheck, UserCheck, AlertCircle, KeyRound, User } from "lucide-react";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -44,10 +46,6 @@ export default function LoginPage() {
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-gradient-to-tr from-sky-600 to-teal-500 rounded-2xl flex items-center justify-center text-white text-3xl font-extrabold mx-auto shadow-md mb-4">
             ح
-          </div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 mb-2 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-200">
-            <Globe className="w-3.5 h-3.5" />
-            <span>نسخة الاستضافة السحابية على GitHub</span>
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-1">
             تسجيل الدخول للنظام

@@ -38,7 +38,6 @@ export interface User {
   id: string;
   fullName: string;
   username: string;
-  password?: string;
   role: UserRole;
   phone?: string;
   isActive: boolean;
@@ -68,7 +67,6 @@ export interface DocumentItem {
   uploadedAt: string;
   reviewStatus: DocumentReviewStatus;
   reviewNote?: string;
-  dataUrl?: string; // Stored in IndexedDB for preview
 }
 
 export interface Traveler {
