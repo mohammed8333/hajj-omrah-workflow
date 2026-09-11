@@ -77,7 +77,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed md:static inset-y-0 right-0 z-50 w-64 bg-white border-l border-gray-200 flex flex-col transition-transform duration-200 ease-in-out ${
+        className={`fixed md:sticky md:top-16 md:h-[calc(100vh-4rem)] inset-y-0 right-0 z-40 w-64 bg-white border-l border-gray-200 flex flex-col transition-transform duration-200 ease-in-out shrink-0 ${
           isOpen ? "translate-x-0" : "translate-x-full md:translate-x-0"
         }`}
       >

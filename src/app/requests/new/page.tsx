@@ -282,7 +282,7 @@ export default function UnifiedNewRequestPage() {
   };
 
   return (
-    <div className="space-y-6 pb-36 max-w-5xl mx-auto">
+    <div className="space-y-6 pb-44 max-w-5xl mx-auto">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 pb-4">
         <div>
@@ -756,25 +756,30 @@ export default function UnifiedNewRequestPage() {
       </div>
 
       {/* Section 3: Flight & Travel Dates (مواعيد وتفاصيل الرحلة والطيران) */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 space-y-4">
-        <div className="flex items-center gap-3 border-b border-gray-100 pb-3">
-          <div className="w-10 h-10 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center shrink-0 border border-sky-100">
-            <Plane className="w-5 h-5" />
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-4">
+        <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0 border border-sky-100 shadow-xs">
+              <Plane className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-gray-900">
+                بيانات ومواعيد الرحلة والطيران
+              </h2>
+              <p className="text-xs text-gray-500">
+                حدد تواريخ الذهاب والعودة ومواعيد إقلاع الطائرة وتواجد المسافرين في المطار
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-base font-bold text-gray-900">
-              بيانات ومواعيد الرحلة والطيران
-            </h2>
-            <p className="text-xs text-gray-500">
-              حدد تواريخ الذهاب والعودة ومواعيد إقلاع الطائرة وتواجد المسافرين في المطار
-            </p>
-          </div>
+          <span className="text-xs bg-sky-50 text-sky-800 font-semibold px-2.5 py-1 rounded-md border border-sky-200">
+            مواعيد السفر
+          </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-1">
           {/* 1. تاريخ ذهاب */}
-          <div>
-            <label className="block text-xs font-bold text-gray-700 mb-1.5 flex items-center gap-1.5">
+          <div className="bg-gray-50/60 p-3.5 rounded-xl border border-gray-200/80 hover:border-sky-300 transition-colors">
+            <label className="block text-xs font-bold text-gray-800 mb-1.5 flex items-center gap-1.5">
               <Calendar className="w-3.5 h-3.5 text-sky-600" />
               <span>تاريخ ذهاب</span>
             </label>
@@ -782,14 +787,14 @@ export default function UnifiedNewRequestPage() {
               type="date"
               value={departureDate}
               onChange={(e) => setDepartureDate(e.target.value)}
-              className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-sky-500 bg-white transition-all text-gray-800"
+              className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 bg-white transition-all text-gray-800 font-medium"
             />
-            <span className="text-[10px] text-gray-400 mt-1 block">تاريخ انطلاق الرحلة</span>
+            <span className="text-[11px] text-gray-500 mt-1.5 block">تاريخ انطلاق الرحلة</span>
           </div>
 
           {/* 2. تاريخ عودة */}
-          <div>
-            <label className="block text-xs font-bold text-gray-700 mb-1.5 flex items-center gap-1.5">
+          <div className="bg-gray-50/60 p-3.5 rounded-xl border border-gray-200/80 hover:border-teal-300 transition-colors">
+            <label className="block text-xs font-bold text-gray-800 mb-1.5 flex items-center gap-1.5">
               <Calendar className="w-3.5 h-3.5 text-teal-600" />
               <span>تاريخ عودة</span>
             </label>
@@ -797,14 +802,14 @@ export default function UnifiedNewRequestPage() {
               type="date"
               value={returnDate}
               onChange={(e) => setReturnDate(e.target.value)}
-              className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-sky-500 bg-white transition-all text-gray-800"
+              className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white transition-all text-gray-800 font-medium"
             />
-            <span className="text-[10px] text-gray-400 mt-1 block">تاريخ رحلة العودة</span>
+            <span className="text-[11px] text-gray-500 mt-1.5 block">تاريخ رحلة العودة</span>
           </div>
 
           {/* 3. وقت إقلاع الطائرة */}
-          <div>
-            <label className="block text-xs font-bold text-gray-700 mb-1.5 flex items-center gap-1.5">
+          <div className="bg-gray-50/60 p-3.5 rounded-xl border border-gray-200/80 hover:border-indigo-300 transition-colors">
+            <label className="block text-xs font-bold text-gray-800 mb-1.5 flex items-center gap-1.5">
               <Clock className="w-3.5 h-3.5 text-indigo-600" />
               <span>وقت إقلاع الطائرة</span>
             </label>
@@ -812,14 +817,14 @@ export default function UnifiedNewRequestPage() {
               type="time"
               value={flightDepartureTime}
               onChange={(e) => setFlightDepartureTime(e.target.value)}
-              className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-sky-500 bg-white transition-all text-gray-800"
+              className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white transition-all text-gray-800 font-medium text-center"
             />
-            <span className="text-[10px] text-gray-400 mt-1 block">موعد إقلاع الطيران المحدد</span>
+            <span className="text-[11px] text-gray-500 mt-1.5 block">موعد إقلاع الطيران المحدد</span>
           </div>
 
           {/* 4. وقت تواجد المسافر في المطار */}
-          <div>
-            <label className="block text-xs font-bold text-gray-700 mb-1.5 flex items-center gap-1.5">
+          <div className="bg-gray-50/60 p-3.5 rounded-xl border border-gray-200/80 hover:border-amber-300 transition-colors">
+            <label className="block text-xs font-bold text-gray-800 mb-1.5 flex items-center gap-1.5">
               <Clock className="w-3.5 h-3.5 text-amber-600" />
               <span>وقت تواجد المسافر في المطار</span>
             </label>
@@ -827,36 +832,44 @@ export default function UnifiedNewRequestPage() {
               type="time"
               value={airportArrivalTime}
               onChange={(e) => setAirportArrivalTime(e.target.value)}
-              className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-sky-500 bg-white transition-all text-gray-800"
+              className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white transition-all text-gray-800 font-medium text-center"
             />
-            <span className="text-[10px] text-gray-400 mt-1 block">الحضور بصالة السفر قبل الإقلاع</span>
+            <span className="text-[11px] text-gray-500 mt-1.5 block">الحضور بصالة السفر قبل الإقلاع</span>
           </div>
         </div>
       </div>
 
-      {/* Action Bar (Fixed Bottom Bar - Always Visible) */}
-      <div className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-gray-200 shadow-[0_-4px_25px_rgba(0,0,0,0.1)] py-3 px-4 sm:px-8">
-        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="text-xs text-gray-600 text-center sm:text-right">
-            <span>إجمالي المسافرين: </span>
-            <strong className="text-blue-600 font-bold">{travelers.length}</strong>
-            <span className="mr-3">| الجوازات الجاهزة: </span>
-            <strong className="text-green-600 font-bold">
-              {travelers.filter((t) => t.passportFile).length}
-            </strong>
-            <span className="mr-3">| التذاكر الجاهزة: </span>
-            <strong className="text-amber-600 font-bold">
-              {travelers.filter((t) => t.ticketFile).length}
-            </strong>
+      {/* Floating Action Bar - Docked at Bottom (Never overlaps sidebar) */}
+      <div className="fixed bottom-4 z-40 left-4 right-4 md:left-6 md:right-72 pointer-events-none transition-all">
+        <div className="max-w-5xl mx-auto bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-gray-200/90 p-3.5 sm:p-4 flex flex-col sm:flex-row items-center justify-between gap-4 pointer-events-auto">
+          <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 sm:gap-3 text-xs text-gray-700 font-medium">
+            <span className="flex items-center gap-1.5">
+              <span>إجمالي المسافرين:</span>
+              <strong className="text-blue-600 font-bold text-sm bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-100">{travelers.length}</strong>
+            </span>
+            <span className="text-gray-300">|</span>
+            <span className="flex items-center gap-1.5">
+              <span>الجوازات:</span>
+              <strong className="text-green-600 font-bold text-sm bg-green-50 px-2 py-0.5 rounded-lg border border-green-100">
+                {travelers.filter((t) => t.passportFile).length}
+              </strong>
+            </span>
+            <span className="text-gray-300">|</span>
+            <span className="flex items-center gap-1.5">
+              <span>التذاكر:</span>
+              <strong className="text-amber-600 font-bold text-sm bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-100">
+                {travelers.filter((t) => t.ticketFile).length}
+              </strong>
+            </span>
           </div>
 
-          <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="flex items-center gap-2.5 w-full sm:w-auto">
             {/* Save Draft */}
             <button
               type="button"
               disabled={loading}
               onClick={() => handleSubmit(false)}
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-800 text-sm font-bold shadow-xs transition-all disabled:opacity-50 cursor-pointer"
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border border-gray-300 bg-white hover:bg-gray-50 text-gray-800 text-sm font-bold shadow-xs transition-all disabled:opacity-50 cursor-pointer"
             >
               <Save className="w-4 h-4 text-gray-500" />
               <span>حفظ كمسودة</span>
@@ -867,7 +880,7 @@ export default function UnifiedNewRequestPage() {
               type="button"
               disabled={loading}
               onClick={() => handleSubmit(true)}
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold shadow-md hover:shadow-lg transition-all disabled:opacity-50 cursor-pointer"
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold shadow-md hover:shadow-lg transition-all disabled:opacity-50 cursor-pointer"
             >
               <Send className="w-4 h-4" />
               <span>حفظ وإرسال للمراجعة مباشرة</span>
