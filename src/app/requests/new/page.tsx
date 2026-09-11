@@ -22,6 +22,9 @@ import {
   X,
   Loader2,
   ShieldCheck,
+  Plane,
+  Calendar,
+  Clock,
 } from "lucide-react";
 
 interface TravelerDraft {
@@ -41,6 +44,12 @@ export default function UnifiedNewRequestPage() {
   const [hasHosting, setHasHosting] = useState(false);
   const [hostPhone, setHostPhone] = useState("");
   const [hostIdFile, setHostIdFile] = useState<File | null>(null);
+
+  // Flight & Travel Details
+  const [departureDate, setDepartureDate] = useState("");
+  const [returnDate, setReturnDate] = useState("");
+  const [flightDepartureTime, setFlightDepartureTime] = useState("");
+  const [airportArrivalTime, setAirportArrivalTime] = useState("");
 
   // Travelers with Direct Documents
   const [travelers, setTravelers] = useState<TravelerDraft[]>([
@@ -180,6 +189,10 @@ export default function UnifiedNewRequestPage() {
         contactPhone: "",
         hasHosting,
         hostPhone: hasHosting ? hostPhone.trim() : undefined,
+        departureDate: departureDate || undefined,
+        returnDate: returnDate || undefined,
+        flightDepartureTime: flightDepartureTime || undefined,
+        airportArrivalTime: airportArrivalTime || undefined,
       });
 
       // 2. Upload Host ID Document if selected
@@ -269,7 +282,7 @@ export default function UnifiedNewRequestPage() {
   };
 
   return (
-    <div className="space-y-6 pb-24 max-w-5xl mx-auto">
+    <div className="space-y-6 pb-36 max-w-5xl mx-auto">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 pb-4">
         <div>
@@ -742,43 +755,124 @@ export default function UnifiedNewRequestPage() {
         </button>
       </div>
 
-      {/* Action Bar (Sticky Bottom) */}
-      <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-4 sticky bottom-4 z-20 flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="text-xs text-gray-600 text-center sm:text-right">
-          <span>إجمالي المسافرين: </span>
-          <strong className="text-blue-600 font-bold">{travelers.length}</strong>
-          <span className="mr-3">| الجوازات الجاهزة: </span>
-          <strong className="text-green-600 font-bold">
-            {travelers.filter((t) => t.passportFile).length}
-          </strong>
-          <span className="mr-3">| التذاكر الجاهزة: </span>
-          <strong className="text-amber-600 font-bold">
-            {travelers.filter((t) => t.ticketFile).length}
-          </strong>
+      {/* Section 3: Flight & Travel Dates (مواعيد وتفاصيل الرحلة والطيران) */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 space-y-4">
+        <div className="flex items-center gap-3 border-b border-gray-100 pb-3">
+          <div className="w-10 h-10 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center shrink-0 border border-sky-100">
+            <Plane className="w-5 h-5" />
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-gray-900">
+              بيانات ومواعيد الرحلة والطيران
+            </h2>
+            <p className="text-xs text-gray-500">
+              حدد تواريخ الذهاب والعودة ومواعيد إقلاع الطائرة وتواجد المسافرين في المطار
+            </p>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          {/* Save Draft */}
-          <button
-            type="button"
-            disabled={loading}
-            onClick={() => handleSubmit(false)}
-            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-800 text-sm font-bold shadow-xs transition-all disabled:opacity-50 cursor-pointer"
-          >
-            <Save className="w-4 h-4 text-gray-500" />
-            <span>حفظ كمسودة</span>
-          </button>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* 1. تاريخ ذهاب */}
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1.5 flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-sky-600" />
+              <span>تاريخ ذهاب</span>
+            </label>
+            <input
+              type="date"
+              value={departureDate}
+              onChange={(e) => setDepartureDate(e.target.value)}
+              className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-sky-500 bg-white transition-all text-gray-800"
+            />
+            <span className="text-[10px] text-gray-400 mt-1 block">تاريخ انطلاق الرحلة</span>
+          </div>
 
-          {/* Direct Submit to Safa */}
-          <button
-            type="button"
-            disabled={loading}
-            onClick={() => handleSubmit(true)}
-            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold shadow-md hover:shadow-lg transition-all disabled:opacity-50 cursor-pointer"
-          >
-            <Send className="w-4 h-4" />
-            <span>حفظ وإرسال للمراجعة مباشرة</span>
-          </button>
+          {/* 2. تاريخ عودة */}
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1.5 flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-teal-600" />
+              <span>تاريخ عودة</span>
+            </label>
+            <input
+              type="date"
+              value={returnDate}
+              onChange={(e) => setReturnDate(e.target.value)}
+              className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-sky-500 bg-white transition-all text-gray-800"
+            />
+            <span className="text-[10px] text-gray-400 mt-1 block">تاريخ رحلة العودة</span>
+          </div>
+
+          {/* 3. وقت إقلاع الطائرة */}
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1.5 flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-indigo-600" />
+              <span>وقت إقلاع الطائرة</span>
+            </label>
+            <input
+              type="time"
+              value={flightDepartureTime}
+              onChange={(e) => setFlightDepartureTime(e.target.value)}
+              className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-sky-500 bg-white transition-all text-gray-800"
+            />
+            <span className="text-[10px] text-gray-400 mt-1 block">موعد إقلاع الطيران المحدد</span>
+          </div>
+
+          {/* 4. وقت تواجد المسافر في المطار */}
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1.5 flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-amber-600" />
+              <span>وقت تواجد المسافر في المطار</span>
+            </label>
+            <input
+              type="time"
+              value={airportArrivalTime}
+              onChange={(e) => setAirportArrivalTime(e.target.value)}
+              className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-sky-500 bg-white transition-all text-gray-800"
+            />
+            <span className="text-[10px] text-gray-400 mt-1 block">الحضور بصالة السفر قبل الإقلاع</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Action Bar (Fixed Bottom Bar - Always Visible) */}
+      <div className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-gray-200 shadow-[0_-4px_25px_rgba(0,0,0,0.1)] py-3 px-4 sm:px-8">
+        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="text-xs text-gray-600 text-center sm:text-right">
+            <span>إجمالي المسافرين: </span>
+            <strong className="text-blue-600 font-bold">{travelers.length}</strong>
+            <span className="mr-3">| الجوازات الجاهزة: </span>
+            <strong className="text-green-600 font-bold">
+              {travelers.filter((t) => t.passportFile).length}
+            </strong>
+            <span className="mr-3">| التذاكر الجاهزة: </span>
+            <strong className="text-amber-600 font-bold">
+              {travelers.filter((t) => t.ticketFile).length}
+            </strong>
+          </div>
+
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            {/* Save Draft */}
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => handleSubmit(false)}
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-800 text-sm font-bold shadow-xs transition-all disabled:opacity-50 cursor-pointer"
+            >
+              <Save className="w-4 h-4 text-gray-500" />
+              <span>حفظ كمسودة</span>
+            </button>
+
+            {/* Direct Submit to Safa */}
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => handleSubmit(true)}
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold shadow-md hover:shadow-lg transition-all disabled:opacity-50 cursor-pointer"
+            >
+              <Send className="w-4 h-4" />
+              <span>حفظ وإرسال للمراجعة مباشرة</span>
+            </button>
+          </div>
         </div>
       </div>
 

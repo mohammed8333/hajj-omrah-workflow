@@ -78,6 +78,13 @@ export default function RequestDetailPage({
     docType: DocumentType;
   } | null>(null);
 
+  // Flight Details Edit Modal
+  const [showFlightEditModal, setShowFlightEditModal] = useState(false);
+  const [editDepartureDate, setEditDepartureDate] = useState("");
+  const [editReturnDate, setEditReturnDate] = useState("");
+  const [editFlightDepartureTime, setEditFlightDepartureTime] = useState("");
+  const [editAirportArrivalTime, setEditAirportArrivalTime] = useState("");
+
   const loadRequest = async () => {
     try {
       setLoading(true);
@@ -134,6 +141,36 @@ export default function RequestDetailPage({
       await loadRequest();
     } catch (err: unknown) {
       if (err instanceof Error) setError(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleSaveFlightDetails = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!request) return;
+    try {
+      setActionLoading(true);
+      setError(null);
+      await api.requests.update(request.id, {
+        groupName: request.groupName,
+        contactPhone: request.contactPhone,
+        hasHosting: request.hasHosting,
+        destination: request.destination,
+        notes: request.notes,
+        hostName: request.hostingInfo?.hostName,
+        hostPhone: request.hostingInfo?.hostPhone,
+        hostAddress: request.hostingInfo?.hostAddress,
+        departureDate: editDepartureDate || undefined,
+        returnDate: editReturnDate || undefined,
+        flightDepartureTime: editFlightDepartureTime || undefined,
+        airportArrivalTime: editAirportArrivalTime || undefined,
+      });
+      setSuccess("تم تحديث مواعيد وبيانات الرحلة والطيران بنجاح.");
+      setShowFlightEditModal(false);
+      await loadRequest();
+    } catch (err: any) {
+      setError(err.message || "فشل تحديث مواعيد الرحلة");
     } finally {
       setActionLoading(false);
     }
@@ -679,6 +716,88 @@ export default function RequestDetailPage({
         </div>
       )}
 
+      {/* Flight & Travel Information Card */}
+      <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-xs space-y-4">
+        <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+          <div className="flex items-center gap-2">
+            <Plane className="w-5 h-5 text-sky-600" />
+            <h2 className="text-base font-bold text-gray-900">
+              بيانات ومواعيد الرحلة والطيران
+            </h2>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs bg-sky-50 text-sky-800 font-semibold px-2.5 py-1 rounded-md border border-sky-200">
+              مواعيد السفر الرسمية
+            </span>
+            {(canEditDocs || role === "Admin") && (
+              <button
+                type="button"
+                onClick={() => {
+                  setEditDepartureDate(request.departureDate || request.travelDate || "");
+                  setEditReturnDate(request.returnDate || "");
+                  setEditFlightDepartureTime(request.flightDepartureTime || "");
+                  setEditAirportArrivalTime(request.airportArrivalTime || "");
+                  setShowFlightEditModal(true);
+                }}
+                className="text-xs text-sky-600 hover:text-sky-800 font-semibold px-2.5 py-1 rounded-lg border border-sky-200 hover:bg-sky-50 transition-colors cursor-pointer"
+              >
+                تعديل المواعيد
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+          {/* تاريخ ذهاب */}
+          <div className="bg-gray-50 p-3.5 rounded-xl border border-gray-100">
+            <div className="flex items-center gap-1.5 text-gray-400 mb-1">
+              <Calendar className="w-3.5 h-3.5 text-sky-600" />
+              <span>تاريخ ذهاب:</span>
+            </div>
+            <span className="font-bold text-gray-800 text-sm">
+              {request.departureDate || request.travelDate
+                ? new Date(request.departureDate || request.travelDate!).toLocaleDateString("ar-SA")
+                : "غير محدد"}
+            </span>
+          </div>
+
+          {/* تاريخ عودة */}
+          <div className="bg-gray-50 p-3.5 rounded-xl border border-gray-100">
+            <div className="flex items-center gap-1.5 text-gray-400 mb-1">
+              <Calendar className="w-3.5 h-3.5 text-teal-600" />
+              <span>تاريخ عودة:</span>
+            </div>
+            <span className="font-bold text-gray-800 text-sm">
+              {request.returnDate
+                ? new Date(request.returnDate).toLocaleDateString("ar-SA")
+                : "غير محدد"}
+            </span>
+          </div>
+
+          {/* وقت إقلاع الطائرة */}
+          <div className="bg-gray-50 p-3.5 rounded-xl border border-gray-100">
+            <div className="flex items-center gap-1.5 text-gray-400 mb-1">
+              <Clock className="w-3.5 h-3.5 text-indigo-600" />
+              <span>وقت إقلاع الطائرة:</span>
+            </div>
+            <span className="font-bold text-gray-800 text-sm" dir="ltr">
+              {request.flightDepartureTime || "غير محدد"}
+            </span>
+          </div>
+
+          {/* وقت تواجد المسافر في المطار */}
+          <div className="bg-gray-50 p-3.5 rounded-xl border border-gray-100">
+            <div className="flex items-center gap-1.5 text-gray-400 mb-1">
+              <Clock className="w-3.5 h-3.5 text-amber-600" />
+              <span>وقت تواجد المسافر في المطار:</span>
+            </div>
+            <span className="font-bold text-gray-800 text-sm" dir="ltr">
+              {request.airportArrivalTime || "غير محدد"}
+            </span>
+          </div>
+        </div>
+      </div>
+
       {/* Travelers & Documents Section */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
@@ -1113,6 +1232,100 @@ export default function RequestDetailPage({
                 إرسال للمرسل
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL 5: Edit Flight & Travel Details --- */}
+      {showFlightEditModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="bg-white w-full max-w-lg rounded-2xl p-6 shadow-xl space-y-4">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+              <h3 className="font-bold text-base text-gray-900 flex items-center gap-2">
+                <Plane className="w-5 h-5 text-sky-600" />
+                <span>تعديل مواعيد وبيانات الرحلة والطيران</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowFlightEditModal(false)}
+                className="p-1 text-gray-400 hover:bg-gray-100 rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveFlightDetails} className="space-y-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1 flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5 text-sky-600" />
+                    <span>تاريخ ذهاب</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={editDepartureDate}
+                    onChange={(e) => setEditDepartureDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-sky-500 text-gray-800"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1 flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5 text-teal-600" />
+                    <span>تاريخ عودة</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={editReturnDate}
+                    onChange={(e) => setEditReturnDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-sky-500 text-gray-800"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1 flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>وقت إقلاع الطائرة</span>
+                  </label>
+                  <input
+                    type="time"
+                    value={editFlightDepartureTime}
+                    onChange={(e) => setEditFlightDepartureTime(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-sky-500 text-gray-800"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1 flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5 text-amber-600" />
+                    <span>وقت تواجد المسافر في المطار</span>
+                  </label>
+                  <input
+                    type="time"
+                    value={editAirportArrivalTime}
+                    onChange={(e) => setEditAirportArrivalTime(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-sky-500 text-gray-800"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setShowFlightEditModal(false)}
+                  className="px-4 py-2 font-semibold text-gray-600 hover:bg-gray-100 rounded-xl cursor-pointer"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionLoading}
+                  className="px-5 py-2 font-bold bg-sky-600 hover:bg-sky-700 text-white rounded-xl shadow-xs cursor-pointer"
+                >
+                  حفظ التعديلات
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

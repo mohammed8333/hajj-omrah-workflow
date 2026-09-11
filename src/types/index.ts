@@ -150,6 +150,10 @@ export interface GroupRequestSummary {
   hasHosting: boolean;
   contactPhone: string;
   travelDate?: string;
+  departureDate?: string;
+  returnDate?: string;
+  flightDepartureTime?: string;
+  airportArrivalTime?: string;
   destination?: string;
   travelersCount: number;
   documentsCount: number;
@@ -173,6 +177,10 @@ export interface GroupRequestDetail {
   hasHosting: boolean;
   contactPhone: string;
   travelDate?: string;
+  departureDate?: string;
+  returnDate?: string;
+  flightDepartureTime?: string;
+  airportArrivalTime?: string;
   destination?: string;
   notes?: string;
   createdAt: string;

@@ -680,6 +680,10 @@ class LocalDatabaseEngine {
         hasHosting: r.hasHosting,
         contactPhone: r.contactPhone,
         travelDate: r.travelDate,
+        departureDate: r.departureDate || r.travelDate,
+        returnDate: r.returnDate,
+        flightDepartureTime: r.flightDepartureTime,
+        airportArrivalTime: r.airportArrivalTime,
         destination: r.destination,
         travelersCount: r.travelers.length,
         documentsCount: docCount,
@@ -727,6 +731,10 @@ class LocalDatabaseEngine {
       groupName: string;
       contactPhone: string;
       travelDate?: string;
+      departureDate?: string;
+      returnDate?: string;
+      flightDepartureTime?: string;
+      airportArrivalTime?: string;
       destination?: string;
       notes?: string;
       hasHosting: boolean;
@@ -760,7 +768,11 @@ class LocalDatabaseEngine {
       status: "Draft",
       hasHosting: data.hasHosting,
       contactPhone: cPhone,
-      travelDate: data.travelDate,
+      travelDate: data.departureDate || data.travelDate,
+      departureDate: data.departureDate || data.travelDate,
+      returnDate: data.returnDate,
+      flightDepartureTime: data.flightDepartureTime,
+      airportArrivalTime: data.airportArrivalTime,
       destination: data.destination || "مكة المكرمة والمدينة المنورة",
       notes: data.notes,
       createdAt: now,
@@ -811,6 +823,10 @@ class LocalDatabaseEngine {
       groupName: string;
       contactPhone: string;
       travelDate?: string;
+      departureDate?: string;
+      returnDate?: string;
+      flightDepartureTime?: string;
+      airportArrivalTime?: string;
       destination?: string;
       notes?: string;
       hasHosting: boolean;
@@ -825,7 +841,11 @@ class LocalDatabaseEngine {
 
     req.groupName = data.groupName;
     req.contactPhone = data.contactPhone;
-    req.travelDate = data.travelDate;
+    req.travelDate = data.departureDate || data.travelDate;
+    if (data.departureDate !== undefined) req.departureDate = data.departureDate;
+    if (data.returnDate !== undefined) req.returnDate = data.returnDate;
+    if (data.flightDepartureTime !== undefined) req.flightDepartureTime = data.flightDepartureTime;
+    if (data.airportArrivalTime !== undefined) req.airportArrivalTime = data.airportArrivalTime;
     req.destination = data.destination;
     req.notes = data.notes;
     req.hasHosting = data.hasHosting;

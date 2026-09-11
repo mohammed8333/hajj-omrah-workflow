@@ -108,6 +108,10 @@ export const api = {
       groupName: string;
       contactPhone: string;
       travelDate?: string;
+      departureDate?: string;
+      returnDate?: string;
+      flightDepartureTime?: string;
+      airportArrivalTime?: string;
       destination?: string;
       notes?: string;
       hasHosting: boolean;
@@ -126,6 +130,10 @@ export const api = {
         groupName: string;
         contactPhone: string;
         travelDate?: string;
+        departureDate?: string;
+        returnDate?: string;
+        flightDepartureTime?: string;
+        airportArrivalTime?: string;
         destination?: string;
         notes?: string;
         hasHosting: boolean;
