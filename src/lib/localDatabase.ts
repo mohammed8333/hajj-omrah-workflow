@@ -518,6 +518,29 @@ class LocalDatabaseEngine {
     if (storedRequests) {
       try {
         this.requests = JSON.parse(storedRequests);
+        // Retroactively link HostId document if missing
+        this.requests.forEach((req) => {
+          if (req.hasHosting || req.hostingInfo) {
+            if (!req.hostingInfo) {
+              req.hostingInfo = {
+                id: "host-" + Date.now(),
+                groupRequestId: req.id,
+                hostName: "مستضيف داخل المملكة",
+                hostPhone: req.contactPhone || "",
+                hostAddress: "",
+              };
+            }
+            if (!req.hostingInfo.hostIdDocument) {
+              const hostDoc = req.groupDocuments?.find(
+                (d) => d.documentType === "HostId" || d.id === req.hostingInfo?.hostIdDocumentId
+              );
+              if (hostDoc) {
+                req.hostingInfo.hostIdDocument = hostDoc;
+                req.hostingInfo.hostIdDocumentId = hostDoc.id;
+              }
+            }
+          }
+        });
       } catch {
         this.requests = [...DEFAULT_REQUESTS];
         this.persistRequests();
@@ -723,6 +746,28 @@ class LocalDatabaseEngine {
   public getRequestById(id: string): GroupRequestDetail {
     const req = this.requests.find((r) => r.id === id);
     if (!req) throw new Error("المعاملة المطلوبة غير موجودة");
+
+    if (req.hasHosting || req.hostingInfo) {
+      if (!req.hostingInfo) {
+        req.hostingInfo = {
+          id: "host-" + Date.now(),
+          groupRequestId: req.id,
+          hostName: "مستضيف داخل المملكة",
+          hostPhone: req.contactPhone || "",
+          hostAddress: "",
+        };
+      }
+      if (!req.hostingInfo.hostIdDocument) {
+        const hostDoc = req.groupDocuments?.find(
+          (d) => d.documentType === "HostId" || d.id === req.hostingInfo?.hostIdDocumentId
+        );
+        if (hostDoc) {
+          req.hostingInfo.hostIdDocument = hostDoc;
+          req.hostingInfo.hostIdDocumentId = hostDoc.id;
+        }
+      }
+    }
+
     return JSON.parse(JSON.stringify(req));
   }
 
@@ -781,8 +826,8 @@ class LocalDatabaseEngine {
         ? {
             id: "host-" + Date.now(),
             groupRequestId: "",
-            hostName: data.hostName || "",
-            hostPhone: data.hostPhone || "",
+            hostName: data.hostName && data.hostName.trim() ? data.hostName.trim() : "مستضيف داخل المملكة",
+            hostPhone: data.hostPhone && data.hostPhone.trim() ? data.hostPhone.trim() : "",
             hostAddress: data.hostAddress || "",
           }
         : undefined,
@@ -1309,6 +1354,25 @@ class LocalDatabaseEngine {
         trv.documents.push(docItem);
       }
     } else {
+      if (documentType === "HostId") {
+        if (!req.hostingInfo) {
+          req.hostingInfo = {
+            id: "host-" + Date.now(),
+            groupRequestId: req.id,
+            hostName: "مستضيف داخل المملكة",
+            hostPhone: req.contactPhone || "",
+            hostAddress: "",
+          };
+        }
+        req.hostingInfo.hostIdDocumentId = docId;
+        req.hostingInfo.hostIdDocument = docItem;
+
+        // Remove previous HostId document from groupDocuments if any
+        const prevIdx = req.groupDocuments.findIndex((d) => d.documentType === "HostId");
+        if (prevIdx !== -1) {
+          req.groupDocuments.splice(prevIdx, 1);
+        }
+      }
       req.groupDocuments.push(docItem);
     }
 
@@ -1348,6 +1412,15 @@ class LocalDatabaseEngine {
 
   public deleteDocument(documentId: string, currentUser?: User) {
     for (const req of this.requests) {
+      if (
+        req.hostingInfo &&
+        (req.hostingInfo.hostIdDocumentId === documentId ||
+          req.hostingInfo.hostIdDocument?.id === documentId)
+      ) {
+        req.hostingInfo.hostIdDocumentId = undefined;
+        req.hostingInfo.hostIdDocument = undefined;
+      }
+
       // Group docs
       const gIndex = req.groupDocuments.findIndex((d) => d.id === documentId);
       if (gIndex !== -1) {
@@ -1383,6 +1456,15 @@ class LocalDatabaseEngine {
     currentUser?: User
   ) {
     for (const req of this.requests) {
+      if (
+        req.hostingInfo?.hostIdDocument &&
+        (req.hostingInfo.hostIdDocument.id === documentId ||
+          req.hostingInfo.hostIdDocumentId === documentId)
+      ) {
+        req.hostingInfo.hostIdDocument.reviewStatus = reviewStatus;
+        req.hostingInfo.hostIdDocument.reviewNote = reviewNote;
+      }
+
       const allDocs = [
         ...req.groupDocuments,
         ...req.travelers.flatMap((t) => t.documents || []),

@@ -594,7 +594,7 @@ export default function RequestDetailPage({
       )}
 
       {/* Hosting Information Card */}
-      {request.hasHosting && request.hostingInfo && (
+      {request.hasHosting && (
         <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-xs space-y-4">
           <div className="flex items-center justify-between border-b border-gray-100 pb-3">
             <div className="flex items-center gap-2">
@@ -612,21 +612,21 @@ export default function RequestDetailPage({
             <div className="bg-gray-50 p-3 rounded-xl">
               <span className="text-gray-400 block mb-0.5">اسم المستضيف:</span>
               <span className="font-bold text-gray-800 text-sm">
-                {request.hostingInfo.hostName}
+                {request.hostingInfo?.hostName || "مستضيف داخل المملكة"}
               </span>
             </div>
 
             <div className="bg-gray-50 p-3 rounded-xl">
               <span className="text-gray-400 block mb-0.5">رقم هاتف المستضيف:</span>
               <span className="font-bold text-gray-800 text-sm" dir="ltr">
-                {request.hostingInfo.hostPhone}
+                {request.hostingInfo?.hostPhone || request.contactPhone || "غير محدد"}
               </span>
             </div>
 
             <div className="bg-gray-50 p-3 rounded-xl">
               <span className="text-gray-400 block mb-0.5">العنوان والسكن:</span>
               <span className="font-bold text-gray-800 text-sm">
-                {request.hostingInfo.hostAddress || "غير محدد"}
+                {request.hostingInfo?.hostAddress || "غير محدد"}
               </span>
             </div>
           </div>
@@ -637,81 +637,85 @@ export default function RequestDetailPage({
               مستند هوية المستضيف (مطلوب):
             </span>
 
-            {request.hostingInfo.hostIdDocument ? (
-              <div className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs">
-                <div className="flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-sky-600" />
-                  <div>
-                    <div className="font-semibold text-gray-800">
-                      {request.hostingInfo.hostIdDocument.originalFileName}
-                    </div>
-                    <div className="text-[10px] text-gray-400">
-                      {(request.hostingInfo.hostIdDocument.fileSize / 1024).toFixed(1)} KB
+            {(() => {
+              const hostDoc =
+                request.hostingInfo?.hostIdDocument ||
+                request.groupDocuments?.find((d) => d.documentType === "HostId");
+
+              return hostDoc ? (
+                <div className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-sky-600" />
+                    <div>
+                      <div className="font-semibold text-gray-800">
+                        {hostDoc.originalFileName}
+                      </div>
+                      <div className="text-[10px] text-gray-400">
+                        {(hostDoc.fileSize / 1024).toFixed(1)} KB
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="flex items-center gap-2">
-                  <DocumentStatusBadge
-                    status={request.hostingInfo.hostIdDocument.reviewStatus}
-                  />
-
-                  <button
-                    onClick={() => setPreviewDoc(request.hostingInfo!.hostIdDocument!)}
-                    className="p-1.5 text-gray-600 hover:text-sky-600 hover:bg-gray-200 rounded-lg"
-                    title="معاينة المستند"
-                  >
-                    <Eye className="w-4 h-4" />
-                  </button>
-
-                  {isSafaReviewer && (
-                    <button
-                      onClick={() => {
-                        setReviewModalDoc(request.hostingInfo!.hostIdDocument!);
-                        setReviewStatus(request.hostingInfo!.hostIdDocument!.reviewStatus);
-                        setReviewNote(request.hostingInfo!.hostIdDocument!.reviewNote || "");
-                      }}
-                      className="px-2.5 py-1 bg-sky-600 hover:bg-sky-700 text-white rounded-md text-[11px] font-semibold"
-                    >
-                      تدقيق
-                    </button>
-                  )}
-
-                  {canEditDocs && (
-                    <button
-                      onClick={() =>
-                        handleDeleteDocument(request.hostingInfo!.hostIdDocument!.id)
-                      }
-                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
-                      title="حذف المستند"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center">
-                <p className="text-xs text-gray-500 mb-2">
-                  لم يتم رفع وثيقة هوية المستضيف بعد.
-                </p>
-                {canEditDocs && (
-                  <label className="inline-flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer">
-                    <UploadCloud className="w-4 h-4" />
-                    <span>رفع هوية المستضيف</span>
-                    <input
-                      type="file"
-                      accept=".pdf,.jpg,.jpeg,.png"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleFileUpload(file, "HostId");
-                      }}
+                  <div className="flex items-center gap-2">
+                    <DocumentStatusBadge
+                      status={hostDoc.reviewStatus}
                     />
-                  </label>
-                )}
-              </div>
-            )}
+
+                    <button
+                      onClick={() => setPreviewDoc(hostDoc)}
+                      className="p-1.5 text-gray-600 hover:text-sky-600 hover:bg-gray-200 rounded-lg"
+                      title="معاينة المستند"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </button>
+
+                    {isSafaReviewer && (
+                      <button
+                        onClick={() => {
+                          setReviewModalDoc(hostDoc);
+                          setReviewStatus(hostDoc.reviewStatus);
+                          setReviewNote(hostDoc.reviewNote || "");
+                        }}
+                        className="px-2.5 py-1 bg-sky-600 hover:bg-sky-700 text-white rounded-md text-[11px] font-semibold"
+                      >
+                        تدقيق
+                      </button>
+                    )}
+
+                    {canEditDocs && (
+                      <button
+                        onClick={() => handleDeleteDocument(hostDoc.id)}
+                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                        title="حذف المستند"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center">
+                  <p className="text-xs text-gray-500 mb-2">
+                    لم يتم رفع وثيقة هوية المستضيف بعد.
+                  </p>
+                  {canEditDocs && (
+                    <label className="inline-flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer">
+                      <UploadCloud className="w-4 h-4" />
+                      <span>رفع هوية المستضيف</span>
+                      <input
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleFileUpload(file, "HostId");
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
