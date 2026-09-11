@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import {
   useNavigate,
   useLocation,
@@ -6,14 +7,18 @@ import {
 
 export function useRouter() {
   const navigate = useNavigate();
-  return {
-    push: (url: string) => navigate(url),
-    replace: (url: string) => navigate(url, { replace: true }),
-    back: () => navigate(-1),
-    forward: () => navigate(1),
-    refresh: () => window.location.reload(),
-    prefetch: () => {},
-  };
+
+  return useMemo(
+    () => ({
+      push: (url: string) => navigate(url),
+      replace: (url: string) => navigate(url, { replace: true }),
+      back: () => navigate(-1),
+      forward: () => navigate(1),
+      refresh: () => {},
+      prefetch: () => {},
+    }),
+    [navigate]
+  );
 }
 
 export function usePathname() {

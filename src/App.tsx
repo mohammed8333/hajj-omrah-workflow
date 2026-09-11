@@ -13,7 +13,11 @@ import AuditLogsPage from "@/app/admin/audit-logs/page";
 
 function RequestDetailWrapper() {
   const { id } = useParams<{ id: string }>();
-  return <RequestDetailPage params={Promise.resolve({ id: id || "" })} />;
+  const paramsPromise = React.useMemo(
+    () => Promise.resolve({ id: id || "" }),
+    [id]
+  );
+  return <RequestDetailPage params={paramsPromise} />;
 }
 
 export default function App() {
