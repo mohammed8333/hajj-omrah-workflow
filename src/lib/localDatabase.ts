@@ -65,6 +65,20 @@ export async function getFileFromIndexedDB(id: string): Promise<string | null> {
   }
 }
 
+export async function clearIndexedDB(): Promise<void> {
+  try {
+    const db = await openIndexedDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, "readwrite");
+      tx.objectStore(IDB_STORE).clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (e) {
+    console.warn("IndexedDB clear failed", e);
+  }
+}
+
 // ----------------------------------------------------
 // DEFAULT SEED DATA
 // ----------------------------------------------------
@@ -1501,6 +1515,72 @@ class LocalDatabaseEngine {
     this.persistUsers();
     this.persistRequests();
     this.persistLogs();
+  }
+
+  public getAllRequestsFull(): GroupRequestDetail[] {
+    return JSON.parse(JSON.stringify(this.requests));
+  }
+
+  public async clearAllRequests(currentUser?: User): Promise<void> {
+    this.requests = [];
+    this.persistRequests();
+    await clearIndexedDB();
+    this.logAction(
+      currentUser || null,
+      "مسح جميع المعاملات والمرفقات من النظام بالكامل",
+      "System",
+      "clear_all_requests"
+    );
+  }
+
+  public async wipeAllData(currentUser?: User): Promise<void> {
+    this.requests = [];
+    this.users = [...DEFAULT_USERS];
+    this.auditLogs = [];
+    this.persistRequests();
+    this.persistUsers();
+    this.persistLogs();
+    await clearIndexedDB();
+    this.logAction(
+      currentUser || null,
+      "إعادة ضبط المصنع ومسح كافة البيانات بالكامل",
+      "System",
+      "wipe_all_data"
+    );
+  }
+
+  public getStorageStats() {
+    let totalTravelers = 0;
+    let totalDocs = 0;
+    this.requests.forEach((r) => {
+      totalDocs += r.groupDocuments ? r.groupDocuments.length : 0;
+      if (r.travelers) {
+        totalTravelers += r.travelers.length;
+        r.travelers.forEach((t) => {
+          totalDocs += t.documents ? t.documents.length : 0;
+        });
+      }
+    });
+
+    let storageBytes = 0;
+    if (typeof window !== "undefined") {
+      try {
+        const u = localStorage.getItem(DB_KEY_USERS) || "";
+        const req = localStorage.getItem(DB_KEY_REQUESTS) || "";
+        const a = localStorage.getItem(DB_KEY_AUDIT_LOGS) || "";
+        storageBytes = (u.length + req.length + a.length) * 2;
+      } catch {
+        storageBytes = 0;
+      }
+    }
+
+    return {
+      requestsCount: this.requests.length,
+      travelersCount: totalTravelers,
+      documentsCount: totalDocs,
+      usersCount: this.users.length,
+      storageSizeKb: Math.max(1, Math.round(storageBytes / 1024)),
+    };
   }
 }
 

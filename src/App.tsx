@@ -10,6 +10,7 @@ import UnifiedNewRequestPage from "@/app/requests/new/page";
 import RequestDetailPage from "@/app/requests/[id]/page";
 import UsersManagementPage from "@/app/admin/users/page";
 import AuditLogsPage from "@/app/admin/audit-logs/page";
+import AdminSettingsPage from "@/app/admin/settings/page";
 
 function RequestDetailWrapper() {
   const { id } = useParams<{ id: string }>();
@@ -34,6 +35,7 @@ export default function App() {
             <Route path="/requests/:id" element={<RequestDetailWrapper />} />
             <Route path="/admin/users" element={<UsersManagementPage />} />
             <Route path="/admin/audit-logs" element={<AuditLogsPage />} />
+            <Route path="/admin/settings" element={<AdminSettingsPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </AppShell>

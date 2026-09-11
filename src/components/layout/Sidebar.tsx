@@ -10,6 +10,7 @@ import {
   Files,
   Users,
   ShieldAlert,
+  Settings,
   X,
   Plane,
 } from "lucide-react";
@@ -52,6 +53,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       href: "/admin/audit-logs",
       label: "سجل التدقيق والأمان",
       icon: ShieldAlert,
+      roles: ["Admin"],
+    },
+    {
+      href: "/admin/settings",
+      label: "إعدادات النظام",
+      icon: Settings,
       roles: ["Admin"],
     },
   ];

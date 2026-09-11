@@ -361,6 +361,28 @@ export const api = {
       await delay();
       return localDB.getAuditLogs(limit);
     },
+
+    getAllRequestsFull: async (): Promise<GroupRequestDetail[]> => {
+      await delay();
+      return localDB.getAllRequestsFull();
+    },
+
+    getStorageStats: async () => {
+      await delay();
+      return localDB.getStorageStats();
+    },
+
+    clearAllRequests: async (): Promise<void> => {
+      await delay();
+      const current = await api.auth.getMe();
+      await localDB.clearAllRequests(current);
+    },
+
+    wipeAllData: async (): Promise<void> => {
+      await delay();
+      const current = await api.auth.getMe();
+      await localDB.wipeAllData(current);
+    },
   },
 
   system: {
@@ -372,6 +394,16 @@ export const api = {
     },
     resetDefaults: (): void => {
       localDB.resetToDefault();
+    },
+    clearAllRequests: async (): Promise<void> => {
+      await delay();
+      const current = await api.auth.getMe();
+      await localDB.clearAllRequests(current);
+    },
+    wipeAllData: async (): Promise<void> => {
+      await delay();
+      const current = await api.auth.getMe();
+      await localDB.wipeAllData(current);
     },
   },
 };
