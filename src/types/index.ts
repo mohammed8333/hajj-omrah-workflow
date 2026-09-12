@@ -12,6 +12,10 @@ export type RequestStatus =
   | "ReceivedBySaudiAgent"
   | "SaudiAgentProcessing"
   | "SaudiAgentCorrectionRequired"
+  | "ProgramLinked"
+  | "HostingAcceptanceRequested"
+  | "HostingAcceptedBySender"
+  | "HostingConfirmed"
   | "Completed"
   | "Cancelled"
   | "Archived";

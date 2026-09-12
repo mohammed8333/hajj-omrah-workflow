@@ -109,11 +109,21 @@ export default function DashboardPage() {
         r.status === "SaudiAgentCorrectionRequired"
       );
     if (activeTab === "READY_AGENT") return r.status === "ReadyForSaudiAgent";
+    if (activeTab === "HOSTING")
+      return (
+        r.status === "HostingAcceptanceRequested" ||
+        r.status === "HostingAcceptedBySender" ||
+        r.status === "HostingConfirmed"
+      );
     if (activeTab === "AGENT_INBOX")
       return (
         r.status === "ReadyForSaudiAgent" ||
         r.status === "ReceivedBySaudiAgent" ||
-        r.status === "SaudiAgentProcessing"
+        r.status === "SaudiAgentProcessing" ||
+        r.status === "ProgramLinked" ||
+        r.status === "HostingAcceptanceRequested" ||
+        r.status === "HostingAcceptedBySender" ||
+        r.status === "HostingConfirmed"
       );
     if (activeTab === "COMPLETED") return r.status === "Completed";
 
@@ -354,6 +364,25 @@ export default function DashboardPage() {
                 }`}
               >
                 المسودات والمقدمة
+              </button>
+              <button
+                onClick={() => setActiveTab("HOSTING")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap cursor-pointer transition-colors ${
+                  activeTab === "HOSTING"
+                    ? "bg-amber-600 text-white"
+                    : "text-gray-600 hover:bg-gray-100"
+                }`}
+              >
+                طلبات الاستضافة (
+                {
+                  requests.filter(
+                    (r) =>
+                      r.status === "HostingAcceptanceRequested" ||
+                      r.status === "HostingAcceptedBySender" ||
+                      r.status === "HostingConfirmed"
+                  ).length
+                }
+                )
               </button>
               <button
                 onClick={() => setActiveTab("ISSUES")}

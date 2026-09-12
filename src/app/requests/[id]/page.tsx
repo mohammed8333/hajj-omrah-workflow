@@ -35,6 +35,7 @@ import {
   Key,
   Calendar,
   Phone,
+  Link2,
 } from "lucide-react";
 
 export default function RequestDetailPage({
@@ -287,6 +288,62 @@ export default function RequestDetailPage({
     }
   };
 
+  const handleLinkProgram = async () => {
+    try {
+      setActionLoading(true);
+      setError(null);
+      await api.requests.linkProgram(requestId, "تم ربط البرنامج بنجاح من قبل الوكيل السعودي");
+      setSuccess("تم ربط البرنامج بنجاح. يمكنك الآن طلب قبول الاستضافة.");
+      await loadRequest();
+    } catch (err: unknown) {
+      if (err instanceof Error) setError(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRequestHostingAcceptance = async () => {
+    try {
+      setActionLoading(true);
+      setError(null);
+      await api.requests.requestHostingAcceptance(requestId, "تم إرسال طلب قبول الاستضافة إلى المرسل للموافقة والتأكيد");
+      setSuccess("تم إرسال طلب قبول الاستضافة بنجاح وإحالة المعاملة للمرسل.");
+      await loadRequest();
+    } catch (err: unknown) {
+      if (err instanceof Error) setError(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleAcceptHosting = async () => {
+    try {
+      setActionLoading(true);
+      setError(null);
+      await api.requests.acceptHosting(requestId, "تم قبول طلب الاستضافة من قبل المرسل");
+      setSuccess("تم قبول طلب الاستضافة. يمكنك الآن تأكيد الاستضافة للوكيل.");
+      await loadRequest();
+    } catch (err: unknown) {
+      if (err instanceof Error) setError(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleConfirmHosting = async () => {
+    try {
+      setActionLoading(true);
+      setError(null);
+      await api.requests.confirmHosting(requestId, "تم تأكيد الاستضافة وإحالتها للوكيل السعودي للاعتماد النهائي");
+      setSuccess("تم تأكيد الاستضافة للوكيل السعودي بنجاح.");
+      await loadRequest();
+    } catch (err: unknown) {
+      if (err instanceof Error) setError(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleSubmitCorrection = async () => {
     if (!correctionReason.trim()) {
       alert("يرجى كتابة سبب طلب التصحيح.");
@@ -355,6 +412,7 @@ export default function RequestDetailPage({
 
   const isSafaReviewer = role === "SafaEmployee" || role === "Admin";
   const isAgent = role === "SaudiAgent" || role === "Admin";
+  const isSender = role === "Sender" || role === "Admin";
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
@@ -497,6 +555,7 @@ export default function RequestDetailPage({
               </button>
             )}
 
+            {/* Step 1: Saudi Agent after receiving sees "طلب تصحيح" + "تم ربط البرنامج" */}
             {isAgent &&
               (request.status === "ReceivedBySaudiAgent" ||
                 request.status === "SaudiAgentProcessing") && (
@@ -513,15 +572,63 @@ export default function RequestDetailPage({
                   </button>
 
                   <button
-                    onClick={handleAgentComplete}
+                    onClick={handleLinkProgram}
                     disabled={actionLoading}
-                    className="bg-green-600 hover:bg-green-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
+                    className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
                   >
-                    <Check className="w-3.5 h-3.5" />
-                    <span>اعتماد وإنهاء المعاملة ✓</span>
+                    <Link2 className="w-3.5 h-3.5" />
+                    <span>تم ربط البرنامج</span>
                   </button>
                 </>
               )}
+
+            {/* Step 2: Saudi Agent after Program Linked sees "طلب قبول الاستضافة" (Correction button is hidden) */}
+            {isAgent && request.status === "ProgramLinked" && (
+              <button
+                onClick={handleRequestHostingAcceptance}
+                disabled={actionLoading}
+                className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
+              >
+                <Home className="w-3.5 h-3.5" />
+                <span>طلب قبول الاستضافة</span>
+              </button>
+            )}
+
+            {/* Step 3: Sender when HostingAcceptanceRequested sees "تم قبول طلب الاستضافة" */}
+            {isSender && request.status === "HostingAcceptanceRequested" && (
+              <button
+                onClick={handleAcceptHosting}
+                disabled={actionLoading}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>تم قبول طلب الاستضافة</span>
+              </button>
+            )}
+
+            {/* Step 4: Sender when HostingAcceptedBySender sees "تأكيد الاستضافة للوكيل" */}
+            {isSender && request.status === "HostingAcceptedBySender" && (
+              <button
+                onClick={handleConfirmHosting}
+                disabled={actionLoading}
+                className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>تأكيد الاستضافة للوكيل</span>
+              </button>
+            )}
+
+            {/* Step 5: Saudi Agent when HostingConfirmed sees "تم اعتماده وإنهاء المعاملة ✓" */}
+            {isAgent && request.status === "HostingConfirmed" && (
+              <button
+                onClick={handleAgentComplete}
+                disabled={actionLoading}
+                className="bg-green-600 hover:bg-green-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>تم اعتماده وإنهاء المعاملة ✓</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -537,6 +644,67 @@ export default function RequestDetailPage({
         <div className="p-4 rounded-xl bg-green-50 border border-green-200 text-green-700 text-sm flex items-center gap-3">
           <CheckCircle className="w-5 h-5 shrink-0 text-green-500" />
           <span>{success}</span>
+        </div>
+      )}
+
+      {/* Workflow Phase Info Banners */}
+      {request.status === "ProgramLinked" && isAgent && (
+        <div className="p-4 rounded-xl bg-purple-50 border border-purple-200 text-purple-800 text-xs sm:text-sm flex items-center gap-3">
+          <Link2 className="w-5 h-5 shrink-0 text-purple-600" />
+          <span>
+            <strong>تم ربط البرنامج بنجاح:</strong> يرجى الضغط على زر <strong>&quot;طلب قبول الاستضافة&quot;</strong> لإحالة المعاملة إلى المرسل.
+          </span>
+        </div>
+      )}
+
+      {request.status === "HostingAcceptanceRequested" && (
+        <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs sm:text-sm flex items-center gap-3">
+          <Home className="w-5 h-5 shrink-0 text-amber-600" />
+          <span>
+            {isSender ? (
+              <>
+                <strong>طلب قبول الاستضافة:</strong> أرسل الوكيل السعودي طلباً لقبول الاستضافة لهذه المجموعة. يرجى الضغط على <strong>&quot;تم قبول طلب الاستضافة&quot;</strong> للمتابعة.
+              </>
+            ) : (
+              <>
+                <strong>بانتظار قبول الاستضافة:</strong> تمت إحالة المعاملة للمرسل لقبول الاستضافة وتأكيدها.
+              </>
+            )}
+          </span>
+        </div>
+      )}
+
+      {request.status === "HostingAcceptedBySender" && (
+        <div className="p-4 rounded-xl bg-sky-50 border border-sky-200 text-sky-800 text-xs sm:text-sm flex items-center gap-3">
+          <CheckCircle className="w-5 h-5 shrink-0 text-sky-600" />
+          <span>
+            {isSender ? (
+              <>
+                <strong>تم قبول الاستضافة:</strong> يرجى الآن الضغط على زر <strong>&quot;تأكيد الاستضافة للوكيل&quot;</strong> لإعادتها للوكيل للاعتماد النهائي.
+              </>
+            ) : (
+              <>
+                <strong>تم قبول الاستضافة من المرسل:</strong> بانتظار تأكيد الإرسال النهائي للوكيل.
+              </>
+            )}
+          </span>
+        </div>
+      )}
+
+      {request.status === "HostingConfirmed" && (
+        <div className="p-4 rounded-xl bg-teal-50 border border-teal-200 text-teal-800 text-xs sm:text-sm flex items-center gap-3">
+          <CheckCircle className="w-5 h-5 shrink-0 text-teal-600" />
+          <span>
+            {isAgent ? (
+              <>
+                <strong>تم تأكيد الاستضافة بنجاح:</strong> قام المرسل بتأكيد الاستضافة، المعاملة جاهزة الآن للاعتماد النهائي عبر زر <strong>&quot;تم اعتماده وإنهاء المعاملة ✓&quot;</strong>.
+              </>
+            ) : (
+              <>
+                <strong>تم تأكيد الاستضافة للوكيل:</strong> المعاملة الآن لدى الوكيل السعودي للاعتماد النهائي وإصدار التأشيرات.
+              </>
+            )}
+          </span>
         </div>
       )}
 

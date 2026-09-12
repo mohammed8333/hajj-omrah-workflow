@@ -1087,6 +1087,118 @@ class LocalDatabaseEngine {
     );
   }
 
+  public agentLinkProgram(id: string, note?: string, currentUser?: User) {
+    const req = this.requests.find((r) => r.id === id);
+    if (!req) throw new Error("المعاملة غير موجودة");
+
+    const prev = req.status;
+    req.status = "ProgramLinked";
+    req.updatedAt = new Date().toISOString();
+
+    req.statusHistories.unshift({
+      id: "sh-" + Date.now(),
+      groupRequestId: req.id,
+      fromStatus: prev,
+      toStatus: "ProgramLinked",
+      changedById: currentUser?.id || "agent",
+      changedByName: currentUser?.fullName || "الوكيل السعودي",
+      note: note || "تم ربط البرنامج بنجاح من قبل الوكيل السعودي",
+      createdAt: new Date().toISOString(),
+    });
+
+    this.persistRequests();
+    this.logAction(
+      currentUser || null,
+      `تم ربط البرنامج للمعاملة (${req.requestNumber})`,
+      "GroupRequest",
+      req.id
+    );
+  }
+
+  public agentRequestHostingAcceptance(id: string, note?: string, currentUser?: User) {
+    const req = this.requests.find((r) => r.id === id);
+    if (!req) throw new Error("المعاملة غير موجودة");
+
+    const prev = req.status;
+    req.status = "HostingAcceptanceRequested";
+    req.updatedAt = new Date().toISOString();
+
+    req.statusHistories.unshift({
+      id: "sh-" + Date.now(),
+      groupRequestId: req.id,
+      fromStatus: prev,
+      toStatus: "HostingAcceptanceRequested",
+      changedById: currentUser?.id || "agent",
+      changedByName: currentUser?.fullName || "الوكيل السعودي",
+      note: note || "تم إرسال طلب قبول الاستضافة إلى المرسل للموافقة والتأكيد",
+      createdAt: new Date().toISOString(),
+    });
+
+    this.persistRequests();
+    this.logAction(
+      currentUser || null,
+      `طلب قبول الاستضافة للمعاملة (${req.requestNumber}) وإحالتها للمرسل`,
+      "GroupRequest",
+      req.id
+    );
+  }
+
+  public senderAcceptHosting(id: string, note?: string, currentUser?: User) {
+    const req = this.requests.find((r) => r.id === id);
+    if (!req) throw new Error("المعاملة غير موجودة");
+
+    const prev = req.status;
+    req.status = "HostingAcceptedBySender";
+    req.updatedAt = new Date().toISOString();
+
+    req.statusHistories.unshift({
+      id: "sh-" + Date.now(),
+      groupRequestId: req.id,
+      fromStatus: prev,
+      toStatus: "HostingAcceptedBySender",
+      changedById: currentUser?.id || "sender",
+      changedByName: currentUser?.fullName || "المرسل",
+      note: note || "تم قبول طلب الاستضافة من قبل المرسل",
+      createdAt: new Date().toISOString(),
+    });
+
+    this.persistRequests();
+    this.logAction(
+      currentUser || null,
+      `قبول طلب الاستضافة للمعاملة (${req.requestNumber}) من المرسل`,
+      "GroupRequest",
+      req.id
+    );
+  }
+
+  public senderConfirmHosting(id: string, note?: string, currentUser?: User) {
+    const req = this.requests.find((r) => r.id === id);
+    if (!req) throw new Error("المعاملة غير موجودة");
+
+    const prev = req.status;
+    req.status = "HostingConfirmed";
+    req.updatedAt = new Date().toISOString();
+
+    req.statusHistories.unshift({
+      id: "sh-" + Date.now(),
+      groupRequestId: req.id,
+      fromStatus: prev,
+      toStatus: "HostingConfirmed",
+      changedById: currentUser?.id || "sender",
+      changedByName: currentUser?.fullName || "المرسل",
+      note: note || "تم تأكيد الاستضافة وإحالتها للوكيل السعودي للاعتماد النهائي",
+      createdAt: new Date().toISOString(),
+    });
+
+    this.persistRequests();
+    this.logAction(
+      currentUser || null,
+      `تأكيد الاستضافة للمعاملة (${req.requestNumber}) وإعادتها للوكيل`,
+      "GroupRequest",
+      req.id
+    );
+  }
+
   public agentComplete(id: string, note?: string, currentUser?: User) {
     const req = this.requests.find((r) => r.id === id);
     if (!req) throw new Error("المعاملة غير موجودة");

@@ -153,6 +153,10 @@ export default function RequestsListPage() {
               <option value="SafaRegistrationCompleted">اكتمل تسجيل صفا</option>
               <option value="ReadyForSaudiAgent">جاهز للوكيل السعودي</option>
               <option value="ReceivedBySaudiAgent">مستلم من الوكيل</option>
+              <option value="ProgramLinked">تم ربط البرنامج</option>
+              <option value="HostingAcceptanceRequested">بانتظار قبول الاستضافة</option>
+              <option value="HostingAcceptedBySender">تم قبول الاستضافة</option>
+              <option value="HostingConfirmed">تم تأكيد الاستضافة</option>
               <option value="SaudiAgentProcessing">قيد المعالجة</option>
               <option value="Completed">مكتمل نهائياً</option>
               <option value="Cancelled">ملغي</option>

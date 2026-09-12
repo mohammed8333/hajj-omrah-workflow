@@ -197,6 +197,46 @@ export const api = {
       return { message: "تم استلام المعاملة من قبل الوكيل السعودي" };
     },
 
+    linkProgram: async (
+      id: string,
+      note?: string
+    ): Promise<{ message: string }> => {
+      await delay();
+      const current = await api.auth.getMe();
+      localDB.agentLinkProgram(id, note, current);
+      return { message: "تم ربط البرنامج بنجاح" };
+    },
+
+    requestHostingAcceptance: async (
+      id: string,
+      note?: string
+    ): Promise<{ message: string }> => {
+      await delay();
+      const current = await api.auth.getMe();
+      localDB.agentRequestHostingAcceptance(id, note, current);
+      return { message: "تم إرسال طلب قبول الاستضافة للمرسل" };
+    },
+
+    acceptHosting: async (
+      id: string,
+      note?: string
+    ): Promise<{ message: string }> => {
+      await delay();
+      const current = await api.auth.getMe();
+      localDB.senderAcceptHosting(id, note, current);
+      return { message: "تم قبول طلب الاستضافة" };
+    },
+
+    confirmHosting: async (
+      id: string,
+      note?: string
+    ): Promise<{ message: string }> => {
+      await delay();
+      const current = await api.auth.getMe();
+      localDB.senderConfirmHosting(id, note, current);
+      return { message: "تم تأكيد الاستضافة للوكيل السعودي بنجاح" };
+    },
+
     agentComplete: async (
       id: string,
       note?: string
