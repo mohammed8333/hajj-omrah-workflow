@@ -7,10 +7,28 @@
     <meta name="theme-color" content="#0284c7" />
     <title>نظام إدارة معاملات الحج والعمرة والسياحة</title>
     <meta name="description" content="منظومة إلكترونية متكاملة لإدارة وتدقيق مستندات وسير معاملات المعتمرين والزوار والوكلاء" />
-    <script type="module" crossorigin src="./assets/index-BOmjp2sI.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-ajoZvdUI.css">
+    <script type="module" crossorigin src="./assets/index-DXS_zS1p.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-CBgUnU8k.css">
   </head>
   <body class="min-h-full flex flex-col font-sans bg-gray-50 text-gray-900 selection:bg-sky-500 selection:text-white">
     <div id="root" class="min-h-full flex flex-col flex-1"></div>
+    <script>
+      (function () {
+        try {
+          var search = window.location.search;
+          if (search) {
+            var params = new URLSearchParams(search);
+            var req = params.get("requestId") || params.get("req");
+            var doc = params.get("docId") || params.get("doc");
+            if (req) {
+              var targetHash = "#/requests/" + encodeURIComponent(req) + (doc ? "?docId=" + encodeURIComponent(doc) : "");
+              if (window.location.hash !== targetHash) {
+                window.location.hash = targetHash;
+              }
+            }
+          }
+        } catch (e) {}
+      })();
+    </script>
   </body>
 </html>

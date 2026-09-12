@@ -940,7 +940,10 @@ class LocalDatabaseEngine {
 
   public getRequestById(id: string): GroupRequestDetail {
     this.applyAutoMaintenance();
-    const req = this.requests.find((r) => r.id === id);
+    const cleanId = (id || "").trim().split("?")[0];
+    const req = this.requests.find(
+      (r) => r.id === cleanId || r.requestNumber === cleanId || r.id === id
+    );
     if (!req) throw new Error("المعاملة المطلوبة غير موجودة");
 
     if (req.hasHosting || req.hostingInfo) {

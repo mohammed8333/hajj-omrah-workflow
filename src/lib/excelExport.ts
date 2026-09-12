@@ -9,7 +9,7 @@ function buildDocUrl(requestId: string, docId: string): string {
   const pathname = window.location.pathname.endsWith("/")
     ? window.location.pathname
     : window.location.pathname.substring(0, window.location.pathname.lastIndexOf("/") + 1);
-  return `${origin}${pathname}#/requests/${requestId}?docId=${docId}`;
+  return `${origin}${pathname}?requestId=${encodeURIComponent(requestId)}&docId=${encodeURIComponent(docId)}`;
 }
 
 // Helpers to extract documents from a request

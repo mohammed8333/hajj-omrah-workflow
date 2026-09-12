@@ -10,6 +10,19 @@ export default function Home() {
 
   useEffect(() => {
     if (!loading) {
+      if (typeof window !== "undefined") {
+        const search = window.location.search;
+        if (search) {
+          const params = new URLSearchParams(search);
+          const req = params.get("requestId") || params.get("req");
+          const doc = params.get("docId") || params.get("doc");
+          if (req) {
+            router.replace(`/requests/${req}${doc ? `?docId=${doc}` : ""}`);
+            return;
+          }
+        }
+      }
+
       if (user) {
         router.push("/dashboard");
       } else {

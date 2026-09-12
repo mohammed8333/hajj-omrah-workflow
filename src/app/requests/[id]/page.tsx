@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useState, use } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useParams } from "react-router-dom";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import {
@@ -43,11 +44,15 @@ import {
 } from "lucide-react";
 
 export default function RequestDetailPage({
+  requestId: propRequestId,
   params,
 }: {
-  params: Promise<{ id: string }>;
+  requestId?: string;
+  params?: Promise<{ id: string }> | { id: string };
 }) {
-  const { id: requestId } = use(params);
+  const routeParams = useParams<{ id: string }>();
+  const rawId = propRequestId || routeParams?.id || "";
+  const requestId = (rawId || "").split("?")[0];
   const router = useRouter();
   const { user, role } = useAuth();
 
@@ -59,6 +64,8 @@ export default function RequestDetailPage({
 
   // Modals state
   const [previewDoc, setPreviewDoc] = useState<DocumentItem | null>(null);
+  const [previewDocUrl, setPreviewDocUrl] = useState<string | null>(null);
+  const [previewDocLoading, setPreviewDocLoading] = useState(false);
   const [reviewModalDoc, setReviewModalDoc] = useState<DocumentItem | null>(null);
   const [reviewStatus, setReviewStatus] = useState<DocumentReviewStatus>("Accepted");
   const [reviewNote, setReviewNote] = useState("");
@@ -90,6 +97,33 @@ export default function RequestDetailPage({
   const [editFlightDepartureTime, setEditFlightDepartureTime] = useState("");
   const [editAirportArrivalTime, setEditAirportArrivalTime] = useState("");
 
+  useEffect(() => {
+    let isMounted = true;
+    if (previewDoc) {
+      setPreviewDocLoading(true);
+      api.documents
+        .getStreamUrl(previewDoc.id)
+        .then((url) => {
+          if (isMounted) {
+            setPreviewDocUrl(url);
+            setPreviewDocLoading(false);
+          }
+        })
+        .catch(() => {
+          if (isMounted) {
+            setPreviewDocUrl(null);
+            setPreviewDocLoading(false);
+          }
+        });
+    } else {
+      setPreviewDocUrl(null);
+      setPreviewDocLoading(false);
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [previewDoc]);
+
   const loadRequest = async (isInitial = false) => {
     try {
       if (isInitial) {
@@ -105,10 +139,11 @@ export default function RequestDetailPage({
       // If URL contains docId (e.g. clicked from Excel export), auto-open preview modal
       if (typeof window !== "undefined") {
         const urlParams = new URLSearchParams(window.location.search);
-        let targetDocId = urlParams.get("docId");
+        let targetDocId = urlParams.get("docId") || urlParams.get("doc");
         if (!targetDocId && window.location.hash.includes("?")) {
           const hashQuery = window.location.hash.split("?")[1];
-          targetDocId = new URLSearchParams(hashQuery).get("docId");
+          const hashParams = new URLSearchParams(hashQuery);
+          targetDocId = hashParams.get("docId") || hashParams.get("doc");
         }
         if (targetDocId) {
           let foundDoc = data.groupDocuments?.find((d) => d.id === targetDocId);
@@ -122,6 +157,26 @@ export default function RequestDetailPage({
                 foundDoc = d;
                 break;
               }
+            }
+          }
+          // Fallback by documentType
+          if (!foundDoc) {
+            if (targetDocId === "HostId" || targetDocId === "host") {
+              foundDoc =
+                data.hostingInfo?.hostIdDocument ||
+                data.groupDocuments?.find((d) => d.documentType === "HostId");
+            } else if (targetDocId === "Passport" || targetDocId === "pass") {
+              foundDoc =
+                data.travelers?.[0]?.documents?.find((d) => d.documentType === "Passport") ||
+                data.groupDocuments?.find((d) => d.documentType === "Passport");
+            } else if (targetDocId === "PersonalPhoto" || targetDocId === "photo") {
+              foundDoc =
+                data.travelers?.[0]?.documents?.find((d) => d.documentType === "PersonalPhoto") ||
+                data.groupDocuments?.find((d) => d.documentType === "PersonalPhoto");
+            } else if (targetDocId === "FlightTicket" || targetDocId === "ticket") {
+              foundDoc =
+                data.travelers?.[0]?.documents?.find((d) => d.documentType === "FlightTicket") ||
+                data.groupDocuments?.find((d) => d.documentType === "FlightTicket");
             }
           }
           if (foundDoc) {
@@ -640,14 +695,26 @@ export default function RequestDetailPage({
 
   if (!request) {
     return (
-      <div className="bg-white p-8 rounded-2xl border border-gray-200 text-center">
-        <h2 className="text-lg font-bold text-gray-800">المعاملة غير موجودة</h2>
-        <button
-          onClick={() => router.push("/dashboard")}
-          className="mt-4 text-xs font-semibold text-sky-600 hover:underline"
-        >
-          العودة للوحة التحكم
-        </button>
+      <div className="bg-white p-8 rounded-2xl border border-gray-200 text-center max-w-md mx-auto my-12 shadow-xs">
+        <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-3" />
+        <h2 className="text-lg font-bold text-gray-800 mb-1">المعاملة غير متوفرة</h2>
+        <p className="text-xs text-gray-500 mb-4 leading-relaxed">
+          تعذر العثور على المعاملة المطلوبة في هذا المتصفح. قد تكون مسجلة تحت حساب أو جهاز آخر، أو تم حذفها.
+        </p>
+        <div className="flex justify-center gap-3">
+          <button
+            onClick={() => router.push("/requests")}
+            className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
+          >
+            عرض كافة المعاملات
+          </button>
+          <button
+            onClick={() => router.push("/dashboard")}
+            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+          >
+            الرئيسية
+          </button>
+        </div>
       </div>
     );
   }
@@ -1706,17 +1773,19 @@ export default function RequestDetailPage({
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <a
-                  href={api.documents.getStreamUrl(previewDoc.id)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg text-xs font-semibold transition-colors"
-                >
-                  فتح في نافذة مستقلة
-                </a>
+                {previewDocUrl && (
+                  <a
+                    href={previewDocUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg text-xs font-semibold transition-colors"
+                  >
+                    فتح في نافذة مستقلة
+                  </a>
+                )}
                 <button
                   onClick={() => setPreviewDoc(null)}
-                  className="p-1 rounded-lg text-gray-500 hover:bg-gray-200"
+                  className="p-1 rounded-lg text-gray-500 hover:bg-gray-200 cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -1724,18 +1793,29 @@ export default function RequestDetailPage({
             </div>
 
             <div className="flex-1 bg-gray-900/5 p-4 overflow-auto flex items-center justify-center relative">
-              {previewDoc.mimeType === "application/pdf" ? (
-                <iframe
-                  src={api.documents.getStreamUrl(previewDoc.id)}
-                  className="w-full h-full rounded-lg border-0 bg-white"
-                  title="PDF Preview"
-                />
+              {previewDocLoading ? (
+                <div className="flex flex-col items-center justify-center p-8 text-gray-500">
+                  <div className="w-8 h-8 border-4 border-sky-600 border-t-transparent rounded-full animate-spin mb-3"></div>
+                  <span className="text-xs font-medium">جاري تحميل المستند...</span>
+                </div>
+              ) : previewDocUrl ? (
+                previewDoc.mimeType === "application/pdf" ? (
+                  <iframe
+                    src={previewDocUrl}
+                    className="w-full h-full rounded-lg border-0 bg-white"
+                    title="PDF Preview"
+                  />
+                ) : (
+                  <img
+                    src={previewDocUrl}
+                    alt="Document preview"
+                    className="max-h-full max-w-full object-contain rounded-lg shadow-md"
+                  />
+                )
               ) : (
-                <img
-                  src={api.documents.getStreamUrl(previewDoc.id)}
-                  alt="Document preview"
-                  className="max-h-full max-w-full object-contain rounded-lg shadow-md"
-                />
+                <div className="text-center p-6 text-gray-500 text-xs">
+                  تعذر استعراض المستند أو الملف غير متاح حالياً.
+                </div>
               )}
             </div>
           </div>

@@ -10,6 +10,24 @@
   </head>
   <body class="min-h-full flex flex-col font-sans bg-gray-50 text-gray-900 selection:bg-sky-500 selection:text-white">
     <div id="root" class="min-h-full flex flex-col flex-1"></div>
+    <script>
+      (function () {
+        try {
+          var search = window.location.search;
+          if (search) {
+            var params = new URLSearchParams(search);
+            var req = params.get("requestId") || params.get("req");
+            var doc = params.get("docId") || params.get("doc");
+            if (req) {
+              var targetHash = "#/requests/" + encodeURIComponent(req) + (doc ? "?docId=" + encodeURIComponent(doc) : "");
+              if (window.location.hash !== targetHash) {
+                window.location.hash = targetHash;
+              }
+            }
+          }
+        } catch (e) {}
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
