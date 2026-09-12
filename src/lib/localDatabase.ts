@@ -79,6 +79,20 @@ export async function clearIndexedDB(): Promise<void> {
   }
 }
 
+export async function deleteFileFromIndexedDB(id: string): Promise<void> {
+  try {
+    const db = await openIndexedDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, "readwrite");
+      tx.objectStore(IDB_STORE).delete(id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (e) {
+    console.warn("IndexedDB delete failed", e);
+  }
+}
+
 // ----------------------------------------------------
 // DEFAULT SEED DATA
 // ----------------------------------------------------
@@ -563,6 +577,8 @@ class LocalDatabaseEngine {
       this.auditLogs = [...DEFAULT_AUDIT_LOGS];
       this.persistLogs();
     }
+
+    this.applyAutoMaintenance();
   }
 
   private persistUsers() {
@@ -673,12 +689,191 @@ class LocalDatabaseEngine {
     };
   }
 
+  // --- Automatic Lifecycle Maintenance & Admin Controls ---
+  public deleteDocumentsForRequest(requestId: string) {
+    const req = this.requests.find((r) => r.id === requestId);
+    if (!req) return;
+    const docIds: string[] = [];
+    if (req.hostingInfo?.hostIdDocumentId) docIds.push(req.hostingInfo.hostIdDocumentId);
+    if (req.hostingInfo?.hostIdDocument?.id) docIds.push(req.hostingInfo.hostIdDocument.id);
+    req.groupDocuments?.forEach((d) => docIds.push(d.id));
+    req.travelers?.forEach((t) => t.documents?.forEach((d) => docIds.push(d.id)));
+
+    docIds.forEach((docId) => {
+      try {
+        deleteFileFromIndexedDB(docId);
+      } catch (e) {
+        console.warn("Could not delete file from IndexedDB:", e);
+      }
+    });
+  }
+
+  public applyAutoMaintenance(): { deletedCount: number; archivedCount: number } {
+    if (typeof window === "undefined") return { deletedCount: 0, archivedCount: 0 };
+
+    const now = Date.now();
+    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+    let deletedCount = 0;
+    let archivedCount = 0;
+    let stateChanged = false;
+
+    // 1. Delete requests older than 30 days from creation
+    const toKeep: GroupRequestDetail[] = [];
+    for (const req of this.requests) {
+      const createdTime = new Date(req.createdAt).getTime();
+      if (!isNaN(createdTime) && now - createdTime >= thirtyDaysMs) {
+        this.deleteDocumentsForRequest(req.id);
+        this.logAction(
+          null,
+          `حذف تلقائي للمعاملة (${req.requestNumber} - ${req.groupName}) لمرور 30 يوماً على إنشائها`,
+          "GroupRequest",
+          req.id
+        );
+        deletedCount++;
+        stateChanged = true;
+      } else {
+        toKeep.push(req);
+      }
+    }
+    this.requests = toKeep;
+
+    // 2. Auto-archive requests whose travel date/time has passed
+    for (const req of this.requests) {
+      if (req.status === "Archived" || req.status === "Cancelled") continue;
+
+      const dateStr = req.departureDate || req.travelDate;
+      if (!dateStr) continue;
+
+      let travelEpoch: number | null = null;
+      try {
+        const dateOnly = dateStr.split("T")[0];
+        if (req.flightDepartureTime && /^\d{1,2}:\d{2}$/.test(req.flightDepartureTime.trim())) {
+          const d = new Date(`${dateOnly}T${req.flightDepartureTime.trim()}:00`);
+          if (!isNaN(d.getTime())) travelEpoch = d.getTime();
+        }
+        if (travelEpoch === null) {
+          const d = new Date(`${dateOnly}T23:59:59`);
+          if (!isNaN(d.getTime())) travelEpoch = d.getTime();
+        }
+      } catch {
+        const d = new Date(dateStr);
+        if (!isNaN(d.getTime())) travelEpoch = d.getTime();
+      }
+
+      if (travelEpoch !== null && now >= travelEpoch) {
+        const prevStatus = req.status;
+        req.status = "Archived";
+        req.updatedAt = new Date().toISOString();
+        req.statusHistories.unshift({
+          id: "sh-auto-arch-" + Date.now(),
+          groupRequestId: req.id,
+          fromStatus: prevStatus,
+          toStatus: "Archived",
+          changedById: "system",
+          changedByName: "النظام التلقائي",
+          note: "أرشفة تلقائية لانتهاء موعد وتاريخ السفر المحدد للمجموعة",
+          createdAt: new Date().toISOString(),
+        });
+        this.logAction(
+          null,
+          `أرشفة تلقائية للمعاملة (${req.requestNumber} - ${req.groupName}) لانتهاء موعد السفر`,
+          "GroupRequest",
+          req.id
+        );
+        archivedCount++;
+        stateChanged = true;
+      }
+    }
+
+    if (stateChanged) {
+      this.persistRequests();
+    }
+
+    return { deletedCount, archivedCount };
+  }
+
+  public deleteRequest(id: string, currentUser?: User): void {
+    if (currentUser && currentUser.role !== "Admin") {
+      throw new Error("عذراً، هذه الصلاحية مقتصرة فقط على مدير النظام (Admin).");
+    }
+    const index = this.requests.findIndex((r) => r.id === id);
+    if (index === -1) throw new Error("المعاملة غير موجودة");
+    const removed = this.requests[index];
+    this.deleteDocumentsForRequest(id);
+    this.requests.splice(index, 1);
+    this.persistRequests();
+    this.logAction(
+      currentUser || null,
+      `حذف المعاملة نهائياً من قبل الإدارة: ${removed.groupName} (${removed.requestNumber})`,
+      "GroupRequest",
+      id
+    );
+  }
+
+  public archiveRequest(id: string, reason?: string, currentUser?: User): void {
+    if (currentUser && currentUser.role !== "Admin") {
+      throw new Error("عذراً، هذه الصلاحية مقتصرة فقط على مدير النظام (Admin).");
+    }
+    const req = this.requests.find((r) => r.id === id);
+    if (!req) throw new Error("المعاملة غير موجودة");
+    const prev = req.status;
+    req.status = "Archived";
+    req.updatedAt = new Date().toISOString();
+    req.statusHistories.unshift({
+      id: "sh-" + Date.now(),
+      groupRequestId: req.id,
+      fromStatus: prev,
+      toStatus: "Archived",
+      changedById: currentUser?.id || "admin",
+      changedByName: currentUser?.fullName || "مدير النظام",
+      note: reason || "تمت أرشفة المعاملة يدوياً بواسطة مدير النظام",
+      createdAt: new Date().toISOString(),
+    });
+    this.persistRequests();
+    this.logAction(
+      currentUser || null,
+      `أرشفة المعاملة: ${req.groupName} (${req.requestNumber})`,
+      "GroupRequest",
+      req.id
+    );
+  }
+
+  public unarchiveRequest(id: string, currentUser?: User): void {
+    if (currentUser && currentUser.role !== "Admin") {
+      throw new Error("عذراً، هذه الصلاحية مقتصرة فقط على مدير النظام (Admin).");
+    }
+    const req = this.requests.find((r) => r.id === id);
+    if (!req) throw new Error("المعاملة غير موجودة");
+    const lastNonArch = req.statusHistories.find((h) => h.toStatus !== "Archived")?.toStatus || "UnderReview";
+    const prev = req.status;
+    req.status = lastNonArch;
+    req.updatedAt = new Date().toISOString();
+    req.statusHistories.unshift({
+      id: "sh-" + Date.now(),
+      groupRequestId: req.id,
+      fromStatus: prev,
+      toStatus: lastNonArch,
+      changedById: currentUser?.id || "admin",
+      changedByName: currentUser?.fullName || "مدير النظام",
+      note: "إلغاء أرشفة المعاملة واستعادتها بواسطة مدير النظام",
+      createdAt: new Date().toISOString(),
+    });
+    this.persistRequests();
+    this.logAction(
+      currentUser || null,
+      `إلغاء أرشفة المعاملة واستعادتها: ${req.groupName} (${req.requestNumber})`,
+      "GroupRequest",
+      req.id
+    );
+  }
+
   // --- Requests ---
   public getRequests(
     statusFilter?: string,
     nusukNumber?: string,
     search?: string
   ): GroupRequestSummary[] {
+    this.applyAutoMaintenance();
     let list = this.requests.map((r) => {
       let docCount = r.groupDocuments.length;
       r.travelers.forEach((t) => {
@@ -744,6 +939,7 @@ class LocalDatabaseEngine {
   }
 
   public getRequestById(id: string): GroupRequestDetail {
+    this.applyAutoMaintenance();
     const req = this.requests.find((r) => r.id === id);
     if (!req) throw new Error("المعاملة المطلوبة غير موجودة");
 

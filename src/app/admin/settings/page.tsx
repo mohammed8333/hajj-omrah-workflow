@@ -20,6 +20,10 @@ import {
   Files,
   X,
   FileText,
+  Hourglass,
+  Clock,
+  Archive,
+  Plane,
 } from "lucide-react";
 
 export default function AdminSettingsPage() {
@@ -120,6 +124,24 @@ export default function AdminSettingsPage() {
       await loadStats();
     } catch (err: any) {
       setError(err.message || "حدث خطأ أثناء مسح البيانات");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Handle Run Auto Maintenance
+  const handleRunMaintenance = async () => {
+    try {
+      setActionLoading(true);
+      setError(null);
+      setSuccess(null);
+      const res = await api.requests.runAutoMaintenance();
+      setSuccess(
+        `تم تشغيل الصيانة التلقائية بنجاح: تم حذف (${res.deletedCount}) معاملة تجاوزت 30 يوماً، وأرشفة (${res.archivedCount}) معاملة انقضى موعد سفرها.`
+      );
+      await loadStats();
+    } catch (err: any) {
+      setError(err.message || "حدث خطأ أثناء تشغيل الصيانة");
     } finally {
       setActionLoading(false);
     }
@@ -319,6 +341,67 @@ export default function AdminSettingsPage() {
               <AlertTriangle className="w-4 h-4" />
               <span>مسح البيانات بالكامل (ضبط المصنع)</span>
             </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Section 3: Automatic Maintenance & Lifecycle Rules */}
+      <div className="bg-white rounded-2xl border border-indigo-100 p-6 shadow-xs relative overflow-hidden">
+        <div className="absolute top-0 right-0 left-0 h-1.5 bg-gradient-to-r from-indigo-500 via-sky-500 to-amber-500" />
+        
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-gray-100 mb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-3 rounded-xl bg-indigo-50 text-indigo-700">
+              <Clock className="w-6 h-6" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">
+                جدولة الصيانة والتدوير الذاتي للمعاملات
+              </h2>
+              <p className="text-xs text-gray-500">
+                مؤقتات وقواعد إدارة دورة حياة الطلبات المطبقة في النظام
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleRunMaintenance}
+            disabled={actionLoading}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl shadow-xs text-xs transition-colors cursor-pointer disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${actionLoading ? "animate-spin" : ""}`} />
+            <span>تشغيل فحص الصيانة التلقائية الآن</span>
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+          {/* Rule 1: 30-Day Deletion */}
+          <div className="bg-amber-50/60 border border-amber-200 rounded-xl p-4 space-y-2">
+            <div className="flex items-center gap-2 font-bold text-amber-900 text-sm">
+              <Hourglass className="w-4 h-4 text-amber-600" />
+              <span>قاعدة الحذف التلقائي (30 يوماً من الإنشاء)</span>
+            </div>
+            <p className="text-amber-800 leading-relaxed text-[11px]">
+              يقوم النظام تلقائياً وبشكل دوري بفحص كافة المعاملات وحذف أي معاملة مر على تاريخ إنشائها 30 يوماً بشكل كامل مع مسح كافة مرفقاتها ووثائق المعتمرين التابعة لها من الذاكرة المحلية (IndexedDB).
+            </p>
+            <div className="text-[10px] text-amber-700 font-medium bg-amber-100/70 px-2.5 py-1 rounded-md inline-block">
+              ✓ تطبق تلقائياً عند فتح قائمة المعاملات أو تشغيل الصيانة
+            </div>
+          </div>
+
+          {/* Rule 2: Travel Date Archival */}
+          <div className="bg-sky-50/60 border border-sky-200 rounded-xl p-4 space-y-2">
+            <div className="flex items-center gap-2 font-bold text-sky-900 text-sm">
+              <Plane className="w-4 h-4 text-sky-600" />
+              <span>قاعدة الأرشفة التلقائية (عند موعد السفر)</span>
+            </div>
+            <p className="text-sky-800 leading-relaxed text-[11px]">
+              تتحول أي معاملة نشطة تلقائياً إلى حالة «مؤرشف» فور انقضاء موعد وتاريخ إقلاع الرحلة المحدد لها لحفظها في الأرشيف التاريخي للنظام وتفادي تكدس المعاملات المنتهية.
+            </p>
+            <div className="text-[10px] text-sky-700 font-medium bg-sky-100/70 px-2.5 py-1 rounded-md inline-block">
+              ✓ تظهر شارة «مؤرشف» ويمكن لمدير النظام إلغاء أرشفتها في أي وقت
+            </div>
           </div>
         </div>
       </div>

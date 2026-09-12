@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { GroupRequestSummary } from "@/types";
 import { RequestStatusBadge } from "@/components/ui/StatusBadge";
+import { RequestLifecycleTimer } from "@/components/ui/RequestLifecycleTimer";
 import {
   FilePlus,
   Search,
@@ -17,6 +18,8 @@ import {
   Copy,
   Check,
   X,
+  Archive,
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -65,6 +68,45 @@ export default function RequestsListPage() {
     navigator.clipboard.writeText(nusuk);
     setCopiedNusuk(nusuk);
     setTimeout(() => setCopiedNusuk(null), 2000);
+  };
+
+  const handleAdminArchive = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm("هل أنت متأكد من رغبتك في أرشفة هذه المعاملة؟")) return;
+    try {
+      await api.requests.archive(id, "أرشفة يدوية بواسطة مدير النظام");
+      await loadRequests();
+    } catch (err: unknown) {
+      if (err instanceof Error) alert(err.message);
+    }
+  };
+
+  const handleAdminUnarchive = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm("هل ترغب في إلغاء أرشفة هذه المعاملة واستعادتها للحالة النشطة؟")) return;
+    try {
+      await api.requests.unarchive(id);
+      await loadRequests();
+    } catch (err: unknown) {
+      if (err instanceof Error) alert(err.message);
+    }
+  };
+
+  const handleAdminDelete = async (id: string, reqNumber: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const confirmation = prompt(
+      `تحذير أمني: أنت على وشك مسح المعاملة (${reqNumber}) وكافة وثائقها نهائياً!\nللتأكيد النهائي، اكتب (حذف) أو (delete):`
+    );
+    if (!confirmation || (confirmation.trim() !== "حذف" && confirmation.trim().toLowerCase() !== "delete")) {
+      return;
+    }
+    try {
+      await api.requests.delete(id);
+      alert("تم حذف المعاملة بالكامل بنجاح.");
+      await loadRequests();
+    } catch (err: unknown) {
+      if (err instanceof Error) alert(err.message);
+    }
   };
 
   const filtered = requests.filter((r) => {
@@ -160,6 +202,7 @@ export default function RequestsListPage() {
               <option value="SaudiAgentProcessing">قيد المعالجة</option>
               <option value="Completed">مكتمل نهائياً</option>
               <option value="Cancelled">ملغي</option>
+              <option value="Archived">معاملات مؤرشفة</option>
             </select>
           </div>
         </div>
@@ -299,6 +342,49 @@ export default function RequestsListPage() {
                   </div>
                 </div>
 
+                {/* Lifecycle Timer on Mobile */}
+                <div className="pt-2 border-t border-gray-100 flex items-center justify-between gap-2">
+                  <RequestLifecycleTimer
+                    createdAt={r.createdAt}
+                    travelDate={r.travelDate}
+                    departureDate={r.departureDate}
+                    flightDepartureTime={r.flightDepartureTime}
+                    status={r.status}
+                    mode="compact"
+                  />
+                  {role === "Admin" && (
+                    <div className="flex items-center gap-1 shrink-0">
+                      {r.status === "Archived" ? (
+                        <button
+                          type="button"
+                          onClick={(e) => handleAdminUnarchive(r.id, e)}
+                          className="p-1.5 text-amber-700 hover:bg-amber-50 rounded-lg text-xs"
+                          title="إلغاء الأرشفة"
+                        >
+                          <Archive className="w-3.5 h-3.5" />
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => handleAdminArchive(r.id, e)}
+                          className="p-1.5 text-purple-700 hover:bg-purple-50 rounded-lg text-xs"
+                          title="أرشفة المعاملة"
+                        >
+                          <Archive className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => handleAdminDelete(r.id, r.requestNumber, e)}
+                        className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg text-xs"
+                        title="مسح المعاملة"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+
                 <Link
                   href={`/requests/${r.id}`}
                   className="w-full flex items-center justify-center gap-1.5 text-xs font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 py-2 rounded-xl transition-colors"
@@ -322,6 +408,7 @@ export default function RequestsListPage() {
                     <th className="py-3.5 px-4">رقم مجموعة نسك</th>
                     <th className="py-3.5 px-4">المسافرين</th>
                     <th className="py-3.5 px-4">الاستضافة</th>
+                    <th className="py-3.5 px-4">دورة المعاملة</th>
                     <th className="py-3.5 px-4">تاريخ الإنشاء</th>
                     <th className="py-3.5 px-4 text-center">الإجراء</th>
                   </tr>
@@ -390,17 +477,63 @@ export default function RequestsListPage() {
                             {r.hasHosting ? "مشتركة" : "بدون"}
                           </span>
                         </td>
+                        <td className="py-3.5 px-4">
+                          <RequestLifecycleTimer
+                            createdAt={r.createdAt}
+                            travelDate={r.travelDate}
+                            departureDate={r.departureDate}
+                            flightDepartureTime={r.flightDepartureTime}
+                            status={r.status}
+                            mode="compact"
+                          />
+                        </td>
                         <td className="py-3.5 px-4 text-gray-500 whitespace-nowrap">
                           {new Date(r.createdAt).toLocaleDateString("ar-SA")}
                         </td>
                         <td className="py-3.5 px-4 text-center">
-                          <Link
-                            href={`/requests/${r.id}`}
-                            className="inline-flex items-center gap-1 text-sky-600 hover:text-sky-800 font-bold bg-sky-50 px-3 py-1.5 rounded-lg transition-colors"
-                          >
-                            <span>فتح</span>
-                            <ArrowRight className="w-3.5 h-3.5 rotate-180" />
-                          </Link>
+                          <div className="inline-flex items-center gap-1.5 justify-center">
+                            <Link
+                              href={`/requests/${r.id}`}
+                              className="inline-flex items-center gap-1 text-sky-600 hover:text-sky-800 font-bold bg-sky-50 px-2.5 py-1.5 rounded-lg transition-colors"
+                              title="فتح المعاملة"
+                            >
+                              <span>فتح</span>
+                              <ArrowRight className="w-3.5 h-3.5 rotate-180" />
+                            </Link>
+
+                            {role === "Admin" && (
+                              <div className="flex items-center gap-1 border-r border-gray-200 pr-1.5 mr-0.5">
+                                {r.status === "Archived" ? (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => handleAdminUnarchive(r.id, e)}
+                                    className="p-1.5 text-amber-700 hover:bg-amber-100 rounded-lg cursor-pointer transition-colors"
+                                    title="إلغاء الأرشفة"
+                                  >
+                                    <Archive className="w-3.5 h-3.5" />
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => handleAdminArchive(r.id, e)}
+                                    className="p-1.5 text-purple-700 hover:bg-purple-100 rounded-lg cursor-pointer transition-colors"
+                                    title="أرشفة المعاملة"
+                                  >
+                                    <Archive className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleAdminDelete(r.id, r.requestNumber, e)}
+                                  className="p-1.5 text-red-600 hover:bg-red-100 rounded-lg cursor-pointer transition-colors"
+                                  title="مسح المعاملة نهائياً"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );

@@ -14,6 +14,7 @@ import {
 } from "@/types";
 import { DocumentStatusBadge, RequestStatusBadge } from "@/components/ui/StatusBadge";
 import { DOCUMENT_TYPE_LABELS, REVIEW_STATUS_MAP } from "@/lib/constants";
+import { RequestLifecycleTimer } from "@/components/ui/RequestLifecycleTimer";
 import {
   Plane,
   Home,
@@ -37,6 +38,8 @@ import {
   Phone,
   Link2,
   RotateCcw,
+  Archive,
+  Hourglass,
 } from "lucide-react";
 
 export default function RequestDetailPage({
@@ -547,6 +550,57 @@ export default function RequestDetailPage({
     }
   };
 
+  const handleAdminArchive = async () => {
+    if (!confirm("هل أنت متأكد من رغبتك في أرشفة هذه المعاملة؟")) return;
+    try {
+      setActionLoading(true);
+      setError(null);
+      setSuccess(null);
+      await api.requests.archive(requestId, "أرشفة يدوية بواسطة مدير النظام");
+      setSuccess("تمت أرشفة المعاملة بنجاح وحفظها في الأرشيف.");
+      await loadRequest(false);
+    } catch (err: unknown) {
+      if (err instanceof Error) setError(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleAdminUnarchive = async () => {
+    if (!confirm("هل ترغب في إلغاء أرشفة هذه المعاملة واستعادتها للحالة النشطة؟")) return;
+    try {
+      setActionLoading(true);
+      setError(null);
+      setSuccess(null);
+      await api.requests.unarchive(requestId);
+      setSuccess("تم إلغاء أرشفة المعاملة واستعادتها للحالة النشطة بنجاح.");
+      await loadRequest(false);
+    } catch (err: unknown) {
+      if (err instanceof Error) setError(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleAdminDelete = async () => {
+    const confirmation = prompt(
+      `تحذير أمني: أنت على وشك مسح هذه المعاملة وكافة وثائقها وملفاتها نهائياً من النظام!\nللتأكيد النهائي، اكتب (حذف) أو (delete) في المربع أدناه:`
+    );
+    if (!confirmation || (confirmation.trim() !== "حذف" && confirmation.trim().toLowerCase() !== "delete")) {
+      return;
+    }
+    try {
+      setActionLoading(true);
+      setError(null);
+      await api.requests.delete(requestId);
+      alert("تم حذف المعاملة بالكامل وجميع مستنداتها بنجاح.");
+      router.push("/requests");
+    } catch (err: unknown) {
+      if (err instanceof Error) setError(err.message);
+      setActionLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-gray-500">
@@ -860,6 +914,55 @@ export default function RequestDetailPage({
                 <Check className="w-3.5 h-3.5" />
                 <span>تم اعتماده وإنهاء المعاملة ✓</span>
               </button>
+            )}
+
+            {/* Admin Management Actions: Archive & Delete */}
+            {role === "Admin" && (
+              <div className="flex items-center gap-1.5 border-r border-gray-200 pr-2 mr-1">
+                {request.status === "Archived" ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleAdminUnarchive();
+                    }}
+                    disabled={actionLoading}
+                    className="bg-amber-100 hover:bg-amber-200 text-amber-900 text-xs font-bold px-3 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                    title="إلغاء أرشفة المعاملة"
+                  >
+                    <Archive className="w-3.5 h-3.5" />
+                    <span>إلغاء الأرشفة</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleAdminArchive();
+                    }}
+                    disabled={actionLoading}
+                    className="bg-purple-100 hover:bg-purple-200 text-purple-900 text-xs font-bold px-3 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                    title="أرشفة المعاملة"
+                  >
+                    <Archive className="w-3.5 h-3.5" />
+                    <span>أرشفة</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleAdminDelete();
+                  }}
+                  disabled={actionLoading}
+                  className="bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold px-3 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer border border-red-200 transition-colors"
+                  title="حذف المعاملة نهائياً من النظام"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>مسح المعاملة</span>
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -1214,6 +1317,16 @@ export default function RequestDetailPage({
           </div>
         </div>
       )}
+
+      {/* Request Lifecycle Timer: 30-Day Auto-Deletion & Travel Auto-Archival */}
+      <RequestLifecycleTimer
+        createdAt={request.createdAt}
+        travelDate={request.travelDate}
+        departureDate={request.departureDate}
+        flightDepartureTime={request.flightDepartureTime}
+        status={request.status}
+        mode="detailed"
+      />
 
       {/* Flight & Travel Information Card */}
       <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-xs space-y-4">

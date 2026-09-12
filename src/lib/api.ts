@@ -271,6 +271,31 @@ export const api = {
       localDB.resolveCorrection(correctionId, resolutionNotes, current);
       return { message: "تم حل وتصحيح الملاحظة بنجاح" };
     },
+
+    delete: async (id: string): Promise<{ message: string }> => {
+      await delay();
+      const current = await api.auth.getMe();
+      localDB.deleteRequest(id, current);
+      return { message: "تم حذف المعاملة نهائياً بنجاح" };
+    },
+
+    archive: async (id: string, reason?: string): Promise<{ message: string }> => {
+      await delay();
+      const current = await api.auth.getMe();
+      localDB.archiveRequest(id, reason, current);
+      return { message: "تمت أرشفة المعاملة بنجاح" };
+    },
+
+    unarchive: async (id: string): Promise<{ message: string }> => {
+      await delay();
+      const current = await api.auth.getMe();
+      localDB.unarchiveRequest(id, current);
+      return { message: "تم إلغاء أرشفة المعاملة واستعادتها بنجاح" };
+    },
+
+    runAutoMaintenance: async (): Promise<{ deletedCount: number; archivedCount: number }> => {
+      return localDB.applyAutoMaintenance();
+    },
   },
 
   travelers: {
