@@ -51,43 +51,125 @@ function getTicketDocument(r: GroupRequestDetail) {
 }
 
 export function exportRequestsToExcel(requests: GroupRequestDetail[]) {
-  // 1. Prepare Main Sheet: Transactions (المعاملات)
-  const transactionsData = requests.map((r, index) => {
+  // 1. Prepare Main Sheet: Transactions with grouped traveler rows underneath
+  const transactionsData: any[] = [];
+  let transactionCounter = 1;
+
+  requests.forEach((r) => {
     const statusArabic = STATUS_MAP[r.status]?.label || r.status;
-
     const hostDoc = getHostDocument(r);
-    const passDoc = getPassportDocument(r);
-    const photoDoc = getPhotoDocument(r);
-    const ticketDoc = getTicketDocument(r);
-
     const hostLink = hostDoc ? buildDocUrl(r.id, hostDoc.id) : "لم يُرفع بعد";
-    const passLink = passDoc ? buildDocUrl(r.id, passDoc.id) : "لم يُرفع بعد";
-    const photoLink = photoDoc ? buildDocUrl(r.id, photoDoc.id) : "لم يُرفع بعد";
-    const ticketLink = ticketDoc ? buildDocUrl(r.id, ticketDoc.id) : "لم يُرفع بعد";
 
-    return {
-      "م": index + 1,
-      "رقم المعاملة": r.requestNumber,
-      "الحالة الحالية": statusArabic,
-      "عدد المعتمرين / المسافرين": r.travelers ? r.travelers.length : 0,
-      "رقم مجموعة نسك": r.nusukGroupNumber || "لم يُسجل بعد",
-      "وكيل الإرسال": r.senderName || "-",
-      "تاريخ السفر / الذهاب": r.departureDate || r.travelDate || "-",
-      "وقت إقلاع الطائرة": r.flightDepartureTime || "-",
-      "وقت تواجد المسافر في المطار": r.airportArrivalTime || "-",
-      "تاريخ العودة": r.returnDate || "-",
-      "رابط صورة الاستضافة": hostLink,
-      "رابط صورة الجواز": passLink,
-      "رابط الصورة الشخصية": photoLink,
-      "رابط تذكرة الطيران": ticketLink,
-      "يوجد استضافة / فندق": r.hasHosting ? "نعم" : "لا",
-      "اسم الفندق / المستضيف": r.hostingInfo?.hostName || "-",
-      "هاتف المستضيف": r.hostingInfo?.hostPhone || "-",
-      "عنوان المستضيف": r.hostingInfo?.hostAddress || "-",
-      "الملاحظات": r.notes || "-",
-      "تاريخ الإنشاء": new Date(r.createdAt).toLocaleString("ar-SA"),
-      "آخر تحديث": new Date(r.updatedAt).toLocaleString("ar-SA"),
-    };
+    const travelers = r.travelers && r.travelers.length > 0 ? r.travelers : null;
+
+    if (!travelers || travelers.length === 0) {
+      // Transaction has no registered travelers yet
+      const passDoc = getPassportDocument(r);
+      const photoDoc = getPhotoDocument(r);
+      const ticketDoc = getTicketDocument(r);
+
+      transactionsData.push({
+        "م": transactionCounter++,
+        "رقم المعاملة": r.requestNumber,
+        "الحالة الحالية": statusArabic,
+        "عدد المعتمرين / المسافرين": 0,
+        "رقم مجموعة نسك": r.nusukGroupNumber || "لم يُسجل بعد",
+        "وكيل الإرسال": r.senderName || "-",
+        "تاريخ السفر / الذهاب": r.departureDate || r.travelDate || "-",
+        "وقت إقلاع الطائرة": r.flightDepartureTime || "-",
+        "وقت تواجد المسافر في المطار": r.airportArrivalTime || "-",
+        "تاريخ العودة": r.returnDate || "-",
+        "اسم المعتمر / المسافر": "لا يوجد مسافرين مسجلين",
+        "رقم جواز السفر": "-",
+        "رابط صورة الجواز": passDoc ? buildDocUrl(r.id, passDoc.id) : "لم يُرفع بعد",
+        "رابط الصورة الشخصية": photoDoc ? buildDocUrl(r.id, photoDoc.id) : "لم يُرفع بعد",
+        "رابط تذكرة الطيران": ticketDoc ? buildDocUrl(r.id, ticketDoc.id) : "لم يُرفع بعد",
+        "رابط صورة الاستضافة": hostLink,
+        "يوجد استضافة / فندق": r.hasHosting ? "نعم" : "لا",
+        "اسم الفندق / المستضيف": r.hostingInfo?.hostName || "-",
+        "هاتف المستضيف": r.hostingInfo?.hostPhone || "-",
+        "عنوان المستضيف": r.hostingInfo?.hostAddress || "-",
+        "الملاحظات": r.notes || "-",
+        "تاريخ الإنشاء": new Date(r.createdAt).toLocaleString("ar-SA"),
+        "آخر تحديث": new Date(r.updatedAt).toLocaleString("ar-SA"),
+      });
+    } else {
+      // Transaction has one or more travelers: list them row under row
+      travelers.forEach((t, tIndex) => {
+        const isFirst = tIndex === 0;
+
+        const tPassDoc =
+          t.documents?.find((d) => d.documentType === "Passport") ||
+          (isFirst ? getPassportDocument(r) : undefined);
+        const tPhotoDoc =
+          t.documents?.find((d) => d.documentType === "PersonalPhoto") ||
+          (isFirst ? getPhotoDocument(r) : undefined);
+        const tTicketDoc =
+          t.documents?.find((d) => d.documentType === "FlightTicket") ||
+          (isFirst ? getTicketDocument(r) : undefined);
+
+        const tPassLink = tPassDoc ? buildDocUrl(r.id, tPassDoc.id) : "لم يُرفع بعد";
+        const tPhotoLink = tPhotoDoc ? buildDocUrl(r.id, tPhotoDoc.id) : "لم يُرفع بعد";
+        const tTicketLink = tTicketDoc ? buildDocUrl(r.id, tTicketDoc.id) : "لم يُرفع بعد";
+
+        if (isFirst) {
+          // Row 1: Full transaction details + First traveler's details
+          transactionsData.push({
+            "م": transactionCounter++,
+            "رقم المعاملة": r.requestNumber,
+            "الحالة الحالية": statusArabic,
+            "عدد المعتمرين / المسافرين": travelers.length,
+            "رقم مجموعة نسك": r.nusukGroupNumber || "لم يُسجل بعد",
+            "وكيل الإرسال": r.senderName || "-",
+            "تاريخ السفر / الذهاب": r.departureDate || r.travelDate || "-",
+            "وقت إقلاع الطائرة": r.flightDepartureTime || "-",
+            "وقت تواجد المسافر في المطار": r.airportArrivalTime || "-",
+            "تاريخ العودة": r.returnDate || "-",
+            "اسم المعتمر / المسافر": t.fullName,
+            "رقم جواز السفر": t.passportNumber || "-",
+            "رابط صورة الجواز": tPassLink,
+            "رابط الصورة الشخصية": tPhotoLink,
+            "رابط تذكرة الطيران": tTicketLink,
+            "رابط صورة الاستضافة": hostLink,
+            "يوجد استضافة / فندق": r.hasHosting ? "نعم" : "لا",
+            "اسم الفندق / المستضيف": r.hostingInfo?.hostName || "-",
+            "هاتف المستضيف": r.hostingInfo?.hostPhone || "-",
+            "عنوان المستضيف": r.hostingInfo?.hostAddress || "-",
+            "الملاحظات": r.notes || "-",
+            "تاريخ الإنشاء": new Date(r.createdAt).toLocaleString("ar-SA"),
+            "آخر تحديث": new Date(r.updatedAt).toLocaleString("ar-SA"),
+          });
+        } else {
+          // Row 2..N: Subsequent travelers under this transaction
+          // Transaction fields are kept blank, only traveler details and document links are shown
+          transactionsData.push({
+            "م": "",
+            "رقم المعاملة": "",
+            "الحالة الحالية": "",
+            "عدد المعتمرين / المسافرين": "",
+            "رقم مجموعة نسك": "",
+            "وكيل الإرسال": "",
+            "تاريخ السفر / الذهاب": "",
+            "وقت إقلاع الطائرة": "",
+            "وقت تواجد المسافر في المطار": "",
+            "تاريخ العودة": "",
+            "اسم المعتمر / المسافر": t.fullName,
+            "رقم جواز السفر": t.passportNumber || "-",
+            "رابط صورة الجواز": tPassLink,
+            "رابط الصورة الشخصية": tPhotoLink,
+            "رابط تذكرة الطيران": tTicketLink,
+            "رابط صورة الاستضافة": "",
+            "يوجد استضافة / فندق": "",
+            "اسم الفندق / المستضيف": "",
+            "هاتف المستضيف": "",
+            "عنوان المستضيف": "",
+            "الملاحظات": t.notes || "",
+            "تاريخ الإنشاء": "",
+            "آخر تحديث": "",
+          });
+        }
+      });
+    }
   });
 
   // 2. Prepare Secondary Sheet: Travelers & Pilgrims (المعتمرون والمسافرون)
@@ -154,10 +236,12 @@ export function exportRequestsToExcel(requests: GroupRequestDetail[]) {
     { wch: 16 }, // وقت إقلاع الطائرة
     { wch: 18 }, // وقت تواجد المسافر في المطار
     { wch: 16 }, // تاريخ العودة
-    { wch: 38 }, // رابط صورة الاستضافة
+    { wch: 26 }, // اسم المعتمر / المسافر
+    { wch: 18 }, // رقم جواز السفر
     { wch: 38 }, // رابط صورة الجواز
     { wch: 38 }, // رابط الصورة الشخصية
     { wch: 38 }, // رابط تذكرة الطيران
+    { wch: 38 }, // رابط صورة الاستضافة
     { wch: 14 }, // يوجد استضافة / فندق
     { wch: 22 }, // اسم الفندق / المستضيف
     { wch: 16 }, // هاتف المستضيف
