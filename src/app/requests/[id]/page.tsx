@@ -101,6 +101,34 @@ export default function RequestDetailPage({
       if (data.nusukGroupNumber) {
         setNusukInput(data.nusukGroupNumber);
       }
+
+      // If URL contains docId (e.g. clicked from Excel export), auto-open preview modal
+      if (typeof window !== "undefined") {
+        const urlParams = new URLSearchParams(window.location.search);
+        let targetDocId = urlParams.get("docId");
+        if (!targetDocId && window.location.hash.includes("?")) {
+          const hashQuery = window.location.hash.split("?")[1];
+          targetDocId = new URLSearchParams(hashQuery).get("docId");
+        }
+        if (targetDocId) {
+          let foundDoc = data.groupDocuments?.find((d) => d.id === targetDocId);
+          if (!foundDoc && data.hostingInfo?.hostIdDocument?.id === targetDocId) {
+            foundDoc = data.hostingInfo.hostIdDocument;
+          }
+          if (!foundDoc && data.travelers) {
+            for (const t of data.travelers) {
+              const d = t.documents?.find((doc) => doc.id === targetDocId);
+              if (d) {
+                foundDoc = d;
+                break;
+              }
+            }
+          }
+          if (foundDoc) {
+            setPreviewDoc(foundDoc);
+          }
+        }
+      }
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message);
