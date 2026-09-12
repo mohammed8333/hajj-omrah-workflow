@@ -22,9 +22,12 @@ import {
   Copy,
   Check,
   X,
+  Archive,
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { RequestLifecycleTimer } from "@/components/ui/RequestLifecycleTimer";
 
 export default function DashboardPage() {
   const { user, role, loading: authLoading } = useAuth();
@@ -42,6 +45,63 @@ export default function DashboardPage() {
     navigator.clipboard.writeText(nusuk);
     setCopiedNusuk(nusuk);
     setTimeout(() => setCopiedNusuk(null), 2000);
+  };
+
+  const handleAdminArchive = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (!confirm("هل أنت متأكد من رغبتك في أرشفة هذه المعاملة؟")) return;
+    try {
+      await api.requests.archive(id, "أرشفة يدوية بواسطة مدير النظام");
+      const reqsRes = await api.requests.getAll();
+      setRequests(reqsRes);
+      if (role === "Admin") {
+        const statsRes = await api.admin.getStats();
+        setAdminStats(statsRes);
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error) alert(err.message);
+    }
+  };
+
+  const handleAdminUnarchive = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (!confirm("هل ترغب في إلغاء أرشفة هذه المعاملة واستعادتها للحالة النشطة؟")) return;
+    try {
+      await api.requests.unarchive(id);
+      const reqsRes = await api.requests.getAll();
+      setRequests(reqsRes);
+      if (role === "Admin") {
+        const statsRes = await api.admin.getStats();
+        setAdminStats(statsRes);
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error) alert(err.message);
+    }
+  };
+
+  const handleAdminDelete = async (id: string, reqNumber: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const confirmation = prompt(
+      `تحذير أمني: أنت على وشك مسح المعاملة (${reqNumber}) وكافة وثائقها نهائياً!\nللتأكيد النهائي، اكتب (حذف) أو (delete):`
+    );
+    if (!confirmation || (confirmation.trim() !== "حذف" && confirmation.trim().toLowerCase() !== "delete")) {
+      return;
+    }
+    try {
+      await api.requests.delete(id);
+      alert("تم حذف المعاملة بالكامل بنجاح.");
+      const reqsRes = await api.requests.getAll();
+      setRequests(reqsRes);
+      if (role === "Admin") {
+        const statsRes = await api.admin.getStats();
+        setAdminStats(statsRes);
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error) alert(err.message);
+    }
   };
 
   useEffect(() => {
@@ -527,17 +587,66 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <div className="mt-5 pt-3 border-t border-gray-100 flex items-center justify-between">
-                <span className="text-[11px] text-gray-400">
+              {/* Lifecycle Timer & Creation Date */}
+              <div className="mt-4 pt-2.5 border-t border-gray-100 flex items-center justify-between gap-2">
+                <RequestLifecycleTimer
+                  createdAt={req.createdAt}
+                  travelDate={req.travelDate}
+                  departureDate={req.departureDate}
+                  flightDepartureTime={req.flightDepartureTime}
+                  status={req.status}
+                  mode="compact"
+                />
+                <span className="text-[11px] text-gray-400 shrink-0">
                   {new Date(req.createdAt).toLocaleDateString("ar-SA")}
                 </span>
+              </div>
+
+              {/* Card Actions: Open Details + Admin Archive & Delete Buttons */}
+              <div className="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between gap-2 flex-wrap">
                 <Link
                   href={`/requests/${req.id}`}
-                  className="inline-flex items-center gap-1 text-xs font-bold text-sky-600 hover:text-sky-800"
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 px-3 py-1.5 rounded-xl transition-colors cursor-pointer"
                 >
                   <span>عرض التفاصيل والإجراء</span>
                   <ArrowRight className="w-3.5 h-3.5 rotate-180" />
                 </Link>
+
+                {role === "Admin" && (
+                  <div className="flex items-center gap-1.5">
+                    {req.status === "Archived" ? (
+                      <button
+                        type="button"
+                        onClick={(e) => handleAdminUnarchive(req.id, e)}
+                        className="inline-flex items-center gap-1 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2.5 py-1.5 rounded-xl transition-colors cursor-pointer"
+                        title="إلغاء أرشفة المعاملة واستعادتها"
+                      >
+                        <Archive className="w-3.5 h-3.5" />
+                        <span>إلغاء الأرشفة</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={(e) => handleAdminArchive(req.id, e)}
+                        className="inline-flex items-center gap-1 text-xs font-bold text-purple-800 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-2.5 py-1.5 rounded-xl transition-colors cursor-pointer"
+                        title="أرشفة المعاملة"
+                      >
+                        <Archive className="w-3.5 h-3.5" />
+                        <span>أرشفة</span>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={(e) => handleAdminDelete(req.id, req.requestNumber, e)}
+                      className="inline-flex items-center gap-1 text-xs font-bold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-2.5 py-1.5 rounded-xl transition-colors cursor-pointer"
+                      title="مسح المعاملة نهائياً"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>مسح</span>
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           ))}
