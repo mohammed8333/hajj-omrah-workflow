@@ -987,6 +987,53 @@ class LocalDatabaseEngine {
     const req = this.requests.find((r) => r.id === id);
     if (!req) throw new Error("المعاملة غير موجودة");
 
+    // Validate that all documents are accepted
+    if (req.hasHosting) {
+      const hostDoc =
+        req.hostingInfo?.hostIdDocument ||
+        req.groupDocuments?.find((d) => d.documentType === "HostId");
+      if (!hostDoc || hostDoc.reviewStatus !== "Accepted") {
+        throw new Error("يجب تدقيق وقبول مستند هوية المستضيف أولاً قبل إدخال رقم نسك.");
+      }
+    }
+
+    if (req.travelers.length === 0) {
+      throw new Error("لا يوجد مسافرين مسجلين في المعاملة.");
+    }
+
+    for (let i = 0; i < req.travelers.length; i++) {
+      const traveler = req.travelers[i];
+      const docs = traveler.documents || [];
+      const hasPassport = docs.some(
+        (d) => d.documentType === "Passport" && d.reviewStatus === "Accepted"
+      );
+      const hasPhoto = docs.some(
+        (d) => d.documentType === "PersonalPhoto" && d.reviewStatus === "Accepted"
+      );
+      if (!hasPassport || !hasPhoto) {
+        throw new Error(
+          `المسافر (${traveler.fullName || `#${i + 1}`}) لم يتم قبول جواز السفر أو الصورة الشخصية الخاصة به بعد.`
+        );
+      }
+
+      const anyUnaccepted = docs.some((d) => d.reviewStatus !== "Accepted");
+      if (anyUnaccepted) {
+        throw new Error(
+          `توجد مستندات غير مقبولة للمسافر (${traveler.fullName || `#${i + 1}`}).`
+        );
+      }
+    }
+
+    if (req.groupDocuments && req.groupDocuments.length > 0) {
+      const unacceptedGroup = req.groupDocuments.find((d) => d.reviewStatus !== "Accepted");
+      if (unacceptedGroup) {
+        throw new Error(
+          `المستند (${unacceptedGroup.originalFileName}) للمجموعة لم يتم قبوله بعد.`
+        );
+      }
+    }
+
+    const prev = req.status;
     req.nusukGroupNumber = nusukGroupNumber;
     req.status = "SafaRegistrationCompleted";
     req.updatedAt = new Date().toISOString();
@@ -994,7 +1041,7 @@ class LocalDatabaseEngine {
     req.statusHistories.unshift({
       id: "sh-" + Date.now(),
       groupRequestId: req.id,
-      fromStatus: "UnderReview",
+      fromStatus: prev,
       toStatus: "SafaRegistrationCompleted",
       changedById: currentUser?.id || "safa",
       changedByName: currentUser?.fullName || "موظف الصفا",

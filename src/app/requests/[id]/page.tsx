@@ -13,7 +13,7 @@ import {
   Traveler,
 } from "@/types";
 import { DocumentStatusBadge, RequestStatusBadge } from "@/components/ui/StatusBadge";
-import { DOCUMENT_TYPE_LABELS } from "@/lib/constants";
+import { DOCUMENT_TYPE_LABELS, REVIEW_STATUS_MAP } from "@/lib/constants";
 import {
   Plane,
   Home,
@@ -264,7 +264,98 @@ export default function RequestDetailPage({
     }
   };
 
+  const checkAllDocumentsAccepted = (): { isAllAccepted: boolean; reason?: string } => {
+    if (!request) return { isAllAccepted: false, reason: "بيانات المعاملة غير متوفرة" };
+
+    // 1. Check hosting document if hasHosting is true
+    if (request.hasHosting) {
+      const hostDoc =
+        request.hostingInfo?.hostIdDocument ||
+        request.groupDocuments?.find((d) => d.documentType === "HostId");
+      if (!hostDoc) {
+        return { isAllAccepted: false, reason: "مستند هوية المستضيف غير مرفوع في المعاملة." };
+      }
+      if (hostDoc.reviewStatus !== "Accepted") {
+        const st = REVIEW_STATUS_MAP[hostDoc.reviewStatus]?.label || hostDoc.reviewStatus;
+        return {
+          isAllAccepted: false,
+          reason: `مستند هوية المستضيف (${st})، يجب مراجعته وقبوله أولاً.`,
+        };
+      }
+    }
+
+    // 2. Check travelers
+    if (!request.travelers || request.travelers.length === 0) {
+      return { isAllAccepted: false, reason: "لا يوجد مسافرين مسجلين في المعاملة." };
+    }
+
+    for (let i = 0; i < request.travelers.length; i++) {
+      const traveler = request.travelers[i];
+      const travelerLabel = traveler.fullName || `المسافر #${i + 1}`;
+      const docs = traveler.documents || [];
+
+      // Check passport
+      const passportDoc = docs.find((d) => d.documentType === "Passport");
+      if (!passportDoc) {
+        return { isAllAccepted: false, reason: `جواز السفر غير مرفوع للمسافر (${travelerLabel}).` };
+      }
+      if (passportDoc.reviewStatus !== "Accepted") {
+        const st = REVIEW_STATUS_MAP[passportDoc.reviewStatus]?.label || passportDoc.reviewStatus;
+        return {
+          isAllAccepted: false,
+          reason: `جواز السفر للمسافر (${travelerLabel}) (${st})، يجب قبوله أولاً.`,
+        };
+      }
+
+      // Check personal photo
+      const photoDoc = docs.find((d) => d.documentType === "PersonalPhoto");
+      if (!photoDoc) {
+        return { isAllAccepted: false, reason: `الصورة الشخصية غير مرفوعة للمسافر (${travelerLabel}).` };
+      }
+      if (photoDoc.reviewStatus !== "Accepted") {
+        const st = REVIEW_STATUS_MAP[photoDoc.reviewStatus]?.label || photoDoc.reviewStatus;
+        return {
+          isAllAccepted: false,
+          reason: `الصورة الشخصية للمسافر (${travelerLabel}) (${st})، يجب قبولها أولاً.`,
+        };
+      }
+
+      // Check all other uploaded documents for this traveler
+      for (const doc of docs) {
+        if (doc.reviewStatus !== "Accepted") {
+          const typeLabel = DOCUMENT_TYPE_LABELS[doc.documentType] || doc.documentType;
+          const st = REVIEW_STATUS_MAP[doc.reviewStatus]?.label || doc.reviewStatus;
+          return {
+            isAllAccepted: false,
+            reason: `المستند (${typeLabel}) للمسافر (${travelerLabel}) (${st})، يجب قبوله أولاً.`,
+          };
+        }
+      }
+    }
+
+    // 3. Check group documents
+    if (request.groupDocuments && request.groupDocuments.length > 0) {
+      for (const doc of request.groupDocuments) {
+        if (doc.reviewStatus !== "Accepted") {
+          const docName = doc.originalFileName || DOCUMENT_TYPE_LABELS[doc.documentType] || doc.documentType;
+          const st = REVIEW_STATUS_MAP[doc.reviewStatus]?.label || doc.reviewStatus;
+          return {
+            isAllAccepted: false,
+            reason: `المستند (${docName}) للمجموعة (${st})، لم يتم قبوله بعد.`,
+          };
+        }
+      }
+    }
+
+    return { isAllAccepted: true };
+  };
+
   const handleCompleteSafa = async () => {
+    const docCheckResult = checkAllDocumentsAccepted();
+    if (!docCheckResult.isAllAccepted) {
+      alert(docCheckResult.reason || "لا يمكن إدخال رقم نسك إلا بعد قبول جميع المستندات.");
+      return;
+    }
     if (!nusukInput.trim()) {
       alert("يرجى إدخال رقم مجموعة نسك.");
       return;
@@ -453,6 +544,9 @@ export default function RequestDetailPage({
   const isAgent = role === "SaudiAgent" || role === "Admin";
   const isSender = role === "Sender" || role === "Admin";
 
+  const docCheck = checkAllDocumentsAccepted();
+  const canCompleteSafa = docCheck.isAllAccepted;
+
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       {/* Top Breadcrumb & Status Header */}
@@ -543,9 +637,26 @@ export default function RequestDetailPage({
                 request.status === "SafaRegistrationCompleted") && (
                 <>
                   <button
-                    onClick={() => setShowNusukModal(true)}
-                    disabled={actionLoading}
-                    className="bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
+                    onClick={() => {
+                      if (!canCompleteSafa) {
+                        alert(docCheck.reason || "لا يمكن إدخال رقم نسك إلا بعد قبول جميع المستندات.");
+                        return;
+                      }
+                      setShowNusukModal(true);
+                    }}
+                    disabled={actionLoading || !canCompleteSafa}
+                    title={
+                      !canCompleteSafa
+                        ? docCheck.reason || "يجب تدقيق وقبول جميع المستندات أولاً"
+                        : request.nusukGroupNumber
+                        ? "تعديل رقم نسك وإكمال صفا"
+                        : "إدخال رقم نسك وإكمال صفا"
+                    }
+                    className={
+                      !canCompleteSafa
+                        ? "bg-gray-200 text-gray-400 border border-gray-300 cursor-not-allowed text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5"
+                        : "bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
+                    }
                   >
                     <Building className="w-3.5 h-3.5" />
                     <span>
@@ -557,13 +668,15 @@ export default function RequestDetailPage({
 
                   <button
                     onClick={handleSendToSaudiAgent}
-                    disabled={actionLoading || !request.nusukGroupNumber}
+                    disabled={actionLoading || !request.nusukGroupNumber || !canCompleteSafa}
                     title={
-                      !request.nusukGroupNumber
+                      !canCompleteSafa
+                        ? docCheck.reason || "يجب تدقيق وقبول جميع المستندات أولاً"
+                        : !request.nusukGroupNumber
                         ? "يجب إدخال رقم مجموعة نسك أولاً"
                         : "إحالة إلى الوكيل السعودي"
                     }
-                    className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
+                    className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
                   >
                     <Send className="w-3.5 h-3.5" />
                     <span>إحالة للوكيل السعودي</span>
@@ -685,6 +798,40 @@ export default function RequestDetailPage({
           <span>{success}</span>
         </div>
       )}
+
+      {/* Safa Employee Review Status Banner */}
+      {isSafaReviewer &&
+        (request.status === "UnderReview" || request.status === "Submitted") &&
+        !canCompleteSafa && (
+          <div className="p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs sm:text-sm flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 shrink-0 text-amber-600 mt-0.5" />
+            <div className="space-y-1">
+              <div className="font-bold text-amber-800">
+                زر إدخال رقم نسك معطل حتى تدقيق وقبول جميع المستندات
+              </div>
+              <div className="text-amber-700">
+                يلزم مراجعة وقبول كافة وثائق ومستندات المسافرين والمستضيف (مقبول ✓) لتتمكن من إدخال رقم نسك وإكمال صفا.
+              </div>
+              {docCheck.reason && (
+                <div className="text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-1.5 rounded-lg inline-block mt-1">
+                  المستند المطلوب مراجعته حالياً: {docCheck.reason}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+      {isSafaReviewer &&
+        request.status === "UnderReview" &&
+        canCompleteSafa &&
+        !request.nusukGroupNumber && (
+          <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs sm:text-sm flex items-center gap-3">
+            <CheckCircle className="w-5 h-5 shrink-0 text-emerald-600" />
+            <div>
+              <strong>اكتمل تدقيق المستندات:</strong> تم قبول جميع وثائق المسافرين والمستضيف بنجاح ✓. يمكنك الآن الضغط على زر <strong>«إدخال رقم نسك وإكمال صفا»</strong> بالأعلى لتوثيق رقم نسك.
+            </div>
+          </div>
+        )}
 
       {/* Workflow Phase Info Banners */}
       {request.status === "ProgramLinked" && isAgent && (
@@ -1447,8 +1594,8 @@ export default function RequestDetailPage({
               <button
                 type="button"
                 onClick={handleCompleteSafa}
-                disabled={actionLoading || !nusukInput.trim()}
-                className="px-4 py-2 text-xs font-bold bg-teal-600 hover:bg-teal-700 text-white rounded-xl shadow-xs"
+                disabled={actionLoading || !nusukInput.trim() || !canCompleteSafa}
+                className="px-4 py-2 text-xs font-bold bg-teal-600 hover:bg-teal-700 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed text-white rounded-xl shadow-xs cursor-pointer"
               >
                 اعتماد واكتمال صفا
               </button>
