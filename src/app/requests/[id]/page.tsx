@@ -87,10 +87,12 @@ export default function RequestDetailPage({
   const [editFlightDepartureTime, setEditFlightDepartureTime] = useState("");
   const [editAirportArrivalTime, setEditAirportArrivalTime] = useState("");
 
-  const loadRequest = async () => {
+  const loadRequest = async (isInitial = false) => {
     try {
-      setLoading(true);
-      setError(null);
+      if (isInitial) {
+        setLoading(true);
+        setError(null);
+      }
       const data = await api.requests.getById(requestId);
       setRequest(data);
       if (data.nusukGroupNumber) {
@@ -103,12 +105,14 @@ export default function RequestDetailPage({
         setError("تعذر تحميل بيانات المعاملة.");
       }
     } finally {
-      setLoading(false);
+      if (isInitial) {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
-    loadRequest();
+    loadRequest(true);
   }, [requestId]);
 
   const handleFileUpload = async (
@@ -246,6 +250,37 @@ export default function RequestDetailPage({
       setActionLoading(true);
       setError(null);
       setSuccess(null);
+
+      // Optimistic in-place update for instant UI feedback without reload
+      setRequest((prev) => {
+        if (!prev) return prev;
+        const updateDoc = (d: DocumentItem): DocumentItem =>
+          d.id === docId
+            ? {
+                ...d,
+                reviewStatus: newStatus,
+                reviewNote: finalNote !== undefined ? finalNote : d.reviewNote,
+              }
+            : d;
+
+        return {
+          ...prev,
+          hostingInfo: prev.hostingInfo
+            ? {
+                ...prev.hostingInfo,
+                hostIdDocument: prev.hostingInfo.hostIdDocument
+                  ? updateDoc(prev.hostingInfo.hostIdDocument)
+                  : undefined,
+              }
+            : prev.hostingInfo,
+          groupDocuments: prev.groupDocuments ? prev.groupDocuments.map(updateDoc) : undefined,
+          travelers: prev.travelers.map((t) => ({
+            ...t,
+            documents: t.documents.map(updateDoc),
+          })),
+        };
+      });
+
       await api.documents.review(docId, newStatus, finalNote);
       const label =
         newStatus === "Accepted"
@@ -256,9 +291,10 @@ export default function RequestDetailPage({
           ? "مرفوض ✗"
           : "قيد الانتظار";
       setSuccess(`تم تحديث حالة المستند إلى: ${label}`);
-      await loadRequest();
+      await loadRequest(false);
     } catch (err: unknown) {
       if (err instanceof Error) setError(err.message);
+      await loadRequest(false);
     } finally {
       setActionLoading(false);
     }
@@ -610,7 +646,11 @@ export default function RequestDetailPage({
             {/* Sender Actions */}
             {role === "Sender" && request.status === "Draft" && (
               <button
-                onClick={handleSubmitRequest}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleSubmitRequest();
+                }}
                 disabled={actionLoading}
                 className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
               >
@@ -622,7 +662,11 @@ export default function RequestDetailPage({
             {/* Safa Employee Actions */}
             {isSafaReviewer && request.status === "Submitted" && (
               <button
-                onClick={handleSafaStartReview}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleSafaStartReview();
+                }}
                 disabled={actionLoading}
                 className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
               >
@@ -637,7 +681,9 @@ export default function RequestDetailPage({
                 request.status === "SafaRegistrationCompleted") && (
                 <>
                   <button
-                    onClick={() => {
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
                       if (!canCompleteSafa) {
                         alert(docCheck.reason || "لا يمكن إدخال رقم نسك إلا بعد قبول جميع المستندات.");
                         return;
@@ -667,7 +713,11 @@ export default function RequestDetailPage({
                   </button>
 
                   <button
-                    onClick={handleSendToSaudiAgent}
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleSendToSaudiAgent();
+                    }}
                     disabled={actionLoading || !request.nusukGroupNumber || !canCompleteSafa}
                     title={
                       !canCompleteSafa
@@ -684,7 +734,11 @@ export default function RequestDetailPage({
 
                   {request.status === "SafaRegistrationCompleted" && (
                     <button
-                      onClick={handleSafaStartReview}
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleSafaStartReview();
+                      }}
                       disabled={actionLoading}
                       className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold px-3 py-2 rounded-xl flex items-center gap-1 cursor-pointer"
                       title="إعادة المعاملة لحالة قيد المراجعة لتعديل المستندات أو التدقيق"
@@ -698,7 +752,11 @@ export default function RequestDetailPage({
             {/* Saudi Agent Actions */}
             {isAgent && request.status === "ReadyForSaudiAgent" && (
               <button
-                onClick={handleAgentReceive}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleAgentReceive();
+                }}
                 disabled={actionLoading}
                 className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
               >
@@ -713,7 +771,9 @@ export default function RequestDetailPage({
                 request.status === "SaudiAgentProcessing") && (
                 <>
                   <button
-                    onClick={() => {
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
                       setCorrectionTarget({});
                       setShowCorrectionModal(true);
                     }}
@@ -724,7 +784,11 @@ export default function RequestDetailPage({
                   </button>
 
                   <button
-                    onClick={handleLinkProgram}
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleLinkProgram();
+                    }}
                     disabled={actionLoading}
                     className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
                   >
@@ -737,7 +801,11 @@ export default function RequestDetailPage({
             {/* Step 2: Saudi Agent after Program Linked sees "طلب قبول الاستضافة" (Correction button is hidden) */}
             {isAgent && request.status === "ProgramLinked" && (
               <button
-                onClick={handleRequestHostingAcceptance}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleRequestHostingAcceptance();
+                }}
                 disabled={actionLoading}
                 className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
               >
@@ -749,7 +817,11 @@ export default function RequestDetailPage({
             {/* Step 3: Sender when HostingAcceptanceRequested sees "تم قبول طلب الاستضافة" */}
             {isSender && request.status === "HostingAcceptanceRequested" && (
               <button
-                onClick={handleAcceptHosting}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleAcceptHosting();
+                }}
                 disabled={actionLoading}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
               >
@@ -761,7 +833,11 @@ export default function RequestDetailPage({
             {/* Step 4: Sender when HostingAcceptedBySender sees "تأكيد الاستضافة للوكيل" */}
             {isSender && request.status === "HostingAcceptedBySender" && (
               <button
-                onClick={handleConfirmHosting}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleConfirmHosting();
+                }}
                 disabled={actionLoading}
                 className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
               >
@@ -773,7 +849,11 @@ export default function RequestDetailPage({
             {/* Step 5: Saudi Agent when HostingConfirmed sees "تم اعتماده وإنهاء المعاملة ✓" */}
             {isAgent && request.status === "HostingConfirmed" && (
               <button
-                onClick={handleAgentComplete}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleAgentComplete();
+                }}
                 disabled={actionLoading}
                 className="bg-green-600 hover:bg-green-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
               >
@@ -934,7 +1014,11 @@ export default function RequestDetailPage({
 
                   {role === "Sender" && (
                     <button
-                      onClick={() => handleResolveCorrection(c.id)}
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleResolveCorrection(c.id);
+                      }}
                       disabled={actionLoading}
                       className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg shadow-2xs cursor-pointer"
                     >
@@ -1016,7 +1100,11 @@ export default function RequestDetailPage({
                     />
 
                     <button
-                      onClick={() => setPreviewDoc(hostDoc)}
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setPreviewDoc(hostDoc);
+                      }}
                       className="p-1.5 text-gray-600 hover:text-sky-600 hover:bg-gray-200 rounded-lg"
                       title="معاينة المستند"
                     >
@@ -1027,7 +1115,11 @@ export default function RequestDetailPage({
                     {(isSafaReviewer || isAgent) && hostDoc.reviewStatus === "Pending" && (
                       <div className="flex items-center gap-1">
                         <button
-                          onClick={() => handleQuickReview(hostDoc.id, "Accepted")}
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleQuickReview(hostDoc.id, "Accepted");
+                          }}
                           disabled={actionLoading}
                           className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[11px] font-bold flex items-center gap-0.5 shadow-xs cursor-pointer transition-all"
                           title="قبول هوية المستضيف"
@@ -1036,7 +1128,11 @@ export default function RequestDetailPage({
                           <span>مقبول</span>
                         </button>
                         <button
-                          onClick={() => handleQuickReview(hostDoc.id, "NeedsCorrection")}
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleQuickReview(hostDoc.id, "NeedsCorrection");
+                          }}
                           disabled={actionLoading}
                           className="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-[11px] font-bold flex items-center gap-0.5 shadow-xs cursor-pointer transition-all"
                           title="طلب تصحيح هوية المستضيف"
@@ -1045,7 +1141,11 @@ export default function RequestDetailPage({
                           <span>يحتاج تصحيح</span>
                         </button>
                         <button
-                          onClick={() => handleQuickReview(hostDoc.id, "Rejected")}
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleQuickReview(hostDoc.id, "Rejected");
+                          }}
                           disabled={actionLoading}
                           className="px-2 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-md text-[11px] font-bold flex items-center gap-0.5 shadow-xs cursor-pointer transition-all"
                           title="رفض هوية المستضيف"
@@ -1059,7 +1159,11 @@ export default function RequestDetailPage({
                     {/* Agent Return/Reset Action: only Agent can return reviewed documents */}
                     {isAgent && hostDoc.reviewStatus !== "Pending" && (
                       <button
-                        onClick={() => handleQuickReview(hostDoc.id, "Pending", "تمت إعادة المستند للمراجعة من قبل الوكيل")}
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handleQuickReview(hostDoc.id, "Pending", "تمت إعادة المستند للمراجعة من قبل الوكيل");
+                        }}
                         disabled={actionLoading}
                         className="px-2 py-1 text-[10px] bg-amber-50 hover:bg-amber-600 text-amber-800 hover:text-white border border-amber-300 rounded-md font-bold transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
                         title="إعادة فتح تدقيق المستند لموظف الصفا"
@@ -1071,7 +1175,11 @@ export default function RequestDetailPage({
 
                     {canEditDocs && (
                       <button
-                        onClick={() => handleDeleteDocument(hostDoc.id)}
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handleDeleteDocument(hostDoc.id);
+                        }}
                         className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
                         title="حذف المستند"
                       >
@@ -1229,7 +1337,9 @@ export default function RequestDetailPage({
               <div className="flex items-center gap-2">
                 {(isSafaReviewer || isAgent) && (
                   <button
-                    onClick={() => {
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
                       setCorrectionTarget({
                         travelerId: traveler.id,
                         targetField: "بيانات المسافر أو مستنداته",
@@ -1288,7 +1398,11 @@ export default function RequestDetailPage({
 
                           <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-gray-200/60">
                             <button
-                              onClick={() => setPreviewDoc(doc)}
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setPreviewDoc(doc);
+                              }}
                               className="px-2.5 py-1 text-xs bg-sky-50 text-sky-700 hover:bg-sky-100 rounded-md font-medium flex items-center gap-1 cursor-pointer"
                             >
                               <Eye className="w-3.5 h-3.5" />
@@ -1299,7 +1413,11 @@ export default function RequestDetailPage({
                             {(isSafaReviewer || isAgent) && doc.reviewStatus === "Pending" && (
                               <div className="flex items-center gap-1">
                                 <button
-                                  onClick={() => handleQuickReview(doc.id, "Accepted")}
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    handleQuickReview(doc.id, "Accepted");
+                                  }}
                                   disabled={actionLoading}
                                   className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[11px] font-bold flex items-center gap-0.5 shadow-xs cursor-pointer transition-all"
                                   title="قبول المستند"
@@ -1308,7 +1426,11 @@ export default function RequestDetailPage({
                                   <span>مقبول</span>
                                 </button>
                                 <button
-                                  onClick={() => handleQuickReview(doc.id, "NeedsCorrection")}
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    handleQuickReview(doc.id, "NeedsCorrection");
+                                  }}
                                   disabled={actionLoading}
                                   className="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-[11px] font-bold flex items-center gap-0.5 shadow-xs cursor-pointer transition-all"
                                   title="طلب تصحيح للمستند"
@@ -1317,7 +1439,11 @@ export default function RequestDetailPage({
                                   <span>يحتاج تصحيح</span>
                                 </button>
                                 <button
-                                  onClick={() => handleQuickReview(doc.id, "Rejected")}
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    handleQuickReview(doc.id, "Rejected");
+                                  }}
                                   disabled={actionLoading}
                                   className="px-2 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-md text-[11px] font-bold flex items-center gap-0.5 shadow-xs cursor-pointer transition-all"
                                   title="رفض المستند"
@@ -1331,7 +1457,11 @@ export default function RequestDetailPage({
                             {/* Agent Return/Reset Action: only Agent can return reviewed documents */}
                             {isAgent && doc.reviewStatus !== "Pending" && (
                               <button
-                                onClick={() => handleQuickReview(doc.id, "Pending", "تمت إعادة المستند للمراجعة من قبل الوكيل")}
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  handleQuickReview(doc.id, "Pending", "تمت إعادة المستند للمراجعة من قبل الوكيل");
+                                }}
                                 disabled={actionLoading}
                                 className="px-2 py-1 text-[10px] bg-amber-50 hover:bg-amber-600 text-amber-800 hover:text-white border border-amber-300 rounded-md font-bold transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
                                 title="إعادة فتح تدقيق المستند لموظف الصفا"
@@ -1343,7 +1473,11 @@ export default function RequestDetailPage({
 
                             {canEditDocs && (
                               <button
-                                onClick={() => handleDeleteDocument(doc.id)}
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  handleDeleteDocument(doc.id);
+                                }}
                                 className="p-1 text-gray-400 hover:text-red-600 rounded cursor-pointer"
                                 title="حذف"
                               >
