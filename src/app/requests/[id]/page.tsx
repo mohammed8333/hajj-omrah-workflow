@@ -36,6 +36,7 @@ import {
   Calendar,
   Phone,
   Link2,
+  RotateCcw,
 } from "lucide-react";
 
 export default function RequestDetailPage({
@@ -217,6 +218,44 @@ export default function RequestDetailPage({
       setSuccess("تم تحديث نتيجة تدقيق المستند.");
       setReviewModalDoc(null);
       setReviewNote("");
+      await loadRequest();
+    } catch (err: unknown) {
+      if (err instanceof Error) setError(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleQuickReview = async (
+    docId: string,
+    newStatus: DocumentReviewStatus,
+    note?: string
+  ) => {
+    let finalNote = note;
+    if (newStatus === "NeedsCorrection" && !finalNote) {
+      const input = prompt("اكتب ملاحظة أو سبب طلب التصحيح (اختياري):");
+      if (input === null) return;
+      finalNote = input.trim() || undefined;
+    } else if (newStatus === "Rejected" && !finalNote) {
+      const input = prompt("اكتب سبب رفض المستند (اختياري):");
+      if (input === null) return;
+      finalNote = input.trim() || undefined;
+    }
+
+    try {
+      setActionLoading(true);
+      setError(null);
+      setSuccess(null);
+      await api.documents.review(docId, newStatus, finalNote);
+      const label =
+        newStatus === "Accepted"
+          ? "مقبول ✓"
+          : newStatus === "NeedsCorrection"
+          ? "يحتاج تصحيح ⚠️"
+          : newStatus === "Rejected"
+          ? "مرفوض ✗"
+          : "قيد الانتظار";
+      setSuccess(`تم تحديث حالة المستند إلى: ${label}`);
       await loadRequest();
     } catch (err: unknown) {
       if (err instanceof Error) setError(err.message);
@@ -837,16 +876,49 @@ export default function RequestDetailPage({
                       <Eye className="w-4 h-4" />
                     </button>
 
-                    {isSafaReviewer && (
+                    {/* Quick Review Buttons when Pending */}
+                    {(isSafaReviewer || isAgent) && hostDoc.reviewStatus === "Pending" && (
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleQuickReview(hostDoc.id, "Accepted")}
+                          disabled={actionLoading}
+                          className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[11px] font-bold flex items-center gap-0.5 shadow-xs cursor-pointer transition-all"
+                          title="قبول هوية المستضيف"
+                        >
+                          <Check className="w-3 h-3" />
+                          <span>مقبول</span>
+                        </button>
+                        <button
+                          onClick={() => handleQuickReview(hostDoc.id, "NeedsCorrection")}
+                          disabled={actionLoading}
+                          className="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-[11px] font-bold flex items-center gap-0.5 shadow-xs cursor-pointer transition-all"
+                          title="طلب تصحيح هوية المستضيف"
+                        >
+                          <AlertTriangle className="w-3 h-3" />
+                          <span>يحتاج تصحيح</span>
+                        </button>
+                        <button
+                          onClick={() => handleQuickReview(hostDoc.id, "Rejected")}
+                          disabled={actionLoading}
+                          className="px-2 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-md text-[11px] font-bold flex items-center gap-0.5 shadow-xs cursor-pointer transition-all"
+                          title="رفض هوية المستضيف"
+                        >
+                          <X className="w-3 h-3" />
+                          <span>مرفوض</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Agent Return/Reset Action: only Agent can return reviewed documents */}
+                    {isAgent && hostDoc.reviewStatus !== "Pending" && (
                       <button
-                        onClick={() => {
-                          setReviewModalDoc(hostDoc);
-                          setReviewStatus(hostDoc.reviewStatus);
-                          setReviewNote(hostDoc.reviewNote || "");
-                        }}
-                        className="px-2.5 py-1 bg-sky-600 hover:bg-sky-700 text-white rounded-md text-[11px] font-semibold"
+                        onClick={() => handleQuickReview(hostDoc.id, "Pending", "تمت إعادة المستند للمراجعة من قبل الوكيل")}
+                        disabled={actionLoading}
+                        className="px-2 py-1 text-[10px] bg-amber-50 hover:bg-amber-600 text-amber-800 hover:text-white border border-amber-300 rounded-md font-bold transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
+                        title="إعادة فتح تدقيق المستند لموظف الصفا"
                       >
-                        تدقيق
+                        <RotateCcw className="w-3 h-3" />
+                        <span>إعادة للمراجعة</span>
                       </button>
                     )}
 
@@ -1076,16 +1148,49 @@ export default function RequestDetailPage({
                               <span>معاينة</span>
                             </button>
 
-                            {isSafaReviewer && (
+                            {/* Quick Review Buttons when Pending */}
+                            {(isSafaReviewer || isAgent) && doc.reviewStatus === "Pending" && (
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => handleQuickReview(doc.id, "Accepted")}
+                                  disabled={actionLoading}
+                                  className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[11px] font-bold flex items-center gap-0.5 shadow-xs cursor-pointer transition-all"
+                                  title="قبول المستند"
+                                >
+                                  <Check className="w-3 h-3" />
+                                  <span>مقبول</span>
+                                </button>
+                                <button
+                                  onClick={() => handleQuickReview(doc.id, "NeedsCorrection")}
+                                  disabled={actionLoading}
+                                  className="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-[11px] font-bold flex items-center gap-0.5 shadow-xs cursor-pointer transition-all"
+                                  title="طلب تصحيح للمستند"
+                                >
+                                  <AlertTriangle className="w-3 h-3" />
+                                  <span>يحتاج تصحيح</span>
+                                </button>
+                                <button
+                                  onClick={() => handleQuickReview(doc.id, "Rejected")}
+                                  disabled={actionLoading}
+                                  className="px-2 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-md text-[11px] font-bold flex items-center gap-0.5 shadow-xs cursor-pointer transition-all"
+                                  title="رفض المستند"
+                                >
+                                  <X className="w-3 h-3" />
+                                  <span>مرفوض</span>
+                                </button>
+                              </div>
+                            )}
+
+                            {/* Agent Return/Reset Action: only Agent can return reviewed documents */}
+                            {isAgent && doc.reviewStatus !== "Pending" && (
                               <button
-                                onClick={() => {
-                                  setReviewModalDoc(doc);
-                                  setReviewStatus(doc.reviewStatus);
-                                  setReviewNote(doc.reviewNote || "");
-                                }}
-                                className="px-2.5 py-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-md font-medium cursor-pointer"
+                                onClick={() => handleQuickReview(doc.id, "Pending", "تمت إعادة المستند للمراجعة من قبل الوكيل")}
+                                disabled={actionLoading}
+                                className="px-2 py-1 text-[10px] bg-amber-50 hover:bg-amber-600 text-amber-800 hover:text-white border border-amber-300 rounded-md font-bold transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
+                                title="إعادة فتح تدقيق المستند لموظف الصفا"
                               >
-                                تدقيق
+                                <RotateCcw className="w-3 h-3" />
+                                <span>إعادة للمراجعة</span>
                               </button>
                             )}
 
