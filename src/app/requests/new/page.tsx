@@ -25,15 +25,26 @@ import {
   Plane,
   Calendar,
   Clock,
+  RotateCcw,
+  Sparkles,
 } from "lucide-react";
+import { scanPassportMRZ } from "@/lib/mrzScanner";
 
 interface TravelerDraft {
   id: string;
+  fullName?: string;
+  fullNameEnglish?: string;
+  passportNumber?: string;
+  nationality?: string;
+  dateOfBirth?: string;
   passportFile: File | null;
   passportPreview?: string;
   photoFile: File | null;
   photoPreview?: string;
   ticketFile: File | null;
+  isScanning?: boolean;
+  scanSuccess?: boolean;
+  scanMessage?: string;
 }
 
 export default function UnifiedNewRequestPage() {
@@ -55,6 +66,7 @@ export default function UnifiedNewRequestPage() {
   const [travelers, setTravelers] = useState<TravelerDraft[]>([
     {
       id: "tr-1",
+      fullName: "",
       passportFile: null,
       photoFile: null,
       ticketFile: null,
@@ -73,6 +85,7 @@ export default function UnifiedNewRequestPage() {
       ...prev,
       {
         id: `tr-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        fullName: "",
         passportFile: null,
         photoFile: null,
         ticketFile: null,
@@ -87,6 +100,82 @@ export default function UnifiedNewRequestPage() {
       return;
     }
     setTravelers((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  // Update specific traveler field (name, passport number, etc.)
+  const updateTravelerField = (
+    travelerId: string,
+    field: "fullName" | "passportNumber" | "nationality" | "dateOfBirth",
+    value: string
+  ) => {
+    setTravelers((prev) =>
+      prev.map((t) => (t.id === travelerId ? { ...t, [field]: value } : t))
+    );
+  };
+
+  // Run MRZ scan on passport file
+  const runMrzScanForTraveler = async (travelerId: string, file: File) => {
+    if (!file.type.startsWith("image/")) return;
+
+    setTravelers((prev) =>
+      prev.map((t) =>
+        t.id === travelerId
+          ? {
+              ...t,
+              isScanning: true,
+              scanSuccess: false,
+              scanMessage: "جاري فحص وقراءة شريط الجواز (MRZ)...",
+            }
+          : t
+      )
+    );
+
+    try {
+      const result = await scanPassportMRZ(file, (msg) => {
+        setTravelers((prev) =>
+          prev.map((t) => (t.id === travelerId ? { ...t, scanMessage: msg } : t))
+        );
+      });
+
+      setTravelers((prev) =>
+        prev.map((t) => {
+          if (t.id !== travelerId) return t;
+          if (result && result.fullNameArabic) {
+            return {
+              ...t,
+              fullName: result.fullNameArabic,
+              fullNameEnglish: result.fullNameEnglish,
+              passportNumber: result.passportNumber || t.passportNumber,
+              nationality: result.nationality || t.nationality,
+              dateOfBirth: result.dateOfBirth || t.dateOfBirth,
+              isScanning: false,
+              scanSuccess: true,
+              scanMessage: `تم التعرف بنجاح على: ${result.fullNameArabic}`,
+            };
+          } else {
+            return {
+              ...t,
+              isScanning: false,
+              scanSuccess: false,
+              scanMessage: "لم يتم التقاط شريط MRZ بوضوح، يمكنك إدخال الاسم يدوياً.",
+            };
+          }
+        })
+      );
+    } catch {
+      setTravelers((prev) =>
+        prev.map((t) =>
+          t.id === travelerId
+            ? {
+                ...t,
+                isScanning: false,
+                scanSuccess: false,
+                scanMessage: "تعذر فحص الجواز، يرجى كتابة الاسم يدوياً.",
+              }
+            : t
+        )
+      );
+    }
   };
 
   // Handle document file changes
@@ -108,8 +197,13 @@ export default function UnifiedNewRequestPage() {
           updated.passportFile = file;
           if (file && file.type.startsWith("image/")) {
             updated.passportPreview = URL.createObjectURL(file);
+            setTimeout(() => {
+              runMrzScanForTraveler(travelerId, file);
+            }, 50);
           } else {
             updated.passportPreview = undefined;
+            updated.isScanning = false;
+            updated.scanSuccess = false;
           }
         } else if (docType === "photo") {
           updated.photoFile = file;
@@ -218,7 +312,10 @@ export default function UnifiedNewRequestPage() {
         setProgressPercent(20 + Math.floor((i / travelers.length) * 40));
 
         const createdTraveler = await api.travelers.add(createdGroup.id, {
-          fullName: `مسافر #${i + 1}`,
+          fullName: t.fullName?.trim() || `مسافر #${i + 1}`,
+          passportNumber: t.passportNumber?.trim() || undefined,
+          nationality: t.nationality?.trim() || undefined,
+          dateOfBirth: t.dateOfBirth?.trim() || undefined,
         });
 
         // Upload Passport
@@ -482,14 +579,44 @@ export default function UnifiedNewRequestPage() {
               className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 space-y-4 relative"
             >
               {/* Traveler Card Header */}
-              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                <div className="flex items-center gap-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-3">
+                <div className="flex items-center gap-2.5 flex-wrap">
                   <span className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold">
                     {index + 1}
                   </span>
-                  <h3 className="text-sm font-bold text-gray-900">
-                    المسافر #{index + 1}
-                  </h3>
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                      {traveler.fullName?.trim() ? (
+                        <>
+                          <span className="text-blue-900 font-extrabold">{traveler.fullName}</span>
+                          {traveler.fullNameEnglish && (
+                            <span className="text-xs text-gray-500 font-normal font-mono">
+                              ({traveler.fullNameEnglish})
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span>المسافر #{index + 1}</span>
+                      )}
+                    </h3>
+                  </div>
+
+                  {/* Status Indicator */}
+                  {traveler.isScanning ? (
+                    <span className="inline-flex items-center gap-1.5 text-xs text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-full animate-pulse">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                      <span>{traveler.scanMessage || "جاري فحص الجواز وقراءة الاسم..."}</span>
+                    </span>
+                  ) : traveler.scanSuccess ? (
+                    <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full font-medium">
+                      <Sparkles className="w-3 h-3 text-emerald-600" />
+                      <span>تم استخراج الاسم وترجمته تلقائياً</span>
+                    </span>
+                  ) : traveler.scanMessage && traveler.passportFile ? (
+                    <span className="inline-flex items-center gap-1 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full">
+                      <span>{traveler.scanMessage}</span>
+                    </span>
+                  ) : null}
                 </div>
 
                 {travelers.length > 1 && (
@@ -502,6 +629,53 @@ export default function UnifiedNewRequestPage() {
                     حذف هذا المسافر
                   </button>
                 )}
+              </div>
+
+              {/* Traveler Basic Data Inputs (Auto-filled from MRZ or manually editable) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50/80 p-3.5 rounded-xl border border-slate-200">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1 flex items-center justify-between">
+                    <span>اسم المسافر (بالعربية)</span>
+                    {traveler.scanSuccess && (
+                      <span className="text-[10px] text-emerald-700 font-semibold flex items-center gap-0.5">
+                        <CheckCircle2 className="w-3 h-3" /> تم التعرف تلقائياً
+                      </span>
+                    )}
+                  </label>
+                  <input
+                    type="text"
+                    value={traveler.fullName || ""}
+                    onChange={(e) =>
+                      updateTravelerField(traveler.id, "fullName", e.target.value)
+                    }
+                    placeholder="مثال: محمد أحمد علي (يُملأ تلقائياً عند رفع صورة الجواز)"
+                    className="w-full text-xs px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1 flex items-center justify-between">
+                    <span>رقم جواز السفر</span>
+                    {traveler.nationality && (
+                      <span className="text-[10px] text-gray-500 font-normal">
+                        الجنسية: {traveler.nationality}
+                      </span>
+                    )}
+                  </label>
+                  <input
+                    type="text"
+                    value={traveler.passportNumber || ""}
+                    onChange={(e) =>
+                      updateTravelerField(
+                        traveler.id,
+                        "passportNumber",
+                        e.target.value.toUpperCase()
+                      )
+                    }
+                    placeholder="رقم الجواز (يُملأ تلقائياً)"
+                    className="w-full text-xs px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                  />
+                </div>
               </div>
 
               {/* Direct Document Upload Cards (3 items) */}
@@ -549,13 +723,33 @@ export default function UnifiedNewRequestPage() {
                           </p>
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleFileChange(traveler.id, "passport", null)}
-                        className="text-[11px] text-red-600 hover:text-red-800 font-medium flex items-center gap-1"
-                      >
-                        <X className="w-3 h-3" /> إزالة واستبدال
-                      </button>
+                      <div className="flex items-center gap-3 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => handleFileChange(traveler.id, "passport", null)}
+                          className="text-[11px] text-red-600 hover:text-red-800 font-medium flex items-center gap-1"
+                        >
+                          <X className="w-3 h-3" /> إزالة واستبدال
+                        </button>
+                        {traveler.passportFile.type.startsWith("image/") && (
+                          <button
+                            type="button"
+                            disabled={traveler.isScanning}
+                            onClick={() =>
+                              runMrzScanForTraveler(traveler.id, traveler.passportFile!)
+                            }
+                            className="text-[11px] text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1 disabled:opacity-50"
+                            title="إعادة فحص وقراءة شريط MRZ"
+                          >
+                            <RotateCcw
+                              className={`w-3 h-3 ${
+                                traveler.isScanning ? "animate-spin" : ""
+                              }`}
+                            />
+                            إعادة فحص الجواز
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ) : (
                     <div>

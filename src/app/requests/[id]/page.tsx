@@ -41,7 +41,11 @@ import {
   RotateCcw,
   Archive,
   Hourglass,
+  Edit2,
+  Sparkles,
+  Loader2,
 } from "lucide-react";
+import { scanPassportMRZ } from "@/lib/mrzScanner";
 
 export default function RequestDetailPage({
   requestId: propRequestId,
@@ -96,6 +100,12 @@ export default function RequestDetailPage({
   const [editReturnDate, setEditReturnDate] = useState("");
   const [editFlightDepartureTime, setEditFlightDepartureTime] = useState("");
   const [editAirportArrivalTime, setEditAirportArrivalTime] = useState("");
+
+  // Traveler Inline Edit / MRZ Scanning
+  const [editingTravelerId, setEditingTravelerId] = useState<string | null>(null);
+  const [editTravelerName, setEditTravelerName] = useState("");
+  const [editTravelerPassport, setEditTravelerPassport] = useState("");
+  const [isMrzScanningTravelerId, setIsMrzScanningTravelerId] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -210,7 +220,39 @@ export default function RequestDetailPage({
       setActionLoading(true);
       setError(null);
       await api.documents.upload(requestId, file, docType, travelerId);
-      setSuccess(`تم رفع مستند (${DOCUMENT_TYPE_LABELS[docType]}) بنجاح.`);
+
+      // If uploading a passport image, scan MRZ and update traveler name if generic
+      if (docType === "Passport" && travelerId && file.type.startsWith("image/")) {
+        try {
+          const scanResult = await scanPassportMRZ(file);
+          if (scanResult && scanResult.fullNameArabic) {
+            const currentTraveler = request?.travelers?.find((t) => t.id === travelerId);
+            const isGenericName =
+              !currentTraveler?.fullName ||
+              /^مسافر\s*#?\d*$/i.test(currentTraveler.fullName.trim()) ||
+              /^المسافر\s*#?\d*$/i.test(currentTraveler.fullName.trim());
+            if (isGenericName) {
+              await api.travelers.update(travelerId, {
+                fullName: scanResult.fullNameArabic,
+                passportNumber: scanResult.passportNumber || currentTraveler?.passportNumber,
+                nationality: scanResult.nationality || currentTraveler?.nationality,
+                dateOfBirth: scanResult.dateOfBirth || currentTraveler?.dateOfBirth,
+              });
+              setSuccess(`تم رفع الجواز واستخراج اسم المسافر تلقائياً: (${scanResult.fullNameArabic})`);
+            } else {
+              setSuccess(`تم رفع مستند (${DOCUMENT_TYPE_LABELS[docType]}) بنجاح.`);
+            }
+          } else {
+            setSuccess(`تم رفع مستند (${DOCUMENT_TYPE_LABELS[docType]}) بنجاح.`);
+          }
+        } catch (mrzErr) {
+          console.warn("MRZ auto-scan error:", mrzErr);
+          setSuccess(`تم رفع مستند (${DOCUMENT_TYPE_LABELS[docType]}) بنجاح.`);
+        }
+      } else {
+        setSuccess(`تم رفع مستند (${DOCUMENT_TYPE_LABELS[docType]}) بنجاح.`);
+      }
+
       await loadRequest();
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -221,6 +263,68 @@ export default function RequestDetailPage({
     } finally {
       setActionLoading(false);
       setUploadingFor(null);
+    }
+  };
+
+  const handleUpdateTraveler = async (
+    travelerId: string,
+    fullName: string,
+    passportNumber?: string
+  ) => {
+    if (!fullName.trim()) {
+      setError("يرجى كتابة اسم المسافر.");
+      return;
+    }
+    try {
+      setActionLoading(true);
+      setError(null);
+      const current = request?.travelers.find((t) => t.id === travelerId);
+      await api.travelers.update(travelerId, {
+        fullName: fullName.trim(),
+        passportNumber: passportNumber?.trim() || current?.passportNumber,
+        nationality: current?.nationality,
+        dateOfBirth: current?.dateOfBirth,
+        notes: current?.notes,
+      });
+      setSuccess("تم تحديث بيانات المسافر بنجاح.");
+      setEditingTravelerId(null);
+      await loadRequest();
+    } catch (err: unknown) {
+      if (err instanceof Error) setError(err.message);
+      else setError("فشل تحديث بيانات المسافر.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleScanExistingPassport = async (traveler: Traveler) => {
+    const passDoc = traveler.documents?.find((d) => d.documentType === "Passport");
+    if (!passDoc) {
+      setError("لا يوجد جواز سفر مرفوع لهذا المسافر لفحصه.");
+      return;
+    }
+    try {
+      setIsMrzScanningTravelerId(traveler.id);
+      setError(null);
+      const streamUrl = await api.documents.getStreamUrl(passDoc.id);
+      const scanResult = await scanPassportMRZ(streamUrl);
+      if (scanResult && scanResult.fullNameArabic) {
+        await api.travelers.update(traveler.id, {
+          fullName: scanResult.fullNameArabic,
+          passportNumber: scanResult.passportNumber || traveler.passportNumber,
+          nationality: scanResult.nationality || traveler.nationality,
+          dateOfBirth: scanResult.dateOfBirth || traveler.dateOfBirth,
+        });
+        setSuccess(`تم بنجاح فحص الجواز وتحديث الاسم إلى: (${scanResult.fullNameArabic})`);
+        await loadRequest();
+      } else {
+        setError("تعذر قراءة شريط الـ MRZ بوضوح من صورة الجواز، يمكنك تعديل الاسم يدوياً.");
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error) setError(err.message);
+      else setError("حدث خطأ أثناء فحص صورة الجواز.");
+    } finally {
+      setIsMrzScanningTravelerId(null);
     }
   };
 
@@ -1522,27 +1626,99 @@ export default function RequestDetailPage({
             {/* Traveler Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-gray-100 pb-3">
               <div className="flex items-center gap-3">
-                <span className="w-7 h-7 rounded-full bg-emerald-100 text-emerald-800 font-black text-xs flex items-center justify-center">
+                <span className="w-7 h-7 rounded-full bg-emerald-100 text-emerald-800 font-black text-xs flex items-center justify-center shrink-0">
                   {tIndex + 1}
                 </span>
-                <div>
-                  <h3 className="text-sm font-bold text-gray-900">
-                    {traveler.fullName}
-                  </h3>
-                  <div className="text-xs text-gray-500 flex gap-2 mt-0.5">
-                    {traveler.passportNumber && (
-                      <span className="font-mono">
-                        جواز: {traveler.passportNumber}
-                      </span>
-                    )}
-                    {traveler.nationality && (
-                      <span>• الجنسية: {traveler.nationality}</span>
-                    )}
+                {editingTravelerId === traveler.id ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      type="text"
+                      value={editTravelerName}
+                      onChange={(e) => setEditTravelerName(e.target.value)}
+                      placeholder="اسم المسافر بالعربية"
+                      className="text-xs px-2.5 py-1.5 border border-emerald-400 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 font-bold"
+                    />
+                    <input
+                      type="text"
+                      value={editTravelerPassport}
+                      onChange={(e) => setEditTravelerPassport(e.target.value.toUpperCase())}
+                      placeholder="رقم الجواز"
+                      className="text-xs px-2.5 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateTraveler(traveler.id, editTravelerName, editTravelerPassport)}
+                      disabled={actionLoading}
+                      className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-xs cursor-pointer"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      <span>حفظ</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingTravelerId(null)}
+                      className="px-2 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-medium flex items-center gap-1 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      <span>إلغاء</span>
+                    </button>
                   </div>
-                </div>
+                ) : (
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-bold text-gray-900">
+                        {traveler.fullName}
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingTravelerId(traveler.id);
+                          setEditTravelerName(traveler.fullName);
+                          setEditTravelerPassport(traveler.passportNumber || "");
+                        }}
+                        className="text-gray-400 hover:text-blue-600 p-1 rounded hover:bg-blue-50 transition-colors"
+                        title="تعديل اسم وبيانات المسافر"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <div className="text-xs text-gray-500 flex gap-2 mt-0.5">
+                      {traveler.passportNumber && (
+                        <span className="font-mono">
+                          جواز: {traveler.passportNumber}
+                        </span>
+                      )}
+                      {traveler.nationality && (
+                        <span>• الجنسية: {traveler.nationality}</span>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center gap-2">
+                {/* MRZ Scan Button if passport document exists */}
+                {traveler.documents?.some((d) => d.documentType === "Passport") && (
+                  <button
+                    type="button"
+                    disabled={isMrzScanningTravelerId === traveler.id}
+                    onClick={() => handleScanExistingPassport(traveler)}
+                    className="text-xs text-blue-700 hover:text-blue-900 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-md font-semibold flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
+                    title="إعادة فحص صورة الجواز المرفوعة لاستخراج الاسم والبيانات تلقائياً"
+                  >
+                    <RotateCcw
+                      className={`w-3.5 h-3.5 ${
+                        isMrzScanningTravelerId === traveler.id ? "animate-spin" : ""
+                      }`}
+                    />
+                    <span>
+                      {isMrzScanningTravelerId === traveler.id
+                        ? "جاري فحص الجواز..."
+                        : "فحص الجواز تلقائياً (MRZ)"}
+                    </span>
+                  </button>
+                )}
+
                 {(isSafaReviewer || isAgent) && (
                   <button
                     type="button"
