@@ -27,8 +27,9 @@ import {
   Clock,
   RotateCcw,
   Sparkles,
+  Languages,
 } from "lucide-react";
-import { scanPassportMRZ } from "@/lib/mrzScanner";
+import { scanPassportMRZ, translateEnglishNameToArabic } from "@/lib/mrzScanner";
 
 interface TravelerDraft {
   id: string;
@@ -642,15 +643,33 @@ export default function UnifiedNewRequestPage() {
                       </span>
                     )}
                   </label>
-                  <input
-                    type="text"
-                    value={traveler.fullName || ""}
-                    onChange={(e) =>
-                      updateTravelerField(traveler.id, "fullName", e.target.value)
-                    }
-                    placeholder="مثال: محمد أحمد علي (يُملأ تلقائياً عند رفع صورة الجواز)"
-                    className="w-full text-xs px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
-                  />
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      value={traveler.fullName || ""}
+                      onChange={(e) =>
+                        updateTravelerField(traveler.id, "fullName", e.target.value)
+                      }
+                      placeholder="مثال: محمد أحمد علي (يُملأ تلقائياً عند رفع صورة الجواز)"
+                      className="w-full text-xs px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                    />
+                    {traveler.fullName && /[A-Za-z]/.test(traveler.fullName) && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const tr = await translateEnglishNameToArabic(traveler.fullName!);
+                          if (tr) {
+                            updateTravelerField(traveler.id, "fullName", tr);
+                          }
+                        }}
+                        className="shrink-0 px-2.5 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold rounded-lg border border-blue-200 flex items-center gap-1 cursor-pointer transition-colors"
+                        title="ترجمة الاسم بالذكاء الاصطناعي عبر Google Translate"
+                      >
+                        <Languages className="w-3.5 h-3.5" />
+                        <span>ترجمة</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div>

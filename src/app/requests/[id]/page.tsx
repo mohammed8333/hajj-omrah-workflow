@@ -44,8 +44,9 @@ import {
   Edit2,
   Sparkles,
   Loader2,
+  Languages,
 } from "lucide-react";
-import { scanPassportMRZ } from "@/lib/mrzScanner";
+import { scanPassportMRZ, translateEnglishNameToArabic } from "@/lib/mrzScanner";
 
 export default function RequestDetailPage({
   requestId: propRequestId,
@@ -325,6 +326,22 @@ export default function RequestDetailPage({
       else setError("حدث خطأ أثناء فحص صورة الجواز.");
     } finally {
       setIsMrzScanningTravelerId(null);
+    }
+  };
+
+  const handleTranslateEditName = async () => {
+    if (!editTravelerName.trim()) return;
+    try {
+      setActionLoading(true);
+      const translated = await translateEnglishNameToArabic(editTravelerName.trim());
+      if (translated) {
+        setEditTravelerName(translated);
+        setSuccess(`تمت ترجمة الاسم عبر Google Translate إلى: (${translated})`);
+      }
+    } catch (e) {
+      console.warn("Translation failed:", e);
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -1645,6 +1662,16 @@ export default function RequestDetailPage({
                       placeholder="رقم الجواز"
                       className="text-xs px-2.5 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono"
                     />
+                    <button
+                      type="button"
+                      onClick={handleTranslateEditName}
+                      disabled={actionLoading || !editTravelerName.trim()}
+                      className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer border border-blue-200"
+                      title="ترجمة الاسم المكتوب فوراً بدقة عبر Google Translate"
+                    >
+                      <Languages className="w-3.5 h-3.5" />
+                      <span>ترجمة جوجل</span>
+                    </button>
                     <button
                       type="button"
                       onClick={() => handleUpdateTraveler(traveler.id, editTravelerName, editTravelerPassport)}

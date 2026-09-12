@@ -98,6 +98,17 @@ const ARABIC_NAMES_DICT: Record<string, string> = {
   ASHRAF: "أشرف",
   ATEF: "عاطف",
   ADEL: "عادل",
+  NESMA: "نسمة",
+  NESMAH: "نسمة",
+  NISMA: "نسمة",
+  NEMA: "نعمة",
+  MOHAM: "محمد",
+  ELBAHNASAWI: "البهنساوي",
+  BAHNASAWI: "البهنساوي",
+  ELBAHNASAWY: "البهنساوي",
+  BAHNASAWY: "البهنساوي",
+  ELBAHNASI: "البهنسي",
+  BAHNASI: "البهنسي",
   ESSAM: "عصام",
   ISAM: "عصام",
   FAROUK: "فاروق",
@@ -238,8 +249,21 @@ const COUNTRY_CODES: Record<string, string> = {
   TUR: "تركيا",
 };
 
+// Clean Arabic text from non-Arabic letters or HTML entities
+function cleanArabicName(name: string): string {
+  return name
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/[^\u0600-\u06FF\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 // 2. Phonetic Transliteration Fallback for unlisted names
-function transliterateWordToArabic(word: string): string {
+function transliterateWordToArabicLocally(word: string): string {
   let w = word.toUpperCase().trim();
   if (ARABIC_NAMES_DICT[w]) {
     return ARABIC_NAMES_DICT[w];
@@ -248,15 +272,15 @@ function transliterateWordToArabic(word: string): string {
   // Check compound names with EL / AL
   if (w.startsWith("EL") && w.length > 2) {
     const rest = w.substring(2);
-    return "ال" + (ARABIC_NAMES_DICT[rest] || transliterateWordToArabic(rest));
+    return "ال" + (ARABIC_NAMES_DICT[rest] || transliterateWordToArabicLocally(rest));
   }
   if (w.startsWith("AL") && w.length > 2) {
     const rest = w.substring(2);
-    return "ال" + (ARABIC_NAMES_DICT[rest] || transliterateWordToArabic(rest));
+    return "ال" + (ARABIC_NAMES_DICT[rest] || transliterateWordToArabicLocally(rest));
   }
   if (w.startsWith("ABD") && w.length > 3) {
     const rest = w.substring(3);
-    return "عبد " + (ARABIC_NAMES_DICT[rest] || transliterateWordToArabic(rest));
+    return "عبد " + (ARABIC_NAMES_DICT[rest] || transliterateWordToArabicLocally(rest));
   }
 
   // Phonetic letter mapping replacement
@@ -304,18 +328,97 @@ function transliterateWordToArabic(word: string): string {
   return res;
 }
 
-export function translateEnglishNameToArabic(englishName: string): string {
+export function translateEnglishNameToArabicLocally(englishName: string): string {
   if (!englishName) return "";
 
-  // Normalize: split by spaces and dashes
   const parts = englishName
     .replace(/[^A-Za-z\s-]/g, "")
     .trim()
     .split(/[\s-]+/)
     .filter(Boolean);
 
-  const arabicParts = parts.map((part) => transliterateWordToArabic(part));
+  const arabicParts = parts.map((part) => transliterateWordToArabicLocally(part));
   return arabicParts.join(" ");
+}
+
+/**
+ * Highly accurate translation of English names to Arabic using:
+ * 1. Google Translate API (clients5.google.com/translate_a/t with CORS support)
+ * 2. Fallback to Google Input Tools transliteration API
+ * 3. Fallback to MyMemory translation API
+ * 4. Fallback to local dictionary + phonetic transliteration
+ */
+export async function translateEnglishNameToArabic(
+  englishName: string
+): Promise<string> {
+  if (!englishName) return "";
+
+  const cleaned = englishName
+    .replace(/[^A-Za-z\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!cleaned) return "";
+
+  // 1. Primary: Google Translate (Chrome client endpoint with CORS support)
+  try {
+    const googleUrl = `https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=en&tl=ar&q=${encodeURIComponent(
+      cleaned
+    )}`;
+    const res = await fetch(googleUrl, { signal: AbortSignal.timeout(4500) });
+    if (res.ok) {
+      const data = await res.json();
+      let translated = "";
+      if (Array.isArray(data) && data.length > 0 && typeof data[0] === "string") {
+        translated = data[0].trim();
+      } else if (typeof data === "string") {
+        translated = data.trim();
+      }
+      if (translated && !/^[A-Za-z\s]+$/.test(translated)) {
+        return cleanArabicName(translated);
+      }
+    }
+  } catch (err) {
+    console.warn("Google Translate client5 failed, trying fallback:", err);
+  }
+
+  // 2. Fallback: Google Input Tools Transliteration API
+  try {
+    const gitUrl = `https://inputtools.google.com/request?text=${encodeURIComponent(
+      cleaned
+    )}&itc=ar-t-i0-und&num=1&cp=0&cs=1&ie=utf-8&oe=utf-8&app=demopage`;
+    const res = await fetch(gitUrl, { signal: AbortSignal.timeout(4500) });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data[0] === "SUCCESS" && data[1]?.[0]?.[1]?.[0]) {
+        const translated = data[1][0][1][0].trim();
+        if (translated && !/^[A-Za-z\s]+$/.test(translated)) {
+          return cleanArabicName(translated);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("Google Input Tools transliteration failed, trying MyMemory:", err);
+  }
+
+  // 3. Fallback: MyMemory Translation API
+  try {
+    const myMemoryUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(
+      cleaned
+    )}&langpair=en|ar`;
+    const res = await fetch(myMemoryUrl, { signal: AbortSignal.timeout(4500) });
+    if (res.ok) {
+      const data = await res.json();
+      const translated = data?.responseData?.translatedText?.trim();
+      if (translated && !/^[A-Za-z\s]+$/.test(translated)) {
+        return cleanArabicName(translated);
+      }
+    }
+  } catch (err) {
+    console.warn("MyMemory translation failed, falling back to local engine:", err);
+  }
+
+  // 4. Fallback: Local Dictionary + Transliteration
+  return cleanArabicName(translateEnglishNameToArabicLocally(cleaned));
 }
 
 // Helper to preprocess image canvas for MRZ detection
@@ -410,8 +513,8 @@ export async function scanPassportMRZ(
     const ret = await worker.recognize(canvas);
     const text = ret?.data?.text || "";
 
-    onProgress?.("جاري تحليل بيانات الجواز وترجمة الاسم...");
-    const parsed = parseMrzLines(text);
+    onProgress?.("جاري تحليل بيانات الجواز وترجمة الاسم عبر Google Translate...");
+    const parsed = await parseMrzLines(text);
     return parsed;
   } catch (err) {
     console.warn("MRZ scanning failed:", err);
@@ -426,7 +529,7 @@ export async function scanPassportMRZ(
 }
 
 // 4. Parse 2 lines of TD3 MRZ (Passport)
-export function parseMrzLines(ocrText: string): ScannedPassportData | null {
+export async function parseMrzLines(ocrText: string): Promise<ScannedPassportData | null> {
   if (!ocrText) return null;
 
   // Split into lines and filter those looking like MRZ
@@ -509,8 +612,8 @@ export function parseMrzLines(ocrText: string): ScannedPassportData | null {
     }
   }
 
-  // Convert English Name to Arabic
-  const fullNameArabic = translateEnglishNameToArabic(fullNameEnglish);
+  // Convert English Name to Arabic via Google Translate
+  const fullNameArabic = await translateEnglishNameToArabic(fullNameEnglish);
 
   return {
     fullNameArabic,
