@@ -1,4 +1,4 @@
-import * as XLSX from "xlsx";
+import XLSX from "xlsx-js-style";
 import { GroupRequestDetail } from "@/types";
 import { STATUS_MAP } from "./constants";
 
@@ -53,9 +53,10 @@ function getTicketDocument(r: GroupRequestDetail) {
 export function exportRequestsToExcel(requests: GroupRequestDetail[]) {
   // 1. Prepare Main Sheet: Transactions with grouped traveler rows underneath
   const transactionsData: any[] = [];
+  const transactionsMeta: { reqIndex: number; isFirstRowOfReq: boolean }[] = [];
   let transactionCounter = 1;
 
-  requests.forEach((r) => {
+  requests.forEach((r, rIdx) => {
     const statusArabic = STATUS_MAP[r.status]?.label || r.status;
     const hostDoc = getHostDocument(r);
     const hostLink = hostDoc ? buildDocUrl(r.id, hostDoc.id) : "لم يُرفع بعد";
@@ -93,6 +94,7 @@ export function exportRequestsToExcel(requests: GroupRequestDetail[]) {
         "تاريخ الإنشاء": new Date(r.createdAt).toLocaleString("ar-SA"),
         "آخر تحديث": new Date(r.updatedAt).toLocaleString("ar-SA"),
       });
+      transactionsMeta.push({ reqIndex: rIdx, isFirstRowOfReq: true });
     } else {
       // Transaction has one or more travelers: list them row under row
       travelers.forEach((t, tIndex) => {
@@ -139,6 +141,7 @@ export function exportRequestsToExcel(requests: GroupRequestDetail[]) {
             "تاريخ الإنشاء": new Date(r.createdAt).toLocaleString("ar-SA"),
             "آخر تحديث": new Date(r.updatedAt).toLocaleString("ar-SA"),
           });
+          transactionsMeta.push({ reqIndex: rIdx, isFirstRowOfReq: true });
         } else {
           // Row 2..N: Subsequent travelers under this transaction
           // Transaction fields are kept blank, only traveler details and document links are shown
@@ -167,6 +170,7 @@ export function exportRequestsToExcel(requests: GroupRequestDetail[]) {
             "تاريخ الإنشاء": "",
             "آخر تحديث": "",
           });
+          transactionsMeta.push({ reqIndex: rIdx, isFirstRowOfReq: false });
         }
       });
     }
@@ -174,14 +178,15 @@ export function exportRequestsToExcel(requests: GroupRequestDetail[]) {
 
   // 2. Prepare Secondary Sheet: Travelers & Pilgrims (المعتمرون والمسافرون)
   const travelersData: any[] = [];
+  const travelersMeta: { reqIndex: number; isFirstRowOfReq: boolean }[] = [];
   let travelerCounter = 1;
 
-  requests.forEach((r) => {
+  requests.forEach((r, rIdx) => {
     const statusArabic = STATUS_MAP[r.status]?.label || r.status;
     const hostDoc = getHostDocument(r);
     const hostLink = hostDoc ? buildDocUrl(r.id, hostDoc.id) : "لم يُرفع بعد";
 
-    r.travelers?.forEach((t) => {
+    r.travelers?.forEach((t, tIndex) => {
       let tStatus = "قيد التدقيق";
       if (t.status === "Accepted") tStatus = "مقبول";
       else if (t.status === "NeedsCorrection") tStatus = "مطلوب تصحيح";
@@ -213,6 +218,7 @@ export function exportRequestsToExcel(requests: GroupRequestDetail[]) {
         "ملاحظات": t.notes || "-",
         "تاريخ الإضافة": t.createdAt ? new Date(t.createdAt).toLocaleDateString("ar-SA") : "-",
       });
+      travelersMeta.push({ reqIndex: rIdx, isFirstRowOfReq: tIndex === 0 });
     });
   });
 
@@ -276,23 +282,111 @@ export function exportRequestsToExcel(requests: GroupRequestDetail[]) {
     { wch: 16 }, // تاريخ الإضافة
   ];
 
-  // Attach clickable hyperlinks to all URL cells in both worksheets
-  function attachHyperlinks(ws: XLSX.WorkSheet) {
+  // Apply colors, alternating transaction tints, borders, fonts and clickable hyperlinks
+  function styleWorksheet(
+    ws: XLSX.WorkSheet,
+    rowMetadata: { reqIndex: number; isFirstRowOfReq?: boolean }[]
+  ) {
     if (!ws || !ws["!ref"]) return;
     const range = XLSX.utils.decode_range(ws["!ref"]);
-    for (let R = range.s.r + 1; R <= range.e.r; ++R) {
-      for (let C = range.s.c; C <= range.e.c; ++C) {
-        const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
-        const cell = ws[cellAddress];
-        if (cell && typeof cell.v === "string" && cell.v.startsWith("http")) {
-          cell.l = { Target: cell.v, Tooltip: "انقر لفتح المستند في النظام" };
-        }
+
+    // Enable Right-To-Left view natively for Arabic layout
+    ws["!views"] = [{ RTL: true }];
+
+    // 1. Style Header Row (R = 0)
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+      const headerAddress = XLSX.utils.encode_cell({ r: range.s.r, c: C });
+      const cell = ws[headerAddress];
+      if (cell) {
+        cell.s = {
+          fill: {
+            patternType: "solid",
+            fgColor: { rgb: "0284C7" }, // Primary Sky Blue Header
+          },
+          font: {
+            name: "Calibri",
+            sz: 11,
+            bold: true,
+            color: { rgb: "FFFFFF" }, // White text
+          },
+          alignment: {
+            vertical: "center",
+            horizontal: "center",
+            wrapText: true,
+          },
+          border: {
+            top: { style: "medium", color: { rgb: "0369A1" } },
+            bottom: { style: "medium", color: { rgb: "0369A1" } },
+            left: { style: "thin", color: { rgb: "38BDF8" } },
+            right: { style: "thin", color: { rgb: "38BDF8" } },
+          },
+        };
       }
     }
+
+    // 2. Prepare row heights
+    const rowHeights: { hpt: number }[] = [{ hpt: 28 }];
+
+    // 3. Style Data Rows (R = 1..end)
+    for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+      rowHeights.push({ hpt: 24 });
+      const metaIdx = R - (range.s.r + 1);
+      const meta = rowMetadata[metaIdx];
+
+      // Alternating blue shades for transactions:
+      // Even transaction: "E0F2FE" (لبني فاتح ناعم ومريح)
+      // Odd transaction:  "BAE6FD" (لبني أغمق سيكا للتمييز الواضح)
+      const isOddTx = meta ? meta.reqIndex % 2 !== 0 : R % 2 !== 0;
+      const bgRgb = isOddTx ? "BAE6FD" : "E0F2FE";
+      const isNewTx = meta ? meta.isFirstRowOfReq : false;
+
+      for (let C = range.s.c; C <= range.e.c; ++C) {
+        const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+        let cell = ws[cellAddress];
+        if (!cell) {
+          cell = { t: "s", v: "" };
+          ws[cellAddress] = cell;
+        }
+
+        const isUrl = typeof cell.v === "string" && cell.v.startsWith("http");
+        if (isUrl) {
+          cell.l = { Target: cell.v, Tooltip: "انقر لفتح المستند في النظام" };
+        }
+
+        cell.s = {
+          fill: {
+            patternType: "solid",
+            fgColor: { rgb: bgRgb },
+          },
+          font: {
+            name: "Calibri",
+            sz: 10,
+            bold: isUrl || C === 0 || C === 1,
+            color: isUrl ? { rgb: "0369A1" } : { rgb: "0F172A" },
+            underline: isUrl,
+          },
+          alignment: {
+            vertical: "center",
+            horizontal: "center",
+            wrapText: true,
+          },
+          border: {
+            top: isNewTx && metaIdx > 0
+              ? { style: "medium", color: { rgb: "0284C7" } } // Thicker border separating transactions
+              : { style: "thin", color: { rgb: "CBD5E1" } },
+            bottom: { style: "thin", color: { rgb: "CBD5E1" } },
+            left: { style: "thin", color: { rgb: "CBD5E1" } },
+            right: { style: "thin", color: { rgb: "CBD5E1" } },
+          },
+        };
+      }
+    }
+
+    ws["!rows"] = rowHeights;
   }
 
-  attachHyperlinks(wsTransactions);
-  attachHyperlinks(wsTravelers);
+  styleWorksheet(wsTransactions, transactionsMeta);
+  styleWorksheet(wsTravelers, travelersMeta);
 
   XLSX.utils.book_append_sheet(workbook, wsTransactions, "قائمة المعاملات");
   XLSX.utils.book_append_sheet(workbook, wsTravelers, "بيانات المعتمرين والمسافرين");
