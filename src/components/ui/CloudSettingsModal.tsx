@@ -18,6 +18,8 @@ import {
   EyeOff,
   Copy,
   Info,
+  Download,
+  FileCheck,
 } from "lucide-react";
 import {
   getSupabaseConfig,
@@ -27,6 +29,7 @@ import {
   testSupabaseConnection,
 } from "@/lib/supabaseClient";
 import { api } from "@/lib/api";
+import { localDB } from "@/lib/localDatabase";
 
 interface CloudSettingsModalProps {
   isOpen: boolean;
@@ -57,6 +60,9 @@ export function CloudSettingsModal({
     success: boolean;
     message: string;
   } | null>(null);
+  const [localRequestsCount, setLocalRequestsCount] = useState(0);
+  const [localTravelersCount, setLocalTravelersCount] = useState(0);
+  const [backupSaved, setBackupSaved] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -67,8 +73,37 @@ export function CloudSettingsModal({
       setTestResult(null);
       setMigrationResult(null);
       setMigrationStatus(null);
+      setBackupSaved(false);
+
+      try {
+        const reqs = localDB.getAllRequestsFull();
+        setLocalRequestsCount(reqs.length);
+        const travCount = reqs.reduce((sum, r) => sum + (r.travelers?.length || 0), 0);
+        setLocalTravelersCount(travCount);
+      } catch {
+        // ignore
+      }
     }
   }, [isOpen]);
+
+  const handleExportLocalBackup = () => {
+    try {
+      const jsonStr = api.system.exportBackup();
+      const blob = new Blob([jsonStr], { type: "application/json" });
+      const u = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = u;
+      a.download = `hajj_local_backup_${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(u);
+      setBackupSaved(true);
+      setTimeout(() => setBackupSaved(false), 4000);
+    } catch (e: any) {
+      alert("فشل تحميل النسخة الاحتياطية: " + e.message);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -379,31 +414,66 @@ export function CloudSettingsModal({
         </div>
 
         {/* One-click Migration Section */}
-        <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-50/70 to-purple-50/70 border border-indigo-100 mb-5">
-          <div className="flex items-center gap-2.5 mb-2">
-            <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-xs">
-              <UploadCloud className="w-4 h-4" />
+        <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-50/70 to-purple-50/70 border border-indigo-100 mb-5 space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                <UploadCloud className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-indigo-950">
+                  نقل وترحيل بيانات المتصفح إلى السحابة
+                </h4>
+                <p className="text-[11px] text-indigo-800/80">
+                  رفع كافة المعاملات والمستندات المخزنة محلياً على هذا الجهاز إلى Supabase
+                </p>
+              </div>
             </div>
-            <div>
-              <h4 className="text-xs font-bold text-indigo-950">
-                ترحيل البيانات المحلية إلى السحابة بنقرة واحدة
-              </h4>
-              <p className="text-[11px] text-indigo-800/80">
-                إذا كان لديك معاملات مسجلة على هذا الجهاز، اضغط هنا لرفعها ومزامنتها على السحابة
-              </p>
+
+            {/* Detected count badge */}
+            <div className="text-left shrink-0 bg-white/80 border border-indigo-200 px-3 py-1.5 rounded-xl text-[11px] text-indigo-900 font-medium shadow-2xs">
+              <div>المعاملات: <strong className="text-indigo-700">{localRequestsCount}</strong></div>
+              <div>المعتمرون: <strong className="text-indigo-700">{localTravelersCount}</strong></div>
             </div>
           </div>
 
+          {/* Backup Download Button for Safety */}
+          <div className="bg-white/90 border border-indigo-100 rounded-xl p-3 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <div className="text-[11px] text-gray-600 flex items-center gap-1.5">
+              <Download className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>
+                <strong>أمان إضافي:</strong> يمكنك حفظ نسخة احتياطية (JSON) على جهازك أولاً قبل الترحيل
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleExportLocalBackup}
+              className="w-full sm:w-auto px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shrink-0"
+            >
+              {backupSaved ? (
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>تم التنزيل بنجاح!</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-3.5 h-3.5" />
+                  <span>تنزيل نسخة احتياطية</span>
+                </>
+              )}
+            </button>
+          </div>
+
           {migrationStatus && (
-            <div className="text-[11px] text-indigo-700 font-medium my-2 bg-indigo-100/60 px-3 py-1.5 rounded-lg flex items-center gap-2">
-              <RefreshCw className="w-3 h-3 animate-spin text-indigo-600" />
+            <div className="text-[11px] text-indigo-700 font-medium bg-indigo-100/60 px-3 py-2 rounded-lg flex items-center gap-2">
+              <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-600 shrink-0" />
               <span>{migrationStatus}</span>
             </div>
           )}
 
           {migrationResult && (
             <div
-              className={`p-3 rounded-xl border text-xs my-2 flex items-start gap-2 ${
+              className={`p-3 rounded-xl border text-xs flex items-start gap-2 ${
                 migrationResult.success
                   ? "bg-emerald-50 border-emerald-200 text-emerald-800"
                   : "bg-rose-50 border-rose-200 text-rose-800"
@@ -421,12 +491,14 @@ export function CloudSettingsModal({
           <button
             type="button"
             onClick={handleMigrateData}
-            disabled={migrating}
-            className="w-full mt-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-colors shadow-xs cursor-pointer disabled:opacity-50"
+            disabled={migrating || (!isConfigured && (!url.trim() || !anonKey.trim()))}
+            className="w-full px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-colors shadow-xs cursor-pointer disabled:opacity-50"
           >
             <UploadCloud className="w-4 h-4" />
             <span>
-              {migrating ? "جاري ترحيل البيانات..." : "بدء ترحيل المعاملات المحلية إلى السحابة الآن"}
+              {migrating
+                ? "جاري ترحيل البيانات ورفع المستندات..."
+                : `بدء ترحيل (${localRequestsCount}) معاملة محلية إلى سحابة Supabase الآن`}
             </span>
           </button>
         </div>

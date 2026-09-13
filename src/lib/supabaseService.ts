@@ -17,7 +17,52 @@ import {
   UserRole,
 } from "@/types";
 
+import { getFileFromIndexedDB } from "./localDatabase";
+
 const BUCKET_NAME = "hajj-documents";
+
+function dataUrlToBlob(dataUrl: string): Blob | null {
+  try {
+    const arr = dataUrl.split(",");
+    const mimeMatch = arr[0].match(/:(.*?);/);
+    const mime = mimeMatch ? mimeMatch[1] : "image/jpeg";
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], { type: mime });
+  } catch {
+    return null;
+  }
+}
+
+async function uploadLocalDocToStorage(
+  client: any,
+  requestId: string,
+  doc: DocumentItem
+): Promise<{ storagePath: string | null; storageUrl: string | null }> {
+  try {
+    const dataUrl = await getFileFromIndexedDB(doc.id);
+    if (!dataUrl) return { storagePath: null, storageUrl: null };
+    const blob = dataUrlToBlob(dataUrl);
+    if (!blob) return { storagePath: null, storageUrl: null };
+
+    const safeName = (doc.originalFileName || "file").replace(/[^a-zA-Z0-9._-]/g, "_");
+    const storagePath = `${requestId}/${doc.id}_${safeName}`;
+    const { error } = await client.storage.from(BUCKET_NAME).upload(storagePath, blob, { upsert: true });
+    if (error) {
+      console.warn("Storage upload warn:", error);
+      return { storagePath: null, storageUrl: null };
+    }
+    const { data } = client.storage.from(BUCKET_NAME).getPublicUrl(storagePath);
+    return { storagePath, storageUrl: data?.publicUrl || null };
+  } catch (err) {
+    console.warn("Error uploading local doc to Supabase Storage:", err);
+    return { storagePath: null, storageUrl: null };
+  }
+}
 
 function getClient() {
   const client = getSupabaseClient();
@@ -1059,9 +1104,10 @@ export const supabaseService = {
               created_at: t.createdAt || req.createdAt,
             });
 
-            // Traveler documents metadata
+            // Traveler documents metadata & storage upload
             if (t.documents && t.documents.length > 0) {
               for (const d of t.documents) {
+                const { storagePath, storageUrl } = await uploadLocalDocToStorage(client, req.id, d);
                 await client.from("documents").upsert({
                   id: d.id,
                   group_request_id: req.id,
@@ -1076,15 +1122,18 @@ export const supabaseService = {
                   uploaded_at: d.uploadedAt || req.createdAt,
                   review_status: d.reviewStatus || "Pending",
                   review_note: d.reviewNote || null,
+                  storage_path: storagePath || null,
+                  storage_url: storageUrl || null,
                 });
               }
             }
           }
         }
 
-        // Group documents metadata
+        // Group documents metadata & storage upload
         if (req.groupDocuments && req.groupDocuments.length > 0) {
           for (const d of req.groupDocuments) {
+            const { storagePath, storageUrl } = await uploadLocalDocToStorage(client, req.id, d);
             await client.from("documents").upsert({
               id: d.id,
               group_request_id: req.id,
@@ -1099,6 +1148,8 @@ export const supabaseService = {
               uploaded_at: d.uploadedAt || req.createdAt,
               review_status: d.reviewStatus || "Pending",
               review_note: d.reviewNote || null,
+              storage_path: storagePath || null,
+              storage_url: storageUrl || null,
             });
           }
         }
