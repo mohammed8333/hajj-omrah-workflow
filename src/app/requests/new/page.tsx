@@ -59,6 +59,7 @@ export default function UnifiedNewRequestPage() {
   const [hasHosting, setHasHosting] = useState(false);
   const [hostName, setHostName] = useState("");
   const [hostBirthDate, setHostBirthDate] = useState("");
+  const [hostNationality, setHostNationality] = useState("");
   const [hostNationalId, setHostNationalId] = useState("");
   const [hostPhone, setHostPhone] = useState("");
   const [hostIdFile, setHostIdFile] = useState<File | null>(null);
@@ -76,15 +77,22 @@ export default function UnifiedNewRequestPage() {
       const result = await scanHostId(file, (msg) => {
         setHostScanMessage(msg);
       });
-      if (result && (result.hostName || result.hostBirthDate || result.idNumber)) {
+      if (
+        result &&
+        (result.hostName ||
+          result.hostBirthDate ||
+          result.hostNationality ||
+          result.idNumber)
+      ) {
         if (result.hostName) setHostName(result.hostName);
         if (result.hostBirthDate) setHostBirthDate(result.hostBirthDate);
+        if (result.hostNationality) setHostNationality(result.hostNationality);
         if (result.idNumber) setHostNationalId(result.idNumber);
         setHostScanSuccess(true);
         setHostScanMessage(
           `تم استخراج البيانات بنجاح: ${result.hostName || ""} ${
-            result.hostBirthDate ? `(الميلاد: ${result.hostBirthDate})` : ""
-          }`
+            result.hostNationality ? `[${result.hostNationality}]` : ""
+          } ${result.hostBirthDate ? `(الميلاد: ${result.hostBirthDate})` : ""}`
         );
       } else {
         setHostScanSuccess(false);
@@ -359,6 +367,7 @@ export default function UnifiedNewRequestPage() {
         hasHosting,
         hostName: hasHosting && hostName.trim() ? hostName.trim() : undefined,
         hostBirthDate: hasHosting && hostBirthDate.trim() ? hostBirthDate.trim() : undefined,
+        hostNationality: hasHosting && hostNationality.trim() ? hostNationality.trim() : undefined,
         hostNationalId: hasHosting && hostNationalId.trim() ? hostNationalId.trim() : undefined,
         hostPhone: hasHosting ? hostPhone.trim() : undefined,
         departureDate: departureDate || undefined,
@@ -574,7 +583,7 @@ export default function UnifiedNewRequestPage() {
             ) : null}
 
             {/* Fields ABOVE the image upload box as requested */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-amber-50/40 p-4 rounded-xl border border-amber-200">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-amber-50/40 p-4 rounded-xl border border-amber-200">
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1 flex items-center justify-between">
                   <span>اسم المستضيف</span>
@@ -589,6 +598,24 @@ export default function UnifiedNewRequestPage() {
                   value={hostName}
                   onChange={(e) => setHostName(e.target.value)}
                   placeholder="اسم المستضيف (يُملأ تلقائياً من الهوية)"
+                  className="w-full text-xs px-3 py-2.5 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1 flex items-center justify-between">
+                  <span>جنسية المستضيف</span>
+                  {hostScanSuccess && hostNationality && (
+                    <span className="text-[10px] text-emerald-700 font-semibold flex items-center gap-0.5">
+                      <CheckCircle2 className="w-3 h-3" /> تم التعرف
+                    </span>
+                  )}
+                </label>
+                <input
+                  type="text"
+                  value={hostNationality}
+                  onChange={(e) => setHostNationality(e.target.value)}
+                  placeholder="مثال: سعودي، مصري..."
                   className="w-full text-xs px-3 py-2.5 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium"
                 />
               </div>
@@ -627,7 +654,7 @@ export default function UnifiedNewRequestPage() {
               </div>
 
               {hostNationalId && (
-                <div className="sm:col-span-3 pt-1">
+                <div className="sm:col-span-2 lg:col-span-4 pt-1">
                   <label className="block text-xs font-bold text-gray-700 mb-1">
                     رقم هوية / إقامة المستضيف (مستخرج)
                   </label>

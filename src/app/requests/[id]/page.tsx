@@ -124,6 +124,7 @@ export default function RequestDetailPage({
   const [editingHostInfo, setEditingHostInfo] = useState(false);
   const [editHostName, setEditHostName] = useState("");
   const [editHostBirthDate, setEditHostBirthDate] = useState("");
+  const [editHostNationality, setEditHostNationality] = useState("");
   const [editHostPhone, setEditHostPhone] = useState("");
   const [editHostNationalId, setEditHostNationalId] = useState("");
 
@@ -252,18 +253,25 @@ export default function RequestDetailPage({
       if (docType === "HostId" && file.type.startsWith("image/")) {
         try {
           const scanResult = await scanHostId(file);
-          if (scanResult && (scanResult.hostName || scanResult.hostBirthDate || scanResult.idNumber)) {
+          if (
+            scanResult &&
+            (scanResult.hostName ||
+              scanResult.hostBirthDate ||
+              scanResult.hostNationality ||
+              scanResult.idNumber)
+          ) {
             await api.requests.update(requestId, {
               hasHosting: true,
               hostName: scanResult.hostName || request?.hostingInfo?.hostName,
               hostBirthDate: scanResult.hostBirthDate || request?.hostingInfo?.hostBirthDate,
+              hostNationality: scanResult.hostNationality || request?.hostingInfo?.hostNationality,
               hostNationalId: scanResult.idNumber || request?.hostingInfo?.hostNationalId,
               hostPhone: request?.hostingInfo?.hostPhone,
             });
             setSuccess(
               `تم رفع هوية المستضيف واستخراج البيانات بنجاح: ${scanResult.hostName || ""} ${
-                scanResult.hostBirthDate ? `(تاريخ الميلاد: ${scanResult.hostBirthDate})` : ""
-              }`
+                scanResult.hostNationality ? `[${scanResult.hostNationality}]` : ""
+              } ${scanResult.hostBirthDate ? `(تاريخ الميلاد: ${scanResult.hostBirthDate})` : ""}`
             );
           } else {
             setSuccess(`تم رفع مستند (${DOCUMENT_TYPE_LABELS[docType]}) بنجاح.`);
@@ -359,6 +367,7 @@ export default function RequestDetailPage({
         hasHosting: true,
         hostName: editHostName.trim(),
         hostBirthDate: editHostBirthDate.trim() || undefined,
+        hostNationality: editHostNationality.trim() || undefined,
         hostPhone: editHostPhone.trim() || undefined,
         hostNationalId: editHostNationalId.trim() || undefined,
       });
@@ -498,19 +507,28 @@ export default function RequestDetailPage({
       setError(null);
       const streamUrl = await api.documents.getStreamUrl(doc.id);
       const scanResult = await scanHostId(streamUrl);
-      if (scanResult && (scanResult.hostName || scanResult.hostBirthDate || scanResult.idNumber)) {
+      if (
+        scanResult &&
+        (scanResult.hostName ||
+          scanResult.hostBirthDate ||
+          scanResult.hostNationality ||
+          scanResult.idNumber)
+      ) {
         await api.requests.update(requestId, {
           hasHosting: true,
           hostName: scanResult.hostName || request?.hostingInfo?.hostName,
           hostBirthDate: scanResult.hostBirthDate || request?.hostingInfo?.hostBirthDate,
+          hostNationality: scanResult.hostNationality || request?.hostingInfo?.hostNationality,
           hostNationalId: scanResult.idNumber || request?.hostingInfo?.hostNationalId,
           hostPhone: request?.hostingInfo?.hostPhone,
         });
         const hasGemini = !!getGeminiApiKey();
         setSuccess(
           `تم بنجاح فحص هوية المستضيف ${hasGemini ? "بالذكاء الاصطناعي (Gemini Vision AI ✨)" : ""}: ${scanResult.hostName || ""} ${
-            scanResult.hostBirthDate ? `(تاريخ الميلاد: ${scanResult.hostBirthDate})` : ""
-          } ${scanResult.idNumber ? `(رقم الهوية: ${scanResult.idNumber})` : ""}`
+            scanResult.hostNationality ? `[${scanResult.hostNationality}]` : ""
+          } ${scanResult.hostBirthDate ? `(تاريخ الميلاد: ${scanResult.hostBirthDate})` : ""} ${
+            scanResult.idNumber ? `(رقم الهوية: ${scanResult.idNumber})` : ""
+          }`
         );
         await loadRequest();
       } else {
@@ -1680,6 +1698,7 @@ export default function RequestDetailPage({
                   type="button"
                   onClick={() => {
                     setEditHostName(request.hostingInfo?.hostName || "");
+                    setEditHostNationality(request.hostingInfo?.hostNationality || "");
                     setEditHostBirthDate(request.hostingInfo?.hostBirthDate || "");
                     setEditHostPhone(request.hostingInfo?.hostPhone || request.contactPhone || "");
                     setEditHostNationalId(request.hostingInfo?.hostNationalId || request.hostingInfo?.hostAddress || "");
@@ -1697,7 +1716,7 @@ export default function RequestDetailPage({
 
           {editingHostInfo ? (
             <div className="space-y-3 bg-amber-50/40 p-4 rounded-xl border border-amber-200">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
                 <div>
                   <label className="block text-gray-600 font-semibold mb-1">اسم المستضيف:</label>
                   <input
@@ -1705,6 +1724,17 @@ export default function RequestDetailPage({
                     value={editHostName}
                     onChange={(e) => setEditHostName(e.target.value)}
                     placeholder="اسم المستضيف رباعي"
+                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-800 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-gray-600 font-semibold mb-1">جنسية المستضيف:</label>
+                  <input
+                    type="text"
+                    value={editHostNationality}
+                    onChange={(e) => setEditHostNationality(e.target.value)}
+                    placeholder="مثال: سعودي، مصري..."
                     className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-800 focus:outline-none focus:ring-1 focus:ring-amber-500"
                   />
                 </div>
@@ -1765,11 +1795,18 @@ export default function RequestDetailPage({
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 text-xs">
               <div className="bg-gray-50 p-3 rounded-xl">
                 <span className="text-gray-400 block mb-0.5">اسم المستضيف:</span>
                 <span className="font-bold text-gray-800 text-sm">
                   {request.hostingInfo?.hostName || "مستضيف داخل المملكة"}
+                </span>
+              </div>
+
+              <div className="bg-gray-50 p-3 rounded-xl">
+                <span className="text-gray-400 block mb-0.5">جنسية المستضيف:</span>
+                <span className="font-bold text-gray-800 text-sm">
+                  {request.hostingInfo?.hostNationality || "غير محدد"}
                 </span>
               </div>
 

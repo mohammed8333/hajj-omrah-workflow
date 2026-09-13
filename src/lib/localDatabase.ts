@@ -1013,6 +1013,7 @@ class LocalDatabaseEngine {
       hostName?: string;
       hostPhone?: string;
       hostBirthDate?: string;
+      hostNationality?: string;
       hostNationalId?: string;
       hostAddress?: string;
     },
@@ -1058,6 +1059,7 @@ class LocalDatabaseEngine {
             hostName: data.hostName && data.hostName.trim() ? data.hostName.trim() : "مستضيف داخل المملكة",
             hostPhone: data.hostPhone && data.hostPhone.trim() ? data.hostPhone.trim() : "",
             hostBirthDate: data.hostBirthDate,
+            hostNationality: data.hostNationality,
             hostNationalId: data.hostNationalId,
             hostAddress: data.hostAddress || "",
           }
@@ -1109,6 +1111,7 @@ class LocalDatabaseEngine {
       hostName?: string;
       hostPhone?: string;
       hostBirthDate?: string;
+      hostNationality?: string;
       hostNationalId?: string;
       hostAddress?: string;
     },
@@ -1137,6 +1140,7 @@ class LocalDatabaseEngine {
           hostName: data.hostName || "",
           hostPhone: data.hostPhone || "",
           hostBirthDate: data.hostBirthDate,
+          hostNationality: data.hostNationality,
           hostNationalId: data.hostNationalId,
           hostAddress: data.hostAddress || "",
         };
@@ -1144,6 +1148,7 @@ class LocalDatabaseEngine {
         if (data.hostName !== undefined) req.hostingInfo.hostName = data.hostName;
         if (data.hostPhone !== undefined) req.hostingInfo.hostPhone = data.hostPhone;
         if (data.hostBirthDate !== undefined) req.hostingInfo.hostBirthDate = data.hostBirthDate;
+        if (data.hostNationality !== undefined) req.hostingInfo.hostNationality = data.hostNationality;
         if (data.hostNationalId !== undefined) req.hostingInfo.hostNationalId = data.hostNationalId;
         if (data.hostAddress !== undefined) req.hostingInfo.hostAddress = data.hostAddress;
       }

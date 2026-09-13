@@ -92,6 +92,7 @@ export interface HostingInfo {
   hostName: string;
   hostPhone: string;
   hostBirthDate?: string;
+  hostNationality?: string;
   hostNationalId?: string;
   hostAddress?: string;
   hostIdDocumentId?: string;

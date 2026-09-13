@@ -118,6 +118,7 @@ export const api = {
       hostName?: string;
       hostPhone?: string;
       hostBirthDate?: string;
+      hostNationality?: string;
       hostNationalId?: string;
       hostAddress?: string;
     }): Promise<GroupRequestDetail> => {
@@ -142,6 +143,7 @@ export const api = {
         hostName?: string;
         hostPhone?: string;
         hostBirthDate?: string;
+        hostNationality?: string;
         hostNationalId?: string;
         hostAddress?: string;
       }

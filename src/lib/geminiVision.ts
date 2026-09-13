@@ -21,6 +21,7 @@ export interface GeminiPassportResult {
 export interface GeminiHostIdResult {
   hostName?: string;
   hostBirthDate?: string;
+  hostNationality?: string;
   idNumber?: string;
   hostPhone?: string;
   hostAddress?: string;
@@ -409,20 +410,22 @@ export async function scanHostIdWithGemini(
   apiKey?: string
 ): Promise<GeminiHostIdResult | null> {
   const prompt = `
-You are an expert Arabic National ID and Residency (Iqama) document inspection system.
+You are an expert Arabic National ID, Residency (Iqama), and Passport inspection system.
 Examine the provided image (which is a Saudi National ID, Saudi Iqama, Egyptian National ID, GCC ID, or passport of a host).
 
 Extract the following details carefully:
 1. "hostName": The full name of the ID holder in Arabic (quadruple name if available, e.g. "عبدالله محمد إبراهيم الشهري").
 2. "hostBirthDate": Date of birth in YYYY-MM-DD or YYYY/MM/DD format (Gregorian or Hijri as written on the card).
-3. "idNumber": The national identity or Iqama number (usually 10 digits for Saudi IDs starting with 1 or 2, or 14 digits for Egyptian IDs). Remove any spaces or dashes.
-4. "hostPhone": Any phone number written on the card if present, otherwise null.
-5. "hostAddress": Any address, city or district written on the card if present.
+3. "hostNationality": The nationality of the ID holder in Arabic (e.g. "سعودي", "مصري", "أردني", "سوداني", "يمني", etc.). If it is a Saudi National ID (بطاقة الهوية الوطنية السعودية), the nationality is "سعودي". If it is an Egyptian National ID (بطاقة الرقم القومي المصرية), the nationality is "مصري". If it is an Iqama (هوية مقيم), extract the specific nationality printed on the card in Arabic.
+4. "idNumber": The national identity or Iqama number (usually 10 digits for Saudi IDs starting with 1 or 2, or 14 digits for Egyptian IDs). Remove any spaces or dashes.
+5. "hostPhone": Any phone number written on the card if present, otherwise null.
+6. "hostAddress": Any address, city or district written on the card if present.
 
 Return strictly a JSON object with this structure:
 {
   "hostName": "string",
   "hostBirthDate": "string",
+  "hostNationality": "string",
   "idNumber": "string",
   "hostPhone": "string or null",
   "hostAddress": "string or null"
@@ -435,6 +438,7 @@ Return strictly a JSON object with this structure:
     return {
       hostName: parsed.hostName?.trim(),
       hostBirthDate: parsed.hostBirthDate?.trim(),
+      hostNationality: parsed.hostNationality?.trim(),
       idNumber: parsed.idNumber?.trim(),
       hostPhone: parsed.hostPhone?.trim() || undefined,
       hostAddress: parsed.hostAddress?.trim() || undefined,

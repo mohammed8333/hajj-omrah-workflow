@@ -5,6 +5,7 @@ import { scanHostIdWithGemini, getGeminiApiKey } from "./geminiVision";
 export interface ScannedHostIdData {
   hostName?: string;
   hostBirthDate?: string;
+  hostNationality?: string;
   idNumber?: string;
   rawText?: string;
 }
@@ -83,6 +84,7 @@ export async function parseHostIdText(rawText: string): Promise<ScannedHostIdDat
         return {
           hostName: mrzData.fullNameArabic,
           hostBirthDate: mrzData.dateOfBirth,
+          hostNationality: mrzData.nationality,
           idNumber: mrzData.passportNumber,
           rawText,
         };
@@ -169,9 +171,33 @@ export async function parseHostIdText(rawText: string): Promise<ScannedHostIdDat
     idNumber = idMatch[1];
   }
 
+  // 5. Extract Nationality (جنسية المستضيف)
+  let hostNationality = "";
+  if (normalized.includes("الهوية الوطنية") || normalized.includes("المملكة العربية السعودية")) {
+    if (!normalized.includes("مقيم")) {
+      hostNationality = "سعودي";
+    }
+  } else if (
+    normalized.includes("جمهورية مصر العربية") ||
+    normalized.includes("بطاقة تحقيق الشخصية") ||
+    normalized.includes("الرقم القومي")
+  ) {
+    hostNationality = "مصري";
+  }
+
+  const natLabelRegex = /(?:الجنسية|Nationality)[\s:]+([^\n\r\d:;,،]{3,30})/i;
+  const natMatch = normalized.match(natLabelRegex);
+  if (natMatch && natMatch[1]) {
+    const extractedNat = natMatch[1].trim();
+    if (extractedNat.length >= 3) {
+      hostNationality = extractedNat;
+    }
+  }
+
   return {
     hostName: hostName || undefined,
     hostBirthDate: hostBirthDate || undefined,
+    hostNationality: hostNationality || undefined,
     idNumber: idNumber || undefined,
     rawText,
   };
@@ -181,7 +207,8 @@ export async function parseHostIdText(rawText: string): Promise<ScannedHostIdDat
  * Scan Host ID image and automatically extract:
  * 1. Host Name (اسم المستضيف)
  * 2. Date of Birth (تاريخ الميلاد)
- * 3. National ID / Iqama Number (رقم الهوية / الإقامة)
+ * 3. Nationality (جنسية المستضيف)
+ * 4. National ID / Iqama Number (رقم الهوية / الإقامة)
  */
 export async function scanHostId(
   fileOrUrl: File | string,
@@ -197,11 +224,13 @@ export async function scanHostId(
         geminiResult &&
         (geminiResult.hostName ||
           geminiResult.hostBirthDate ||
+          geminiResult.hostNationality ||
           geminiResult.idNumber)
       ) {
         return {
           hostName: geminiResult.hostName,
           hostBirthDate: geminiResult.hostBirthDate,
+          hostNationality: geminiResult.hostNationality,
           idNumber: geminiResult.idNumber,
           rawText: "Gemini Vision AI extraction",
         };
