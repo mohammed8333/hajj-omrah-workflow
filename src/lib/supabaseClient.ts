@@ -1,13 +1,23 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
+// Project Supabase Cloud Credentials (Default for all devices)
+export const DEFAULT_SUPABASE_URL = "https://gutebfeczxaoeahoczde.supabase.co";
+export const DEFAULT_SUPABASE_ANON_KEY = "sb_publishable_i9oPqPbwmt4ZhL8NlGUHFQ__EmaD2-p";
+
 const STORAGE_KEY_URL = "supabase_url";
 const STORAGE_KEY_ANON_KEY = "supabase_anon_key";
+const STORAGE_KEY_FORCE_LOCAL = "supabase_force_local";
 
 let cachedClient: SupabaseClient | null = null;
 let currentUrl: string | null = null;
 let currentKey: string | null = null;
 
 export function getSupabaseConfig(): { url: string; anonKey: string } {
+  // If user explicitly chose to force local/offline mode on this device
+  if (typeof window !== "undefined" && localStorage.getItem(STORAGE_KEY_FORCE_LOCAL) === "true") {
+    return { url: "", anonKey: "" };
+  }
+
   let url = "";
   let anonKey = "";
 
@@ -22,6 +32,14 @@ export function getSupabaseConfig(): { url: string; anonKey: string } {
   }
   if (!anonKey && typeof import.meta !== "undefined" && import.meta.env) {
     anonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || "";
+  }
+
+  // Default project credentials so any device connects automatically!
+  if (!url) {
+    url = DEFAULT_SUPABASE_URL;
+  }
+  if (!anonKey) {
+    anonKey = DEFAULT_SUPABASE_ANON_KEY;
   }
 
   return { url: url.trim(), anonKey: anonKey.trim() };
@@ -63,6 +81,7 @@ export function setSupabaseCredentials(url: string, anonKey: string): void {
   if (typeof window !== "undefined") {
     localStorage.setItem(STORAGE_KEY_URL, url.trim());
     localStorage.setItem(STORAGE_KEY_ANON_KEY, anonKey.trim());
+    localStorage.removeItem(STORAGE_KEY_FORCE_LOCAL);
   }
   cachedClient = null;
   currentUrl = null;
@@ -73,6 +92,7 @@ export function clearSupabaseCredentials(): void {
   if (typeof window !== "undefined") {
     localStorage.removeItem(STORAGE_KEY_URL);
     localStorage.removeItem(STORAGE_KEY_ANON_KEY);
+    localStorage.setItem(STORAGE_KEY_FORCE_LOCAL, "true");
   }
   cachedClient = null;
   currentUrl = null;
