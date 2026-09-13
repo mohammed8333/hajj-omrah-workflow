@@ -87,6 +87,7 @@ export function exportRequestsToExcel(requests: GroupRequestDetail[]) {
         "تاريخ العودة": r.returnDate || "-",
         "اسم المعتمر / المسافر": "لا يوجد مسافرين مسجلين",
         "رقم جواز السفر": "-",
+        "رقم هاتف المسافر": "-",
         "رابط صورة الجواز": passDoc ? buildDocUrl(r.id, passDoc.id) : "لم يُرفع بعد",
         "رابط الصورة الشخصية": photoDoc ? buildDocUrl(r.id, photoDoc.id) : "لم يُرفع بعد",
         "رابط تذكرة الطيران": ticketDoc ? buildDocUrl(r.id, ticketDoc.id) : "لم يُرفع بعد",
@@ -138,6 +139,7 @@ export function exportRequestsToExcel(requests: GroupRequestDetail[]) {
             "تاريخ العودة": r.returnDate || "-",
             "اسم المعتمر / المسافر": t.fullName,
             "رقم جواز السفر": t.passportNumber || "-",
+            "رقم هاتف المسافر": t.phoneNumber || "-",
             "رابط صورة الجواز": tPassLink,
             "رابط الصورة الشخصية": tPhotoLink,
             "رابط تذكرة الطيران": tTicketLink,
@@ -171,6 +173,7 @@ export function exportRequestsToExcel(requests: GroupRequestDetail[]) {
             "تاريخ العودة": "",
             "اسم المعتمر / المسافر": t.fullName,
             "رقم جواز السفر": t.passportNumber || "-",
+            "رقم هاتف المسافر": t.phoneNumber || "-",
             "رابط صورة الجواز": tPassLink,
             "رابط الصورة الشخصية": tPhotoLink,
             "رابط تذكرة الطيران": tTicketLink,
@@ -224,6 +227,7 @@ export function exportRequestsToExcel(requests: GroupRequestDetail[]) {
         "حالة المعاملة": statusArabic,
         "اسم المعتمر / المسافر": t.fullName,
         "رقم جواز السفر": t.passportNumber || "-",
+        "رقم الهاتف": t.phoneNumber || "-",
         "الجنسية": t.nationality || "-",
         "تاريخ الميلاد": t.dateOfBirth || "-",
         "حالة تدقيق المعتمر": tStatus,
@@ -263,6 +267,7 @@ export function exportRequestsToExcel(requests: GroupRequestDetail[]) {
     { wch: 16 }, // تاريخ العودة
     { wch: 26 }, // اسم المعتمر / المسافر
     { wch: 18 }, // رقم جواز السفر
+    { wch: 18 }, // رقم هاتف المسافر
     { wch: 38 }, // رابط صورة الجواز
     { wch: 38 }, // رابط الصورة الشخصية
     { wch: 38 }, // رابط تذكرة الطيران
@@ -291,6 +296,7 @@ export function exportRequestsToExcel(requests: GroupRequestDetail[]) {
     { wch: 20 }, // حالة المعاملة
     { wch: 28 }, // اسم المعتمر / المسافر
     { wch: 18 }, // رقم جواز السفر
+    { wch: 18 }, // رقم الهاتف
     { wch: 16 }, // الجنسية
     { wch: 14 }, // تاريخ الميلاد
     { wch: 18 }, // حالة تدقيق المعتمر

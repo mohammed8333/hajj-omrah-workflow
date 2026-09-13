@@ -120,6 +120,7 @@ export default function RequestDetailPage({
   const [editingTravelerId, setEditingTravelerId] = useState<string | null>(null);
   const [editTravelerName, setEditTravelerName] = useState("");
   const [editTravelerPassport, setEditTravelerPassport] = useState("");
+  const [editTravelerPhone, setEditTravelerPhone] = useState("");
   const [editTravelerNationality, setEditTravelerNationality] = useState("");
   const [editTravelerBirthDate, setEditTravelerBirthDate] = useState("");
   const [isMrzScanningTravelerId, setIsMrzScanningTravelerId] = useState<string | null>(null);
@@ -370,6 +371,7 @@ export default function RequestDetailPage({
     travelerId: string,
     fullName: string,
     passportNumber?: string,
+    phoneNumber?: string,
     nationality?: string,
     dateOfBirth?: string
   ) => {
@@ -384,6 +386,7 @@ export default function RequestDetailPage({
       await api.travelers.update(travelerId, {
         fullName: fullName.trim(),
         passportNumber: passportNumber?.trim() || current?.passportNumber,
+        phoneNumber: phoneNumber !== undefined ? (phoneNumber.trim() || undefined) : current?.phoneNumber,
         nationality: nationality?.trim() || current?.nationality,
         dateOfBirth: dateOfBirth?.trim() || current?.dateOfBirth,
         notes: current?.notes,
@@ -1246,6 +1249,12 @@ export default function RequestDetailPage({
   const isSafaReviewer = role === "SafaEmployee" || role === "Admin";
   const isAgent = role === "SaudiAgent" || role === "Admin";
   const isSender = role === "Sender" || role === "Admin";
+  const canEditTraveler =
+    role === "Admin" ||
+    role === "Sender" ||
+    role === "SafaEmployee" ||
+    role === "SaudiAgent" ||
+    canEditAnyData;
 
   const docCheck = checkAllDocumentsAccepted();
   const canCompleteSafa = docCheck.isAllAccepted;
@@ -2480,6 +2489,15 @@ export default function RequestDetailPage({
                     />
 
                     <input
+                      type="tel"
+                      dir="ltr"
+                      value={editTravelerPhone}
+                      onChange={(e) => setEditTravelerPhone(e.target.value)}
+                      placeholder="رقم الهاتف (اختياري)"
+                      className="text-xs px-2.5 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono bg-white w-36 text-right"
+                    />
+
+                    <input
                       type="text"
                       value={editTravelerNationality}
                       onChange={(e) => setEditTravelerNationality(e.target.value)}
@@ -2503,6 +2521,7 @@ export default function RequestDetailPage({
                             traveler.id,
                             editTravelerName,
                             editTravelerPassport,
+                            editTravelerPhone,
                             editTravelerNationality,
                             editTravelerBirthDate
                           )
@@ -2529,18 +2548,19 @@ export default function RequestDetailPage({
                       <h3 className="text-sm font-bold text-gray-900">
                         {traveler.fullName}
                       </h3>
-                      {canEditAnyData && (
+                      {canEditTraveler && (
                         <button
                           type="button"
                           onClick={() => {
                             setEditingTravelerId(traveler.id);
                             setEditTravelerName(traveler.fullName);
                             setEditTravelerPassport(traveler.passportNumber || "");
+                            setEditTravelerPhone(traveler.phoneNumber || "");
                             setEditTravelerNationality(traveler.nationality || "");
                             setEditTravelerBirthDate(traveler.dateOfBirth || "");
                           }}
                           className="text-gray-400 hover:text-blue-600 p-1 rounded hover:bg-blue-50 transition-colors cursor-pointer"
-                          title="تعديل اسم وبيانات المسافر بالكامل"
+                          title="تعديل بيانات المسافر ورقم الهاتف"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
@@ -2551,6 +2571,36 @@ export default function RequestDetailPage({
                         <span className="font-mono">
                           جواز: {traveler.passportNumber}
                         </span>
+                      )}
+                      {traveler.phoneNumber ? (
+                        <a
+                          href={`tel:${traveler.phoneNumber}`}
+                          className="inline-flex items-center gap-1 text-emerald-700 hover:text-emerald-900 font-mono bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded-md border border-emerald-200 transition-colors font-semibold"
+                          title="الاتصال برقم هاتف المسافر"
+                          dir="ltr"
+                        >
+                          <Phone className="w-3 h-3 text-emerald-600" />
+                          <span>{traveler.phoneNumber}</span>
+                        </a>
+                      ) : (
+                        canEditTraveler && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingTravelerId(traveler.id);
+                              setEditTravelerName(traveler.fullName);
+                              setEditTravelerPassport(traveler.passportNumber || "");
+                              setEditTravelerPhone("");
+                              setEditTravelerNationality(traveler.nationality || "");
+                              setEditTravelerBirthDate(traveler.dateOfBirth || "");
+                            }}
+                            className="inline-flex items-center gap-1 text-sky-700 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 px-2 py-0.5 rounded-md border border-sky-200 transition-colors cursor-pointer font-medium text-[11px]"
+                            title="إضافة رقم هاتف المسافر (يمكن إدخاله بواسطة المرسل، المدير، الوكيل، أو موظف صفا)"
+                          >
+                            <Phone className="w-3 h-3 text-sky-600" />
+                            <span>+ إضافة هاتف</span>
+                          </button>
+                        )
                       )}
                       {traveler.nationality && (
                         <span>• الجنسية: {traveler.nationality}</span>

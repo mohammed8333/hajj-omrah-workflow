@@ -28,6 +28,7 @@ import {
   RotateCcw,
   Sparkles,
   Languages,
+  Phone,
 } from "lucide-react";
 import { scanPassportMRZ, translateEnglishNameToArabic } from "@/lib/mrzScanner";
 import { scanHostId } from "@/lib/hostIdScanner";
@@ -39,6 +40,7 @@ interface TravelerDraft {
   fullName?: string;
   fullNameEnglish?: string;
   passportNumber?: string;
+  phoneNumber?: string;
   nationality?: string;
   dateOfBirth?: string;
   passportFile: File | null;
@@ -258,10 +260,10 @@ export default function UnifiedNewRequestPage() {
     setTravelers((prev) => prev.filter((t) => t.id !== id));
   };
 
-  // Update specific traveler field (name, passport number, etc.)
+  // Update specific traveler field (name, passport number, phone, etc.)
   const updateTravelerField = (
     travelerId: string,
-    field: "fullName" | "passportNumber" | "nationality" | "dateOfBirth",
+    field: "fullName" | "passportNumber" | "nationality" | "dateOfBirth" | "phoneNumber",
     value: string
   ) => {
     setTravelers((prev) =>
@@ -491,6 +493,7 @@ export default function UnifiedNewRequestPage() {
         const createdTraveler = await api.travelers.add(createdGroup.id, {
           fullName: t.fullName?.trim() || `مسافر #${i + 1}`,
           passportNumber: t.passportNumber?.trim() || undefined,
+          phoneNumber: t.phoneNumber?.trim() || undefined,
           nationality: t.nationality?.trim() || undefined,
           dateOfBirth: t.dateOfBirth?.trim() || undefined,
         });
@@ -1169,7 +1172,7 @@ export default function UnifiedNewRequestPage() {
               </div>
 
               {/* Traveler Basic Data Inputs (Auto-filled from MRZ or manually editable) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50/80 p-3.5 rounded-xl border border-slate-200">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50/80 p-3.5 rounded-xl border border-slate-200">
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1 flex items-center justify-between">
                     <span>اسم المسافر (بالعربية)</span>
@@ -1229,6 +1232,27 @@ export default function UnifiedNewRequestPage() {
                     }
                     placeholder="رقم الجواز (يُملأ تلقائياً)"
                     className="w-full text-xs px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1 flex items-center gap-1">
+                    <Phone className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>رقم هاتف المسافر (اختياري)</span>
+                  </label>
+                  <input
+                    type="tel"
+                    dir="ltr"
+                    value={traveler.phoneNumber || ""}
+                    onChange={(e) =>
+                      updateTravelerField(
+                        traveler.id,
+                        "phoneNumber",
+                        e.target.value
+                      )
+                    }
+                    placeholder="مثال: +966501234567"
+                    className="w-full text-xs px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-right"
                   />
                 </div>
               </div>

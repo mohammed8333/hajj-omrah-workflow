@@ -1642,6 +1642,7 @@ class LocalDatabaseEngine {
     data: {
       fullName: string;
       passportNumber?: string;
+      phoneNumber?: string;
       nationality?: string;
       dateOfBirth?: string;
       notes?: string;
@@ -1656,6 +1657,7 @@ class LocalDatabaseEngine {
       groupRequestId: req.id,
       fullName: data.fullName,
       passportNumber: data.passportNumber,
+      phoneNumber: data.phoneNumber,
       nationality: data.nationality || "سعودي",
       dateOfBirth: data.dateOfBirth,
       status: "Pending",
@@ -1681,6 +1683,7 @@ class LocalDatabaseEngine {
     data: {
       fullName: string;
       passportNumber?: string;
+      phoneNumber?: string;
       nationality?: string;
       dateOfBirth?: string;
       notes?: string;
@@ -1692,6 +1695,7 @@ class LocalDatabaseEngine {
       if (trv) {
         trv.fullName = data.fullName;
         trv.passportNumber = data.passportNumber;
+        if (data.phoneNumber !== undefined) trv.phoneNumber = data.phoneNumber;
         trv.nationality = data.nationality;
         trv.dateOfBirth = data.dateOfBirth;
         trv.notes = data.notes;

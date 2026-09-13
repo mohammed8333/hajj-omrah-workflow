@@ -315,6 +315,7 @@ export const api = {
       data: {
         fullName: string;
         passportNumber?: string;
+        phoneNumber?: string;
         nationality?: string;
         dateOfBirth?: string;
         notes?: string;
@@ -330,6 +331,7 @@ export const api = {
       data: {
         fullName: string;
         passportNumber?: string;
+        phoneNumber?: string;
         nationality?: string;
         dateOfBirth?: string;
         notes?: string;

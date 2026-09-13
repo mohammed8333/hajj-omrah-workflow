@@ -78,6 +78,7 @@ export interface Traveler {
   groupRequestId: string;
   fullName: string;
   passportNumber?: string;
+  phoneNumber?: string;
   nationality?: string;
   dateOfBirth?: string;
   status: TravelerStatus;
