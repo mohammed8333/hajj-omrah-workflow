@@ -405,15 +405,23 @@ export const api = {
     updateUser: async (
       id: string,
       data: {
-        fullName: string;
+        fullName?: string;
+        username?: string;
         password?: string;
-        role: any;
+        role?: any;
         phone?: string;
-        isActive: boolean;
+        isActive?: boolean;
       }
-    ): Promise<void> => {
+    ): Promise<User> => {
       await delay();
-      localDB.updateUser(id, data);
+      const current = await api.auth.getMe();
+      return localDB.updateUser(id, data, current);
+    },
+
+    deleteUser: async (id: string): Promise<{ message: string }> => {
+      await delay();
+      const current = await api.auth.getMe();
+      return localDB.deleteUser(id, current);
     },
 
     toggleUserStatus: async (

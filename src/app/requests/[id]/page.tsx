@@ -46,6 +46,7 @@ import {
   Loader2,
   Download,
   Languages,
+  ExternalLink,
 } from "lucide-react";
 import { scanPassportMRZ, translateEnglishNameToArabic } from "@/lib/mrzScanner";
 import { scanHostId } from "@/lib/hostIdScanner";
@@ -1540,11 +1541,10 @@ export default function RequestDetailPage({
                         e.preventDefault();
                         handleScanExistingHostId(hostDoc);
                       }}
-                      className="px-2 py-1 text-[11px] text-amber-700 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-md font-semibold flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-50"
-                      title="فحص هوية المستضيف واستخراج الاسم وتاريخ الميلاد تلقائياً"
+                      className="p-1.5 text-amber-700 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                      title="فحص هوية المستضيف واستخراج البيانات تلقائياً (OCR)"
                     >
-                      <RotateCcw className={`w-3.5 h-3.5 ${isScanningHostIdDoc ? "animate-spin" : ""}`} />
-                      <span>{isScanningHostIdDoc ? "جاري الفحص..." : "فحص الهوية (OCR)"}</span>
+                      <RotateCcw className={`w-4 h-4 ${isScanningHostIdDoc ? "animate-spin" : ""}`} />
                     </button>
 
                     {/* Quick Review Buttons when Pending */}
@@ -1557,11 +1557,10 @@ export default function RequestDetailPage({
                             handleQuickReview(hostDoc.id, "Accepted");
                           }}
                           disabled={actionLoading}
-                          className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[11px] font-bold flex items-center gap-0.5 shadow-xs cursor-pointer transition-all"
-                          title="قبول هوية المستضيف"
+                          className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors cursor-pointer shadow-2xs"
+                          title="قبول هوية المستضيف (صح)"
                         >
-                          <Check className="w-3 h-3" />
-                          <span>مقبول</span>
+                          <Check className="w-4 h-4" />
                         </button>
                         <button
                           type="button"
@@ -1570,11 +1569,10 @@ export default function RequestDetailPage({
                             handleQuickReview(hostDoc.id, "NeedsCorrection");
                           }}
                           disabled={actionLoading}
-                          className="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-[11px] font-bold flex items-center gap-0.5 shadow-xs cursor-pointer transition-all"
-                          title="طلب تصحيح هوية المستضيف"
+                          className="p-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors cursor-pointer shadow-2xs"
+                          title="طلب تصحيح هوية المستضيف (مثلث الخطر)"
                         >
-                          <AlertTriangle className="w-3 h-3" />
-                          <span>يحتاج تصحيح</span>
+                          <AlertTriangle className="w-4 h-4" />
                         </button>
                         <button
                           type="button"
@@ -1583,11 +1581,10 @@ export default function RequestDetailPage({
                             handleQuickReview(hostDoc.id, "Rejected");
                           }}
                           disabled={actionLoading}
-                          className="px-2 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-md text-[11px] font-bold flex items-center gap-0.5 shadow-xs cursor-pointer transition-all"
-                          title="رفض هوية المستضيف"
+                          className="p-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition-colors cursor-pointer shadow-2xs"
+                          title="رفض هوية المستضيف (إكس)"
                         >
-                          <X className="w-3 h-3" />
-                          <span>مرفوض</span>
+                          <X className="w-4 h-4" />
                         </button>
                       </div>
                     )}
@@ -1601,11 +1598,10 @@ export default function RequestDetailPage({
                           handleQuickReview(hostDoc.id, "Pending", "تمت إعادة المستند للمراجعة من قبل الوكيل");
                         }}
                         disabled={actionLoading}
-                        className="px-2 py-1 text-[10px] bg-amber-50 hover:bg-amber-600 text-amber-800 hover:text-white border border-amber-300 rounded-md font-bold transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
+                        className="p-1.5 bg-amber-50 hover:bg-amber-500 text-amber-800 hover:text-white border border-amber-300 rounded-lg transition-colors cursor-pointer shadow-2xs"
                         title="إعادة فتح تدقيق المستند لموظف الصفا"
                       >
-                        <RotateCcw className="w-3 h-3" />
-                        <span>إعادة للمراجعة</span>
+                        <RotateCcw className="w-4 h-4" />
                       </button>
                     )}
 
@@ -1931,10 +1927,10 @@ export default function RequestDetailPage({
                                 e.preventDefault();
                                 setPreviewDoc(doc);
                               }}
-                              className="px-2.5 py-1 text-xs bg-sky-50 text-sky-700 hover:bg-sky-100 rounded-md font-medium flex items-center gap-1 cursor-pointer"
+                              className="p-1.5 text-sky-600 hover:text-sky-800 hover:bg-sky-50 rounded-lg transition-colors cursor-pointer"
+                              title="معاينة المستند"
                             >
-                              <Eye className="w-3.5 h-3.5" />
-                              <span>معاينة</span>
+                              <Eye className="w-4 h-4" />
                             </button>
 
                             <button
@@ -1943,11 +1939,10 @@ export default function RequestDetailPage({
                                 e.preventDefault();
                                 handleDownloadDoc(doc);
                               }}
-                              className="px-2.5 py-1 text-xs bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-md font-medium flex items-center gap-1 cursor-pointer transition-colors"
-                              title="تنزيل الملف"
+                              className="p-1.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                              title="تنزيل المستند"
                             >
-                              <Download className="w-3.5 h-3.5" />
-                              <span>تنزيل</span>
+                              <Download className="w-4 h-4" />
                             </button>
 
                             {/* Quick Review Buttons when Pending */}
@@ -1960,11 +1955,10 @@ export default function RequestDetailPage({
                                     handleQuickReview(doc.id, "Accepted");
                                   }}
                                   disabled={actionLoading}
-                                  className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[11px] font-bold flex items-center gap-0.5 shadow-xs cursor-pointer transition-all"
-                                  title="قبول المستند"
+                                  className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors cursor-pointer shadow-2xs"
+                                  title="قبول المستند (صح)"
                                 >
-                                  <Check className="w-3 h-3" />
-                                  <span>مقبول</span>
+                                  <Check className="w-4 h-4" />
                                 </button>
                                 <button
                                   type="button"
@@ -1973,11 +1967,10 @@ export default function RequestDetailPage({
                                     handleQuickReview(doc.id, "NeedsCorrection");
                                   }}
                                   disabled={actionLoading}
-                                  className="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-[11px] font-bold flex items-center gap-0.5 shadow-xs cursor-pointer transition-all"
-                                  title="طلب تصحيح للمستند"
+                                  className="p-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors cursor-pointer shadow-2xs"
+                                  title="طلب تصحيح للمستند (مثلث الخطر)"
                                 >
-                                  <AlertTriangle className="w-3 h-3" />
-                                  <span>يحتاج تصحيح</span>
+                                  <AlertTriangle className="w-4 h-4" />
                                 </button>
                                 <button
                                   type="button"
@@ -1986,11 +1979,10 @@ export default function RequestDetailPage({
                                     handleQuickReview(doc.id, "Rejected");
                                   }}
                                   disabled={actionLoading}
-                                  className="px-2 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-md text-[11px] font-bold flex items-center gap-0.5 shadow-xs cursor-pointer transition-all"
-                                  title="رفض المستند"
+                                  className="p-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition-colors cursor-pointer shadow-2xs"
+                                  title="رفض المستند (إكس)"
                                 >
-                                  <X className="w-3 h-3" />
-                                  <span>مرفوض</span>
+                                  <X className="w-4 h-4" />
                                 </button>
                               </div>
                             )}
@@ -2004,11 +1996,10 @@ export default function RequestDetailPage({
                                   handleQuickReview(doc.id, "Pending", "تمت إعادة المستند للمراجعة من قبل الوكيل");
                                 }}
                                 disabled={actionLoading}
-                                className="px-2 py-1 text-[10px] bg-amber-50 hover:bg-amber-600 text-amber-800 hover:text-white border border-amber-300 rounded-md font-bold transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
+                                className="p-1.5 bg-amber-50 hover:bg-amber-500 text-amber-800 hover:text-white border border-amber-300 rounded-lg transition-colors cursor-pointer shadow-2xs"
                                 title="إعادة فتح تدقيق المستند لموظف الصفا"
                               >
-                                <RotateCcw className="w-3 h-3" />
-                                <span>إعادة للمراجعة</span>
+                                <RotateCcw className="w-4 h-4" />
                               </button>
                             )}
 
@@ -2109,25 +2100,26 @@ export default function RequestDetailPage({
                 <button
                   type="button"
                   onClick={() => handleDownloadDoc(previewDoc)}
-                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                  className="p-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors cursor-pointer shadow-xs"
                   title="تنزيل الملف على جهازك"
                 >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>تنزيل الملف</span>
+                  <Download className="w-4 h-4" />
                 </button>
                 {previewDocUrl && (
                   <a
                     href={previewDocUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg text-xs font-semibold transition-colors"
+                    className="p-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg transition-colors"
+                    title="فتح في نافذة مستقلة"
                   >
-                    فتح في نافذة مستقلة
+                    <ExternalLink className="w-4 h-4" />
                   </a>
                 )}
                 <button
                   onClick={() => setPreviewDoc(null)}
-                  className="p-1 rounded-lg text-gray-500 hover:bg-gray-200 cursor-pointer"
+                  className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-200 cursor-pointer"
+                  title="إغلاق"
                 >
                   <X className="w-5 h-5" />
                 </button>

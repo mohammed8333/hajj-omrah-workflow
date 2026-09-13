@@ -504,7 +504,8 @@ export default function DashboardPage() {
           {filteredRequests.map((req) => (
             <div
               key={req.id}
-              className="bg-white rounded-2xl border border-gray-200 p-5 shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between"
+              onClick={() => router.push(`/requests/${req.id}`)}
+              className="bg-white rounded-2xl border border-gray-200 hover:border-sky-300 p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between cursor-pointer group"
             >
               <div>
                 <div className="flex justify-between items-start mb-3 gap-2">
@@ -514,7 +515,7 @@ export default function DashboardPage() {
                   <RequestStatusBadge status={req.status} />
                 </div>
 
-                <h3 className="text-base font-bold text-gray-900 mb-1">
+                <h3 className="text-base font-bold text-gray-900 mb-1 group-hover:text-sky-700 transition-colors">
                   {req.groupName}
                 </h3>
 
@@ -602,48 +603,44 @@ export default function DashboardPage() {
                 </span>
               </div>
 
-              {/* Card Actions: Open Details + Admin Archive & Delete Buttons */}
-              <div className="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between gap-2 flex-wrap">
-                <Link
-                  href={`/requests/${req.id}`}
-                  className="inline-flex items-center gap-1.5 text-xs font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 px-3 py-1.5 rounded-xl transition-colors cursor-pointer"
+              {/* Card Actions: Open Icon + Admin Archive & Delete Icon Buttons */}
+              <div className="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between gap-2">
+                <span
+                  className="p-1.5 text-sky-600 group-hover:text-sky-800 bg-sky-50 group-hover:bg-sky-100 rounded-xl transition-all flex items-center gap-1 text-xs font-bold"
+                  title="فتح تفاصيل المعاملة"
                 >
-                  <span>عرض التفاصيل والإجراء</span>
-                  <ArrowRight className="w-3.5 h-3.5 rotate-180" />
-                </Link>
+                  <ArrowRight className="w-4 h-4 rotate-180 group-hover:translate-x-[-2px] transition-transform" />
+                </span>
 
                 {role === "Admin" && (
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                     {req.status === "Archived" ? (
                       <button
                         type="button"
                         onClick={(e) => handleAdminUnarchive(req.id, e)}
-                        className="inline-flex items-center gap-1 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2.5 py-1.5 rounded-xl transition-colors cursor-pointer"
+                        className="p-2 text-amber-700 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-xl transition-colors cursor-pointer shadow-2xs"
                         title="إلغاء أرشفة المعاملة واستعادتها"
                       >
-                        <Archive className="w-3.5 h-3.5" />
-                        <span>إلغاء الأرشفة</span>
+                        <Archive className="w-4 h-4" />
                       </button>
                     ) : (
                       <button
                         type="button"
                         onClick={(e) => handleAdminArchive(req.id, e)}
-                        className="inline-flex items-center gap-1 text-xs font-bold text-purple-800 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-2.5 py-1.5 rounded-xl transition-colors cursor-pointer"
+                        className="p-2 text-purple-700 hover:text-purple-900 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-xl transition-colors cursor-pointer shadow-2xs"
                         title="أرشفة المعاملة"
                       >
-                        <Archive className="w-3.5 h-3.5" />
-                        <span>أرشفة</span>
+                        <Archive className="w-4 h-4" />
                       </button>
                     )}
 
                     <button
                       type="button"
                       onClick={(e) => handleAdminDelete(req.id, req.requestNumber, e)}
-                      className="inline-flex items-center gap-1 text-xs font-bold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-2.5 py-1.5 rounded-xl transition-colors cursor-pointer"
+                      className="p-2 text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 border border-red-200 rounded-xl transition-colors cursor-pointer shadow-2xs"
                       title="مسح المعاملة نهائياً"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>مسح</span>
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 )}

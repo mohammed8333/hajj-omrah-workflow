@@ -15,6 +15,8 @@ import {
   CheckCircle,
   X,
   Power,
+  Edit2,
+  Trash2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -34,6 +36,16 @@ export default function UsersManagementPage() {
   const [userRole, setUserRole] = useState<UserRole>("Sender");
   const [phone, setPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  // Edit User Modal
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingUserId, setEditingUserId] = useState("");
+  const [editFullName, setEditFullName] = useState("");
+  const [editUsername, setEditUsername] = useState("");
+  const [editPassword, setEditPassword] = useState("");
+  const [editRole, setEditRole] = useState<UserRole>("Sender");
+  const [editPhone, setEditPhone] = useState("");
+  const [editIsActive, setEditIsActive] = useState(true);
 
   const loadUsers = async () => {
     try {
@@ -90,6 +102,60 @@ export default function UsersManagementPage() {
   const handleToggleStatus = async (userId: string) => {
     try {
       const res = await api.admin.toggleUserStatus(userId);
+      setSuccess(res.message);
+      await loadUsers();
+    } catch (err: unknown) {
+      if (err instanceof Error) setError(err.message);
+    }
+  };
+
+  const openEditModal = (u: User) => {
+    setEditingUserId(u.id);
+    setEditFullName(u.fullName);
+    setEditUsername(u.username);
+    setEditPassword("");
+    setEditRole(u.role);
+    setEditPhone(u.phone || "");
+    setEditIsActive(u.isActive);
+    setShowEditModal(true);
+  };
+
+  const handleUpdateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editFullName.trim() || !editUsername.trim()) {
+      alert("يرجى ملء الاسم الكامل واسم الدخول.");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      setError(null);
+      await api.admin.updateUser(editingUserId, {
+        fullName: editFullName.trim(),
+        username: editUsername.trim(),
+        password: editPassword ? editPassword : undefined,
+        role: editRole,
+        phone: editPhone.trim() || undefined,
+        isActive: editIsActive,
+      });
+
+      setSuccess("تم تحديث بيانات المستخدم بنجاح.");
+      setShowEditModal(false);
+      await loadUsers();
+    } catch (err: unknown) {
+      if (err instanceof Error) setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteUser = async (userId: string, userName: string) => {
+    if (!confirm(`تحذير: هل أنت متأكد من حذف حساب المستخدم (${userName}) نهائياً؟`)) {
+      return;
+    }
+    try {
+      setError(null);
+      const res = await api.admin.deleteUser(userId);
       setSuccess(res.message);
       await loadUsers();
     } catch (err: unknown) {
@@ -187,19 +253,42 @@ export default function UsersManagementPage() {
                       : "لم يسجل"}
                   </td>
                   <td className="py-3.5 px-4 text-center">
-                    {u.id !== currentUser?.id && (
+                    <div className="flex items-center justify-center gap-1.5">
                       <button
-                        onClick={() => handleToggleStatus(u.id)}
-                        className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-lg transition-colors ${
-                          u.isActive
-                            ? "bg-red-50 text-red-700 hover:bg-red-100"
-                            : "bg-green-50 text-green-700 hover:bg-green-100"
-                        }`}
+                        type="button"
+                        onClick={() => openEditModal(u)}
+                        className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                        title="تعديل بيانات المستخدم"
                       >
-                        <Power className="w-3 h-3" />
-                        <span>{u.isActive ? "تعطيل الحساب" : "تفعيل"}</span>
+                        <Edit2 className="w-4 h-4" />
                       </button>
-                    )}
+
+                      {u.id !== currentUser?.id && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleStatus(u.id)}
+                            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                              u.isActive
+                                ? "text-amber-600 hover:text-amber-800 hover:bg-amber-50"
+                                : "text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50"
+                            }`}
+                            title={u.isActive ? "إيقاف نشاط الحساب (تعطيل)" : "تنشيط الحساب (تفعيل)"}
+                          >
+                            <Power className="w-4 h-4" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteUser(u.id, u.fullName)}
+                            className="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                            title="حذف المستخدم نهائياً"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -311,6 +400,129 @@ export default function UsersManagementPage() {
                   className="px-4 py-2 font-bold bg-purple-600 hover:bg-purple-700 text-white rounded-xl shadow-xs"
                 >
                   حفظ المستخدم
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Edit User */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="bg-white w-full max-w-md rounded-2xl p-6 shadow-xl space-y-4">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+              <h3 className="font-bold text-base text-gray-900 flex items-center gap-2">
+                <Edit2 className="w-5 h-5 text-blue-600" />
+                <span>تعديل بيانات المستخدم</span>
+              </h3>
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="p-1 text-gray-400 hover:bg-gray-100 rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateUser} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-semibold text-gray-700 mb-1">
+                  الاسم الكامل *
+                </label>
+                <input
+                  type="text"
+                  value={editFullName}
+                  onChange={(e) => setEditFullName(e.target.value)}
+                  placeholder="مثال: أحمد محمد"
+                  className="w-full px-3 py-2 rounded-xl border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 text-sm"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-gray-700 mb-1">
+                  اسم المستخدم (للدخول) *
+                </label>
+                <input
+                  type="text"
+                  value={editUsername}
+                  onChange={(e) => setEditUsername(e.target.value)}
+                  placeholder="ahmed123"
+                  className="w-full px-3 py-2 rounded-xl border border-gray-300 font-mono focus:outline-hidden focus:ring-2 focus:ring-blue-500 text-sm"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-gray-700 mb-1">
+                  كلمة المرور الجديدة (اتركه فارغاً للإبقاء على الحالية)
+                </label>
+                <input
+                  type="password"
+                  value={editPassword}
+                  onChange={(e) => setEditPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full px-3 py-2 rounded-xl border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-gray-700 mb-1">
+                  الدور الوظيفي *
+                </label>
+                <select
+                  value={editRole}
+                  onChange={(e) => setEditRole(e.target.value as UserRole)}
+                  className="w-full px-3 py-2 rounded-xl border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 text-sm"
+                >
+                  <option value="Sender">مرسل المعاملات (Sender)</option>
+                  <option value="SafaEmployee">موظف تسجيل الصفا (Safa Employee)</option>
+                  <option value="SaudiAgent">الوكيل السعودي (Saudi Agent)</option>
+                  <option value="Admin">مدير النظام (Admin)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-gray-700 mb-1">
+                  رقم الهاتف (اختياري)
+                </label>
+                <input
+                  type="tel"
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  placeholder="05XXXXXXXX"
+                  dir="ltr"
+                  className="w-full px-3 py-2 rounded-xl border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 text-sm text-right"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="edit-is-active"
+                  checked={editIsActive}
+                  onChange={(e) => setEditIsActive(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                />
+                <label htmlFor="edit-is-active" className="text-xs font-semibold text-gray-700 cursor-pointer">
+                  الحساب نشط
+                </label>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="px-4 py-2 font-semibold text-gray-600 hover:bg-gray-100 rounded-xl cursor-pointer"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-4 py-2 font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-xs cursor-pointer"
+                >
+                  تحديث البيانات
                 </button>
               </div>
             </form>

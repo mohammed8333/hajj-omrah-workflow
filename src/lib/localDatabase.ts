@@ -662,18 +662,46 @@ class LocalDatabaseEngine {
 
   public updateUser(
     id: string,
-    data: { fullName: string; password?: string; role: any; phone?: string; isActive: boolean }
+    data: {
+      fullName?: string;
+      username?: string;
+      password?: string;
+      role?: any;
+      phone?: string;
+      isActive?: boolean;
+    },
+    currentUser?: User
   ): User {
     const user = this.users.find((u) => u.id === id);
     if (!user) throw new Error("المستخدم غير موجود");
-    user.fullName = data.fullName;
-    if (data.password) user.password = data.password;
-    user.role = data.role;
-    user.phone = data.phone;
-    user.isActive = data.isActive;
+    if (data.fullName !== undefined) user.fullName = data.fullName.trim();
+    if (data.username !== undefined && data.username.trim()) {
+      const existing = this.users.find(
+        (u) => u.id !== id && u.username.toLowerCase() === data.username!.trim().toLowerCase()
+      );
+      if (existing) throw new Error("اسم المستخدم محجوز بالفعل لمستخدم آخر.");
+      user.username = data.username.trim();
+    }
+    if (data.password && data.password.trim()) user.password = data.password.trim();
+    if (data.role !== undefined) user.role = data.role;
+    if (data.phone !== undefined) user.phone = data.phone.trim();
+    if (data.isActive !== undefined) user.isActive = data.isActive;
     this.persistUsers();
-    this.logAction(null, `تحديث بيانات المستخدم: ${user.fullName}`, "User", user.id);
+    this.logAction(currentUser || null, `تحديث بيانات المستخدم: ${user.fullName} (${user.username})`, "User", user.id);
     return user;
+  }
+
+  public deleteUser(id: string, currentUser?: User): { message: string } {
+    if (currentUser && currentUser.id === id) {
+      throw new Error("لا يمكنك حذف حسابك الحالي المسجل به.");
+    }
+    const index = this.users.findIndex((u) => u.id === id);
+    if (index === -1) throw new Error("المستخدم غير موجود");
+    const removed = this.users[index];
+    this.users.splice(index, 1);
+    this.persistUsers();
+    this.logAction(currentUser || null, `حذف المستخدم نهائياً: ${removed.fullName} (${removed.username})`, "User", id);
+    return { message: `تم حذف المستخدم (${removed.fullName}) بنجاح.` };
   }
 
   public toggleUserStatus(id: string): { isActive: boolean; message: string } {
