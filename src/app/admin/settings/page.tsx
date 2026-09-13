@@ -31,6 +31,9 @@ import {
   EyeOff,
   ExternalLink,
   Zap,
+  Cloud,
+  CloudOff,
+  UploadCloud,
 } from "lucide-react";
 import {
   getGeminiApiKey,
@@ -38,10 +41,15 @@ import {
   removeGeminiApiKey,
   testGeminiApiKey,
 } from "@/lib/geminiVision";
+import { isSupabaseConfigured } from "@/lib/supabaseClient";
+import { CloudSettingsModal } from "@/components/ui/CloudSettingsModal";
 
 export default function AdminSettingsPage() {
   const { role, user, loading: authLoading } = useAuth();
   const router = useRouter();
+
+  const [cloudModalOpen, setCloudModalOpen] = useState(false);
+  const [isCloud, setIsCloud] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
@@ -60,6 +68,7 @@ export default function AdminSettingsPage() {
   } | null>(null);
 
   useEffect(() => {
+    setIsCloud(isSupabaseConfigured());
     const saved = getGeminiApiKey();
     if (saved) {
       setGeminiKey(saved);
@@ -356,6 +365,77 @@ export default function AdminSettingsPage() {
           </div>
           <div className="text-2xl font-bold text-gray-900">
             {stats.storageSizeKb} <span className="text-xs font-normal text-gray-500">KB</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Supabase Cloud Database & Online Sync */}
+      <div className="bg-white rounded-2xl border border-sky-200 p-6 shadow-xs relative overflow-hidden space-y-4">
+        <div className="absolute top-0 right-0 left-0 h-1.5 bg-gradient-to-r from-teal-500 via-sky-600 to-indigo-600" />
+
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <div
+              className={`p-3 rounded-xl ${
+                isCloud ? "bg-emerald-50 text-emerald-700" : "bg-sky-50 text-sky-700"
+              }`}
+            >
+              {isCloud ? <Cloud className="w-6 h-6" /> : <CloudOff className="w-6 h-6" />}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-bold text-gray-900">
+                  قاعدة البيانات السحابية والمزامنة أونلاين (Supabase Cloud Sync)
+                </h2>
+                <span
+                  className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${
+                    isCloud
+                      ? "bg-emerald-100 text-emerald-800"
+                      : "bg-gray-100 text-gray-700"
+                  }`}
+                >
+                  {isCloud ? "🟢 سحابي (متصل أونلاين)" : "⚪ وضع محلي"}
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 mt-0.5">
+                ربط النظام بسحابة Supabase لمشاركة المعاملات والملفات والعمل الجماعي بين عدة أجهزة في الوقت الفعلي مجاناً.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setCloudModalOpen(true)}
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 px-4 py-2.5 rounded-xl shadow-xs transition-colors cursor-pointer"
+            >
+              <Cloud className="w-4 h-4" />
+              <span>إعدادات الربط السحابي والترحيل</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-[11px] text-gray-600">
+          <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 flex items-start gap-2">
+            <span className="text-emerald-600 font-bold text-sm">✓</span>
+            <div>
+              <strong className="block text-gray-800 mb-0.5">تزامن فوري بين الأجهزة:</strong>
+              أي معاملة ينشئها المرسل أو يعتمدها موظف الصفا تظهر فوراً للوكيل السعودي على جهازه في نفس اللحظة.
+            </div>
+          </div>
+          <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 flex items-start gap-2">
+            <span className="text-emerald-600 font-bold text-sm">✓</span>
+            <div>
+              <strong className="block text-gray-800 mb-0.5">تخزين سحابي للمستندات:</strong>
+              رفع الجوازات والتذاكر والهويات في حاوية تخزين آمنة بروابط مباشرة وتصفح سريع ومجاني.
+            </div>
+          </div>
+          <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 flex items-start gap-2">
+            <span className="text-emerald-600 font-bold text-sm">✓</span>
+            <div>
+              <strong className="block text-gray-800 mb-0.5">ترحيل محلي إلى سحابي:</strong>
+              يمكنك بضغطة زر واحدة نقل جميع بياناتك المحلية الحالية إلى السحابة دون فقدان أي معاملة.
+            </div>
           </div>
         </div>
       </div>
@@ -735,6 +815,13 @@ export default function AdminSettingsPage() {
           </div>
         </div>
       )}
+
+      {/* Cloud Settings Modal */}
+      <CloudSettingsModal
+        isOpen={cloudModalOpen}
+        onClose={() => setCloudModalOpen(false)}
+        onConnectionChanged={(conn) => setIsCloud(conn)}
+      />
     </div>
   );
 }

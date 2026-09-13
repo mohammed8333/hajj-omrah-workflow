@@ -10,6 +10,7 @@
     "build:docs": "vite build --outDir docs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.116.0",
     "@types/jszip": "^3.4.0",
     "clsx": "^2.1.1",
     "jszip": "^3.10.2",
