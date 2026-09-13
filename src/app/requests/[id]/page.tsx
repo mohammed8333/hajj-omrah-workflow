@@ -49,6 +49,8 @@ import {
   ExternalLink,
   ScanText,
   Undo2,
+  Upload,
+  UploadCloud,
 } from "lucide-react";
 import { scanPassportMRZ, translateEnglishNameToArabic } from "@/lib/mrzScanner";
 import { scanHostId } from "@/lib/hostIdScanner";
@@ -113,8 +115,24 @@ export default function RequestDetailPage({
   const [editingTravelerId, setEditingTravelerId] = useState<string | null>(null);
   const [editTravelerName, setEditTravelerName] = useState("");
   const [editTravelerPassport, setEditTravelerPassport] = useState("");
+  const [editTravelerNationality, setEditTravelerNationality] = useState("");
+  const [editTravelerBirthDate, setEditTravelerBirthDate] = useState("");
   const [isMrzScanningTravelerId, setIsMrzScanningTravelerId] = useState<string | null>(null);
   const [isScanningHostIdDoc, setIsScanningHostIdDoc] = useState(false);
+
+  // Host Info Edit State
+  const [editingHostInfo, setEditingHostInfo] = useState(false);
+  const [editHostName, setEditHostName] = useState("");
+  const [editHostBirthDate, setEditHostBirthDate] = useState("");
+  const [editHostPhone, setEditHostPhone] = useState("");
+  const [editHostNationalId, setEditHostNationalId] = useState("");
+
+  // General Transaction Info Edit Modal
+  const [showEditGeneralModal, setShowEditGeneralModal] = useState(false);
+  const [editGroupName, setEditGroupName] = useState("");
+  const [editContactPhone, setEditContactPhone] = useState("");
+  const [editDestination, setEditDestination] = useState("");
+  const [editNotes, setEditNotes] = useState("");
 
   useEffect(() => {
     let isMounted = true;
@@ -301,7 +319,9 @@ export default function RequestDetailPage({
   const handleUpdateTraveler = async (
     travelerId: string,
     fullName: string,
-    passportNumber?: string
+    passportNumber?: string,
+    nationality?: string,
+    dateOfBirth?: string
   ) => {
     if (!fullName.trim()) {
       setError("يرجى كتابة اسم المسافر.");
@@ -314,16 +334,63 @@ export default function RequestDetailPage({
       await api.travelers.update(travelerId, {
         fullName: fullName.trim(),
         passportNumber: passportNumber?.trim() || current?.passportNumber,
-        nationality: current?.nationality,
-        dateOfBirth: current?.dateOfBirth,
+        nationality: nationality?.trim() || current?.nationality,
+        dateOfBirth: dateOfBirth?.trim() || current?.dateOfBirth,
         notes: current?.notes,
       });
       setSuccess("تم تحديث بيانات المسافر بنجاح.");
       setEditingTravelerId(null);
-      await loadRequest();
+      await loadRequest(false);
     } catch (err: unknown) {
       if (err instanceof Error) setError(err.message);
       else setError("فشل تحديث بيانات المسافر.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleSaveHostInfo = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!request) return;
+    try {
+      setActionLoading(true);
+      setError(null);
+      await api.requests.update(requestId, {
+        hasHosting: true,
+        hostName: editHostName.trim(),
+        hostBirthDate: editHostBirthDate.trim() || undefined,
+        hostPhone: editHostPhone.trim() || undefined,
+        hostNationalId: editHostNationalId.trim() || undefined,
+      });
+      setSuccess("تم تحديث بيانات المستضيف بنجاح.");
+      setEditingHostInfo(false);
+      await loadRequest(false);
+    } catch (err: unknown) {
+      if (err instanceof Error) setError(err.message);
+      else setError("فشل تحديث بيانات المستضيف.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleSaveGeneralInfo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!request) return;
+    try {
+      setActionLoading(true);
+      setError(null);
+      await api.requests.update(requestId, {
+        groupName: editGroupName.trim() || request.groupName,
+        contactPhone: editContactPhone.trim() || request.contactPhone,
+        destination: editDestination.trim() || undefined,
+        notes: editNotes.trim() || undefined,
+      });
+      setSuccess("تم تحديث بيانات المعاملة الأساسية بنجاح.");
+      setShowEditGeneralModal(false);
+      await loadRequest(false);
+    } catch (err: unknown) {
+      if (err instanceof Error) setError(err.message);
+      else setError("فشل تحديث بيانات المعاملة.");
     } finally {
       setActionLoading(false);
     }
@@ -1008,11 +1075,27 @@ export default function RequestDetailPage({
     );
   }
 
+  const hasItemsNeedingCorrection =
+    request.status === "CorrectionRequired" ||
+    request.travelers.some(
+      (t) =>
+        t.status === "NeedsCorrection" ||
+        t.documents.some((d) => d.reviewStatus === "NeedsCorrection")
+    ) ||
+    request.hostingInfo?.hostIdDocument?.reviewStatus === "NeedsCorrection" ||
+    request.groupDocuments?.some((d) => d.reviewStatus === "NeedsCorrection");
+
   const canEditDocs =
-    role === "Sender" &&
+    (role === "Sender" || role === "Admin") &&
     (request.status === "Draft" ||
       request.status === "CorrectionRequired" ||
-      request.status === "MissingDocuments");
+      request.status === "MissingDocuments" ||
+      hasItemsNeedingCorrection);
+
+  const canEditAnyData =
+    role === "Admin" ||
+    canEditDocs ||
+    hasItemsNeedingCorrection;
 
   const isSafaReviewer = role === "SafaEmployee" || role === "Admin";
   const isAgent = role === "SaudiAgent" || role === "Admin";
@@ -1040,9 +1123,28 @@ export default function RequestDetailPage({
             </span>
           </div>
 
-          <h1 className="text-xl sm:text-2xl font-black text-gray-900">
-            {request.groupName}
-          </h1>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h1 className="text-xl sm:text-2xl font-black text-gray-900">
+              {request.groupName}
+            </h1>
+            {canEditAnyData && (
+              <button
+                type="button"
+                onClick={() => {
+                  setEditGroupName(request.groupName);
+                  setEditContactPhone(request.contactPhone);
+                  setEditDestination(request.destination || "");
+                  setEditNotes(request.notes || "");
+                  setShowEditGeneralModal(true);
+                }}
+                className="text-xs text-sky-700 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="تعديل بيانات المعاملة (الاسم، الهاتف، الملاحظات)"
+              >
+                <Edit2 className="w-3.5 h-3.5" />
+                <span>تعديل المعاملة</span>
+              </button>
+            )}
+          </div>
 
           <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 mt-2">
             <span className="flex items-center gap-1">
@@ -1532,42 +1634,132 @@ export default function RequestDetailPage({
                 بيانات الاستضافة المشتركة للمجموعة
               </h2>
             </div>
-            <span className="text-xs bg-amber-50 text-amber-800 font-semibold px-2.5 py-1 rounded-md border border-amber-200">
-              مشتركة لجميع المسافرين
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-            <div className="bg-gray-50 p-3 rounded-xl">
-              <span className="text-gray-400 block mb-0.5">اسم المستضيف:</span>
-              <span className="font-bold text-gray-800 text-sm">
-                {request.hostingInfo?.hostName || "مستضيف داخل المملكة"}
+            <div className="flex items-center gap-2">
+              <span className="text-xs bg-amber-50 text-amber-800 font-semibold px-2.5 py-1 rounded-md border border-amber-200">
+                مشتركة لجميع المسافرين
               </span>
-            </div>
-
-            <div className="bg-gray-50 p-3 rounded-xl">
-              <span className="text-gray-400 block mb-0.5">تاريخ ميلاد المستضيف:</span>
-              <span className="font-bold text-gray-800 text-sm">
-                {request.hostingInfo?.hostBirthDate || "غير محدد"}
-              </span>
-            </div>
-
-            <div className="bg-gray-50 p-3 rounded-xl">
-              <span className="text-gray-400 block mb-0.5">رقم هاتف المستضيف:</span>
-              <span className="font-bold text-gray-800 text-sm" dir="ltr">
-                {request.hostingInfo?.hostPhone || request.contactPhone || "غير محدد"}
-              </span>
-            </div>
-
-            <div className="bg-gray-50 p-3 rounded-xl">
-              <span className="text-gray-400 block mb-0.5">العنوان أو الهوية:</span>
-              <span className="font-bold text-gray-800 text-sm">
-                {request.hostingInfo?.hostNationalId
-                  ? `هوية: ${request.hostingInfo.hostNationalId}`
-                  : request.hostingInfo?.hostAddress || "غير محدد"}
-              </span>
+              {canEditAnyData && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditHostName(request.hostingInfo?.hostName || "");
+                    setEditHostBirthDate(request.hostingInfo?.hostBirthDate || "");
+                    setEditHostPhone(request.hostingInfo?.hostPhone || request.contactPhone || "");
+                    setEditHostNationalId(request.hostingInfo?.hostNationalId || request.hostingInfo?.hostAddress || "");
+                    setEditingHostInfo(!editingHostInfo);
+                  }}
+                  className="text-xs text-amber-800 hover:text-amber-900 bg-amber-100/70 hover:bg-amber-100 border border-amber-300 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="تعديل بيانات المستضيف"
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                  <span>{editingHostInfo ? "إلغاء التعديل" : "تعديل بيانات المستضيف"}</span>
+                </button>
+              )}
             </div>
           </div>
+
+          {editingHostInfo ? (
+            <div className="space-y-3 bg-amber-50/40 p-4 rounded-xl border border-amber-200">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                <div>
+                  <label className="block text-gray-600 font-semibold mb-1">اسم المستضيف:</label>
+                  <input
+                    type="text"
+                    value={editHostName}
+                    onChange={(e) => setEditHostName(e.target.value)}
+                    placeholder="اسم المستضيف رباعي"
+                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-800 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-gray-600 font-semibold mb-1">تاريخ ميلاد المستضيف:</label>
+                  <input
+                    type="text"
+                    value={editHostBirthDate}
+                    onChange={(e) => setEditHostBirthDate(e.target.value)}
+                    placeholder="YYYY/MM/DD"
+                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-800 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-gray-600 font-semibold mb-1">رقم هاتف المستضيف:</label>
+                  <input
+                    type="tel"
+                    dir="ltr"
+                    value={editHostPhone}
+                    onChange={(e) => setEditHostPhone(e.target.value)}
+                    placeholder="05xxxxxxxx"
+                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-800 focus:outline-none focus:ring-1 focus:ring-amber-500 text-left font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-gray-600 font-semibold mb-1">العنوان أو الهوية:</label>
+                  <input
+                    type="text"
+                    value={editHostNationalId}
+                    onChange={(e) => setEditHostNationalId(e.target.value)}
+                    placeholder="رقم الهوية أو الإقامة"
+                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-800 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-amber-200/60">
+                <button
+                  type="button"
+                  onClick={handleSaveHostInfo}
+                  disabled={actionLoading}
+                  className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>حفظ بيانات المستضيف</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingHostInfo(false)}
+                  className="px-3 py-1.5 bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 rounded-lg text-xs font-medium flex items-center gap-1 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>إلغاء</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+              <div className="bg-gray-50 p-3 rounded-xl">
+                <span className="text-gray-400 block mb-0.5">اسم المستضيف:</span>
+                <span className="font-bold text-gray-800 text-sm">
+                  {request.hostingInfo?.hostName || "مستضيف داخل المملكة"}
+                </span>
+              </div>
+
+              <div className="bg-gray-50 p-3 rounded-xl">
+                <span className="text-gray-400 block mb-0.5">تاريخ ميلاد المستضيف:</span>
+                <span className="font-bold text-gray-800 text-sm">
+                  {request.hostingInfo?.hostBirthDate || "غير محدد"}
+                </span>
+              </div>
+
+              <div className="bg-gray-50 p-3 rounded-xl">
+                <span className="text-gray-400 block mb-0.5">رقم هاتف المستضيف:</span>
+                <span className="font-bold text-gray-800 text-sm" dir="ltr">
+                  {request.hostingInfo?.hostPhone || request.contactPhone || "غير محدد"}
+                </span>
+              </div>
+
+              <div className="bg-gray-50 p-3 rounded-xl">
+                <span className="text-gray-400 block mb-0.5">العنوان أو الهوية:</span>
+                <span className="font-bold text-gray-800 text-sm">
+                  {request.hostingInfo?.hostNationalId
+                    ? `هوية: ${request.hostingInfo.hostNationalId}`
+                    : request.hostingInfo?.hostAddress || "غير محدد"}
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Host ID Document */}
           <div className="pt-2">
@@ -1622,6 +1814,24 @@ export default function RequestDetailPage({
                     >
                       <Download className="w-4 h-4" />
                     </button>
+
+                    {canEditAnyData && (
+                      <label
+                        className="p-1.5 text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors cursor-pointer shadow-2xs"
+                        title="استبدال / رفع هوية المستضيف مجدداً"
+                      >
+                        <UploadCloud className="w-4 h-4" />
+                        <input
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleFileUpload(file, "HostId");
+                          }}
+                        />
+                      </label>
+                    )}
 
                     <button
                       type="button"
@@ -1698,7 +1908,7 @@ export default function RequestDetailPage({
                       </button>
                     )}
 
-                    {canEditDocs && (
+                    {canEditAnyData && (
                       <button
                         type="button"
                         onClick={(e) => {
@@ -1718,7 +1928,7 @@ export default function RequestDetailPage({
                   <p className="text-xs text-gray-500 mb-2">
                     لم يتم رفع وثيقة هوية المستضيف بعد.
                   </p>
-                  {canEditDocs && (
+                  {canEditAnyData && (
                     <label className="inline-flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer">
                       <UploadCloud className="w-4 h-4" />
                       <span>رفع هوية المستضيف</span>
@@ -1853,48 +2063,78 @@ export default function RequestDetailPage({
                   {tIndex + 1}
                 </span>
                 {editingTravelerId === traveler.id ? (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <input
-                      type="text"
-                      value={editTravelerName}
-                      onChange={(e) => setEditTravelerName(e.target.value)}
-                      placeholder="اسم المسافر بالعربية"
-                      className="text-xs px-2.5 py-1.5 border border-emerald-400 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 font-bold"
-                    />
+                  <div className="flex flex-wrap items-center gap-2 bg-emerald-50/50 p-2.5 rounded-xl border border-emerald-200">
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        value={editTravelerName}
+                        onChange={(e) => setEditTravelerName(e.target.value)}
+                        placeholder="اسم المسافر بالعربية *"
+                        className="text-xs px-2.5 py-1.5 border border-emerald-400 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 font-bold bg-white"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleTranslateEditName}
+                        disabled={actionLoading || !editTravelerName.trim()}
+                        className="px-2 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer border border-blue-200"
+                        title="ترجمة الاسم المكتوب فوراً بدقة عبر Google Translate"
+                      >
+                        <Languages className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">ترجمة جوجل</span>
+                      </button>
+                    </div>
+
                     <input
                       type="text"
                       value={editTravelerPassport}
                       onChange={(e) => setEditTravelerPassport(e.target.value.toUpperCase())}
                       placeholder="رقم الجواز"
-                      className="text-xs px-2.5 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono"
+                      className="text-xs px-2.5 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono bg-white w-28"
                     />
-                    <button
-                      type="button"
-                      onClick={handleTranslateEditName}
-                      disabled={actionLoading || !editTravelerName.trim()}
-                      className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer border border-blue-200"
-                      title="ترجمة الاسم المكتوب فوراً بدقة عبر Google Translate"
-                    >
-                      <Languages className="w-3.5 h-3.5" />
-                      <span>ترجمة جوجل</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleUpdateTraveler(traveler.id, editTravelerName, editTravelerPassport)}
-                      disabled={actionLoading}
-                      className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-xs cursor-pointer"
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                      <span>حفظ</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditingTravelerId(null)}
-                      className="px-2 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-medium flex items-center gap-1 cursor-pointer"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                      <span>إلغاء</span>
-                    </button>
+
+                    <input
+                      type="text"
+                      value={editTravelerNationality}
+                      onChange={(e) => setEditTravelerNationality(e.target.value)}
+                      placeholder="الجنسية"
+                      className="text-xs px-2.5 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white w-24"
+                    />
+
+                    <input
+                      type="text"
+                      value={editTravelerBirthDate}
+                      onChange={(e) => setEditTravelerBirthDate(e.target.value)}
+                      placeholder="تاريخ الميلاد (YYYY-MM-DD)"
+                      className="text-xs px-2.5 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono bg-white w-36"
+                    />
+
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleUpdateTraveler(
+                            traveler.id,
+                            editTravelerName,
+                            editTravelerPassport,
+                            editTravelerNationality,
+                            editTravelerBirthDate
+                          )
+                        }
+                        disabled={actionLoading || !editTravelerName.trim()}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-xs cursor-pointer"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>حفظ</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingTravelerId(null)}
+                        className="px-2.5 py-1.5 bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 rounded-lg text-xs font-medium flex items-center gap-1 cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        <span>إلغاء</span>
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div>
@@ -1902,20 +2142,24 @@ export default function RequestDetailPage({
                       <h3 className="text-sm font-bold text-gray-900">
                         {traveler.fullName}
                       </h3>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingTravelerId(traveler.id);
-                          setEditTravelerName(traveler.fullName);
-                          setEditTravelerPassport(traveler.passportNumber || "");
-                        }}
-                        className="text-gray-400 hover:text-blue-600 p-1 rounded hover:bg-blue-50 transition-colors"
-                        title="تعديل اسم وبيانات المسافر"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </button>
+                      {canEditAnyData && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingTravelerId(traveler.id);
+                            setEditTravelerName(traveler.fullName);
+                            setEditTravelerPassport(traveler.passportNumber || "");
+                            setEditTravelerNationality(traveler.nationality || "");
+                            setEditTravelerBirthDate(traveler.dateOfBirth || "");
+                          }}
+                          className="text-gray-400 hover:text-blue-600 p-1 rounded hover:bg-blue-50 transition-colors cursor-pointer"
+                          title="تعديل اسم وبيانات المسافر بالكامل"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
-                    <div className="text-xs text-gray-500 flex gap-2 mt-0.5">
+                    <div className="text-xs text-gray-500 flex flex-wrap items-center gap-2 mt-0.5">
                       {traveler.passportNumber && (
                         <span className="font-mono">
                           جواز: {traveler.passportNumber}
@@ -1923,6 +2167,9 @@ export default function RequestDetailPage({
                       )}
                       {traveler.nationality && (
                         <span>• الجنسية: {traveler.nationality}</span>
+                      )}
+                      {traveler.dateOfBirth && (
+                        <span>• الميلاد: {traveler.dateOfBirth}</span>
                       )}
                     </div>
                   </div>
@@ -2038,6 +2285,24 @@ export default function RequestDetailPage({
                               <Download className="w-4 h-4" />
                             </button>
 
+                            {canEditAnyData && (
+                              <label
+                                className="p-1.5 text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors cursor-pointer shadow-2xs"
+                                title="استبدال / رفع مستند مصحح"
+                              >
+                                <UploadCloud className="w-4 h-4" />
+                                <input
+                                  type="file"
+                                  accept=".pdf,.jpg,.jpeg,.png"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) handleFileUpload(file, docType, traveler.id);
+                                  }}
+                                />
+                              </label>
+                            )}
+
                             {/* Quick Review Buttons when Pending */}
                             {(isSafaReviewer || isAgent) && doc.reviewStatus === "Pending" && (
                               <div className="flex items-center gap-1">
@@ -2096,7 +2361,7 @@ export default function RequestDetailPage({
                               </button>
                             )}
 
-                            {canEditDocs && (
+                            {canEditAnyData && (
                               <button
                                 type="button"
                                 onClick={(e) => {
@@ -2113,7 +2378,7 @@ export default function RequestDetailPage({
                         </div>
                       ) : (
                         <div className="mt-4 flex flex-col items-center justify-center p-3 border border-dashed border-gray-300 rounded-lg bg-white text-center">
-                          {canEditDocs ? (
+                          {canEditAnyData ? (
                             <label className="text-xs font-semibold text-sky-600 hover:text-sky-800 flex items-center gap-1 cursor-pointer">
                               <UploadCloud className="w-4 h-4" />
                               <span>رفع المستند</span>
@@ -2526,6 +2791,103 @@ export default function RequestDetailPage({
                 <button
                   type="submit"
                   disabled={actionLoading}
+                  className="px-5 py-2 font-bold bg-sky-600 hover:bg-sky-700 text-white rounded-xl shadow-xs cursor-pointer"
+                >
+                  حفظ التعديلات
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL 6: Edit General Transaction Details --- */}
+      {showEditGeneralModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="bg-white w-full max-w-lg rounded-2xl p-6 shadow-xl space-y-4">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+              <h3 className="font-bold text-base text-gray-900 flex items-center gap-2">
+                <Edit2 className="w-5 h-5 text-sky-600" />
+                <span>تعديل بيانات المعاملة الأساسية</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowEditGeneralModal(false)}
+                className="p-1 text-gray-400 hover:bg-gray-100 rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveGeneralInfo} className="space-y-4 text-xs">
+              <div className="space-y-3">
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">
+                    اسم المجموعة / المعاملة *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editGroupName}
+                    onChange={(e) => setEditGroupName(e.target.value)}
+                    placeholder="مثال: مجموعة عمرة رمضان - عائلة الأحمد"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-sky-500 text-gray-800 font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">
+                    رقم هاتف التواصل *
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    dir="ltr"
+                    value={editContactPhone}
+                    onChange={(e) => setEditContactPhone(e.target.value)}
+                    placeholder="05xxxxxxxx"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-sky-500 text-gray-800 text-left font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">
+                    الوجهة / المدينة
+                  </label>
+                  <input
+                    type="text"
+                    value={editDestination}
+                    onChange={(e) => setEditDestination(e.target.value)}
+                    placeholder="مثال: مكة المكرمة / جدة"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-sky-500 text-gray-800"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">
+                    ملاحظات المعاملة
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={editNotes}
+                    onChange={(e) => setEditNotes(e.target.value)}
+                    placeholder="أي ملاحظات إضافية حول المعاملة..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-sky-500 text-gray-800"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setShowEditGeneralModal(false)}
+                  className="px-4 py-2 font-semibold text-gray-600 hover:bg-gray-100 rounded-xl cursor-pointer"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionLoading || !editGroupName.trim()}
                   className="px-5 py-2 font-bold bg-sky-600 hover:bg-sky-700 text-white rounded-xl shadow-xs cursor-pointer"
                 >
                   حفظ التعديلات
