@@ -47,32 +47,34 @@ export function Navbar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
               </Link>
             </div>
 
-            {/* Left Side (in RTL): Cloud status, User info & Logout */}
+            {/* Left Side (in RTL): Cloud status (Admin only), User info & Logout */}
             <div className="flex items-center gap-2 sm:gap-4">
-              {/* Cloud Connection Badge / Button */}
-              <button
-                onClick={() => setCloudModalOpen(true)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-                  isCloud
-                    ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 shadow-2xs"
-                    : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100"
-                }`}
-                title={isCloud ? "متصل بسحابة Supabase (أونلاين)" : "يعمل محلياً (انقر للربط بالسحابة)"}
-              >
-                {isCloud ? (
-                  <>
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <Cloud className="w-4 h-4 text-emerald-600" />
-                    <span className="hidden sm:inline">سحابي (أونلاين)</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="w-2 h-2 rounded-full bg-gray-400"></span>
-                    <CloudOff className="w-4 h-4 text-gray-500" />
-                    <span className="hidden sm:inline">محلي</span>
-                  </>
-                )}
-              </button>
+              {/* Cloud Connection Badge / Button - Visible to Admin ONLY */}
+              {role === "Admin" && (
+                <button
+                  onClick={() => setCloudModalOpen(true)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                    isCloud
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 shadow-2xs"
+                      : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100"
+                  }`}
+                  title={isCloud ? "متصل بسحابة Supabase (أونلاين)" : "يعمل محلياً (انقر للربط بالسحابة)"}
+                >
+                  {isCloud ? (
+                    <>
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                      <Cloud className="w-4 h-4 text-emerald-600" />
+                      <span className="hidden sm:inline">سحابي (أونلاين)</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="w-2 h-2 rounded-full bg-gray-400"></span>
+                      <CloudOff className="w-4 h-4 text-gray-500" />
+                      <span className="hidden sm:inline">محلي</span>
+                    </>
+                  )}
+                </button>
+              )}
 
               {user ? (
                 <>
@@ -115,12 +117,14 @@ export function Navbar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
         </div>
       </header>
 
-      {/* Cloud Settings Modal */}
-      <CloudSettingsModal
-        isOpen={cloudModalOpen}
-        onClose={() => setCloudModalOpen(false)}
-        onConnectionChanged={(connected) => setIsCloud(connected)}
-      />
+      {/* Cloud Settings Modal - Visible to Admin ONLY */}
+      {role === "Admin" && (
+        <CloudSettingsModal
+          isOpen={cloudModalOpen}
+          onClose={() => setCloudModalOpen(false)}
+          onConnectionChanged={(connected) => setIsCloud(connected)}
+        />
+      )}
     </>
   );
 }
