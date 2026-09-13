@@ -41,13 +41,16 @@ function getPhotoDocument(r: GroupRequestDetail) {
 }
 
 function getTicketDocument(r: GroupRequestDetail) {
+  if (r.flightTicketDocument) return r.flightTicketDocument;
+  const groupTicket = r.groupDocuments?.find((d) => d.documentType === "FlightTicket");
+  if (groupTicket) return groupTicket;
   if (r.travelers) {
     for (const t of r.travelers) {
       const doc = t.documents?.find((d) => d.documentType === "FlightTicket");
       if (doc) return doc;
     }
   }
-  return r.groupDocuments?.find((d) => d.documentType === "FlightTicket");
+  return undefined;
 }
 
 export function exportRequestsToExcel(requests: GroupRequestDetail[]) {
@@ -77,6 +80,8 @@ export function exportRequestsToExcel(requests: GroupRequestDetail[]) {
         "رقم مجموعة نسك": r.nusukGroupNumber || "لم يُسجل بعد",
         "وكيل الإرسال": r.senderName || "-",
         "تاريخ السفر / الذهاب": r.departureDate || r.travelDate || "-",
+        "شركة / نوع الطيران": r.airline || "-",
+        "رقم الرحلة": r.flightNumber || "-",
         "وقت إقلاع الطائرة": r.flightDepartureTime || "-",
         "وقت تواجد المسافر في المطار": r.airportArrivalTime || "-",
         "تاريخ العودة": r.returnDate || "-",
@@ -110,7 +115,7 @@ export function exportRequestsToExcel(requests: GroupRequestDetail[]) {
           (isFirst ? getPhotoDocument(r) : undefined);
         const tTicketDoc =
           t.documents?.find((d) => d.documentType === "FlightTicket") ||
-          (isFirst ? getTicketDocument(r) : undefined);
+          getTicketDocument(r);
 
         const tPassLink = tPassDoc ? buildDocUrl(r.id, tPassDoc.id) : "لم يُرفع بعد";
         const tPhotoLink = tPhotoDoc ? buildDocUrl(r.id, tPhotoDoc.id) : "لم يُرفع بعد";
@@ -126,6 +131,8 @@ export function exportRequestsToExcel(requests: GroupRequestDetail[]) {
             "رقم مجموعة نسك": r.nusukGroupNumber || "لم يُسجل بعد",
             "وكيل الإرسال": r.senderName || "-",
             "تاريخ السفر / الذهاب": r.departureDate || r.travelDate || "-",
+            "شركة / نوع الطيران": r.airline || "-",
+            "رقم الرحلة": r.flightNumber || "-",
             "وقت إقلاع الطائرة": r.flightDepartureTime || "-",
             "وقت تواجد المسافر في المطار": r.airportArrivalTime || "-",
             "تاريخ العودة": r.returnDate || "-",
@@ -157,6 +164,8 @@ export function exportRequestsToExcel(requests: GroupRequestDetail[]) {
             "رقم مجموعة نسك": "",
             "وكيل الإرسال": "",
             "تاريخ السفر / الذهاب": "",
+            "شركة / نوع الطيران": "",
+            "رقم الرحلة": "",
             "وقت إقلاع الطائرة": "",
             "وقت تواجد المسافر في المطار": "",
             "تاريخ العودة": "",
@@ -168,6 +177,8 @@ export function exportRequestsToExcel(requests: GroupRequestDetail[]) {
             "رابط صورة الاستضافة": "",
             "يوجد استضافة / فندق": "",
             "اسم الفندق / المستضيف": "",
+            "جنسية المستضيف": "",
+            "تاريخ ميلاد المستضيف": "",
             "هاتف المستضيف": "",
             "عنوان المستضيف": "",
             "الملاحظات": t.notes || "",
@@ -198,7 +209,9 @@ export function exportRequestsToExcel(requests: GroupRequestDetail[]) {
 
       const tPassDoc = t.documents?.find((d) => d.documentType === "Passport");
       const tPhotoDoc = t.documents?.find((d) => d.documentType === "PersonalPhoto");
-      const tTicketDoc = t.documents?.find((d) => d.documentType === "FlightTicket");
+      const tTicketDoc =
+        t.documents?.find((d) => d.documentType === "FlightTicket") ||
+        getTicketDocument(r);
 
       const tPassLink = tPassDoc ? buildDocUrl(r.id, tPassDoc.id) : "لم يُرفع بعد";
       const tPhotoLink = tPhotoDoc ? buildDocUrl(r.id, tPhotoDoc.id) : "لم يُرفع بعد";
@@ -243,6 +256,8 @@ export function exportRequestsToExcel(requests: GroupRequestDetail[]) {
     { wch: 18 }, // رقم مجموعة نسك
     { wch: 24 }, // وكيل الإرسال
     { wch: 16 }, // تاريخ السفر / الذهاب
+    { wch: 20 }, // شركة / نوع الطيران
+    { wch: 14 }, // رقم الرحلة
     { wch: 16 }, // وقت إقلاع الطائرة
     { wch: 18 }, // وقت تواجد المسافر في المطار
     { wch: 16 }, // تاريخ العودة
@@ -254,6 +269,8 @@ export function exportRequestsToExcel(requests: GroupRequestDetail[]) {
     { wch: 38 }, // رابط صورة الاستضافة
     { wch: 14 }, // يوجد استضافة / فندق
     { wch: 22 }, // اسم الفندق / المستضيف
+    { wch: 18 }, // جنسية المستضيف
+    { wch: 18 }, // تاريخ ميلاد المستضيف
     { wch: 16 }, // هاتف المستضيف
     { wch: 25 }, // عنوان المستضيف
     { wch: 30 }, // الملاحظات

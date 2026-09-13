@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { scanPassportMRZ, translateEnglishNameToArabic } from "@/lib/mrzScanner";
 import { scanHostId } from "@/lib/hostIdScanner";
+import { scanFlightTicket, calculateAirportArrivalTime } from "@/lib/flightTicketScanner";
 import { useDialog } from "@/lib/dialog-context";
 
 interface TravelerDraft {
@@ -44,7 +45,6 @@ interface TravelerDraft {
   passportPreview?: string;
   photoFile: File | null;
   photoPreview?: string;
-  ticketFile: File | null;
   isScanning?: boolean;
   scanSuccess?: boolean;
   scanMessage?: string;
@@ -127,20 +127,102 @@ export default function UnifiedNewRequestPage() {
     }
   };
 
-  // Flight & Travel Details
+  // Shared Flight & Travel Details
+  const [airline, setAirline] = useState("");
+  const [flightNumber, setFlightNumber] = useState("");
   const [departureDate, setDepartureDate] = useState("");
   const [returnDate, setReturnDate] = useState("");
   const [flightDepartureTime, setFlightDepartureTime] = useState("");
   const [airportArrivalTime, setAirportArrivalTime] = useState("");
+  const [flightTicketFile, setFlightTicketFile] = useState<File | null>(null);
+  const [isScanningTicket, setIsScanningTicket] = useState(false);
+  const [ticketScanSuccess, setTicketScanSuccess] = useState(false);
+  const [ticketScanMessage, setTicketScanMessage] = useState("");
 
-  // Travelers with Direct Documents
+  // Run AI scan on flight ticket file (Gemini Vision)
+  const runTicketScan = async (file: File) => {
+    setIsScanningTicket(true);
+    setTicketScanSuccess(false);
+    setTicketScanMessage("جاري فحص تذكرة الطيران بالذكاء الاصطناعي (Google Gemini)...");
+    try {
+      const result = await scanFlightTicket(file, (msg) => {
+        setTicketScanMessage(msg);
+      });
+      if (
+        result &&
+        (result.departureDate ||
+          result.returnDate ||
+          result.flightDepartureTime ||
+          result.airline ||
+          result.flightNumber)
+      ) {
+        if (result.airline) setAirline(result.airline);
+        if (result.flightNumber) setFlightNumber(result.flightNumber);
+        if (result.departureDate) setDepartureDate(result.departureDate);
+        if (result.returnDate) setReturnDate(result.returnDate);
+        if (result.flightDepartureTime) {
+          setFlightDepartureTime(result.flightDepartureTime);
+          const calcTime = calculateAirportArrivalTime(result.flightDepartureTime);
+          setAirportArrivalTime(calcTime || result.airportArrivalTime || "");
+        } else if (result.airportArrivalTime) {
+          setAirportArrivalTime(result.airportArrivalTime);
+        }
+        setTicketScanSuccess(true);
+        setTicketScanMessage(
+          `تم استخراج بيانات الرحلة بنجاح: ${result.airline || ""} ${
+            result.flightNumber ? `(رحلة ${result.flightNumber})` : ""
+          } ${result.departureDate ? `| الذهاب: ${result.departureDate}` : ""} ${
+            result.flightDepartureTime ? `| الإقلاع: ${result.flightDepartureTime}` : ""
+          }`
+        );
+      } else {
+        setTicketScanSuccess(false);
+        setTicketScanMessage("لم يتم استخراج بيانات التذكرة بوضوح، يمكنك إدخال المواعيد يدوياً.");
+      }
+    } catch {
+      setTicketScanSuccess(false);
+      setTicketScanMessage("تعذر فحص التذكرة بالذكاء الاصطناعي، يرجى كتابة البيانات يدوياً.");
+    } finally {
+      setIsScanningTicket(false);
+    }
+  };
+
+  const handleTicketFileChange = async (file: File | null) => {
+    if (file && file.size > 15 * 1024 * 1024) {
+      await alert({
+        title: "تنبيه حجم الملف",
+        message: "حجم ملف تذكرة الطيران يتجاوز الحد الأقصى المسموح به (15 ميجابايت).",
+        variant: "warning",
+      });
+      return;
+    }
+    setFlightTicketFile(file);
+    if (file) {
+      setTimeout(() => {
+        runTicketScan(file);
+      }, 50);
+    } else {
+      setIsScanningTicket(false);
+      setTicketScanSuccess(false);
+      setTicketScanMessage("");
+    }
+  };
+
+  const handleDepartureTimeChange = (val: string) => {
+    setFlightDepartureTime(val);
+    if (val) {
+      const calcArrival = calculateAirportArrivalTime(val);
+      if (calcArrival) setAirportArrivalTime(calcArrival);
+    }
+  };
+
+  // Travelers with Direct Documents (Passport & Photo only)
   const [travelers, setTravelers] = useState<TravelerDraft[]>([
     {
       id: "tr-1",
       fullName: "",
       passportFile: null,
       photoFile: null,
-      ticketFile: null,
     },
   ]);
 
@@ -159,7 +241,6 @@ export default function UnifiedNewRequestPage() {
         fullName: "",
         passportFile: null,
         photoFile: null,
-        ticketFile: null,
       },
     ]);
   };
@@ -256,7 +337,7 @@ export default function UnifiedNewRequestPage() {
   // Handle document file changes
   const handleFileChange = async (
     travelerId: string,
-    docType: "passport" | "photo" | "ticket",
+    docType: "passport" | "photo",
     file: File | null
   ) => {
     if (file && file.size > 10 * 1024 * 1024) {
@@ -291,8 +372,6 @@ export default function UnifiedNewRequestPage() {
           } else {
             updated.photoPreview = undefined;
           }
-        } else if (docType === "ticket") {
-          updated.ticketFile = file;
         }
         return updated;
       })
@@ -332,12 +411,12 @@ export default function UnifiedNewRequestPage() {
     }
 
     // Check if at least one document is attached
-    const totalAttached = travelers.filter(
-      (t) => t.passportFile || t.photoFile || t.ticketFile
-    ).length;
+    const totalAttached =
+      travelers.filter((t) => t.passportFile || t.photoFile).length +
+      (flightTicketFile ? 1 : 0);
 
     if (totalAttached === 0) {
-      setError("يرجى إرفاق مستند واحد على الأقل (جواز السفر، الصورة، أو التذكرة) لمتابعة الحفظ.");
+      setError("يرجى إرفاق مستند واحد على الأقل (جواز السفر، الصورة، أو تذكرة الطيران) لمتابعة الحفظ.");
       return;
     }
 
@@ -370,6 +449,8 @@ export default function UnifiedNewRequestPage() {
         hostNationality: hasHosting && hostNationality.trim() ? hostNationality.trim() : undefined,
         hostNationalId: hasHosting && hostNationalId.trim() ? hostNationalId.trim() : undefined,
         hostPhone: hasHosting ? hostPhone.trim() : undefined,
+        airline: airline.trim() || undefined,
+        flightNumber: flightNumber.trim() || undefined,
         departureDate: departureDate || undefined,
         returnDate: returnDate || undefined,
         flightDepartureTime: flightDepartureTime || undefined,
@@ -382,17 +463,26 @@ export default function UnifiedNewRequestPage() {
         await api.documents.upload(createdGroup.id, hostIdFile, "HostId");
       }
 
+      // Upload Shared Flight Ticket Document if selected
+      if (flightTicketFile) {
+        setProgressStep("جاري رفع تذكرة الطيران المشتركة...");
+        await api.documents.upload(createdGroup.id, flightTicketFile, "FlightTicket");
+      }
+
       // Calculate total uploads
-      let totalFilesToUpload = (hasHosting && hostIdFile ? 1 : 0);
+      let totalFilesToUpload =
+        (hasHosting && hostIdFile ? 1 : 0) +
+        (flightTicketFile ? 1 : 0);
       travelers.forEach((t) => {
         if (t.passportFile) totalFilesToUpload++;
         if (t.photoFile) totalFilesToUpload++;
-        if (t.ticketFile) totalFilesToUpload++;
       });
 
-      let uploadedFilesCount = (hasHosting && hostIdFile ? 1 : 0);
+      let uploadedFilesCount =
+        (hasHosting && hostIdFile ? 1 : 0) +
+        (flightTicketFile ? 1 : 0);
 
-      // 3. Create Travelers & Upload Documents
+      // 3. Create Travelers & Upload Documents (Passport & Photo)
       for (let i = 0; i < travelers.length; i++) {
         const t = travelers[i];
         setProgressStep(`جاري تسجيل المسافر (${i + 1} من ${travelers.length})...`);
@@ -425,18 +515,6 @@ export default function UnifiedNewRequestPage() {
             createdGroup.id,
             t.photoFile,
             "PersonalPhoto",
-            createdTraveler.id
-          );
-        }
-
-        // Upload Ticket
-        if (t.ticketFile) {
-          uploadedFilesCount++;
-          setProgressStep(`جاري رفع تذكرة الطيران للمسافر (${i + 1})...`);
-          await api.documents.upload(
-            createdGroup.id,
-            t.ticketFile,
-            "FlightTicket",
             createdTraveler.id
           );
         }
@@ -749,9 +827,266 @@ export default function UnifiedNewRequestPage() {
             </div>
           </div>
         )}
-    </div>
+      </div>
 
-      {/* Section 2: Travelers & Documents in Place (NO scalar inputs, only upload boxes) */}
+      {/* Section 2: Shared Flight Ticket & Schedule (بيانات وتذكرة الطيران المشتركة لجميع المسافرين) */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0 border border-sky-100 shadow-xs">
+              <Plane className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-gray-900">
+                بيانات وتذكرة الطيران المشتركة لجميع المسافرين
+              </h2>
+              <p className="text-xs text-gray-500">
+                تذكرة واحدة مشتركة لكافة مسافري المجموعة مع الفحص التلقائي واستخراج البيانات بالذكاء الاصطناعي
+              </p>
+            </div>
+          </div>
+          <span className="text-xs bg-sky-50 text-sky-800 font-semibold px-2.5 py-1 rounded-md border border-sky-200 w-fit">
+            تذكرة واحدة لجميع المسافرين
+          </span>
+        </div>
+
+        {/* AI Status Indicator */}
+        {isScanningTicket ? (
+          <div className="flex items-center gap-2 p-3.5 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-700 animate-pulse">
+            <Loader2 className="w-4 h-4 animate-spin text-blue-600 shrink-0" />
+            <span>{ticketScanMessage || "جاري فحص تذكرة الطيران واستخراج المواعيد بالذكاء الاصطناعي (Google Gemini)..."}</span>
+          </div>
+        ) : ticketScanSuccess ? (
+          <div className="flex items-center justify-between p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span className="font-semibold">{ticketScanMessage}</span>
+            </div>
+            <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold shrink-0">
+              تم الاستخراج تلقائياً بالذكاء الاصطناعي ✓
+            </span>
+          </div>
+        ) : ticketScanMessage && flightTicketFile ? (
+          <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
+            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>{ticketScanMessage}</span>
+          </div>
+        ) : null}
+
+        {/* Flight Ticket Upload Dropzone */}
+        <div className="space-y-2">
+          <label className="block text-xs font-bold text-gray-800 flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <Ticket className="w-4 h-4 text-sky-600" />
+              <span>مستند / ملف تذكرة الطيران المشتركة (صورة أو PDF)</span>
+            </span>
+            {flightTicketFile && (
+              <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" /> تم اختيار التذكرة
+              </span>
+            )}
+          </label>
+
+          {flightTicketFile ? (
+            <div className="p-4 bg-sky-50/50 border border-sky-200 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="flex items-center gap-3 overflow-hidden w-full sm:w-auto">
+                <div className="w-12 h-12 bg-sky-100 text-sky-700 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 border border-sky-200">
+                  <Ticket className="w-6 h-6" />
+                </div>
+                <div className="overflow-hidden flex-1">
+                  <p className="text-sm font-bold text-gray-800 truncate">{flightTicketFile.name}</p>
+                  <p className="text-xs text-gray-500">{(flightTicketFile.size / 1024).toFixed(1)} KB</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <button
+                  type="button"
+                  disabled={isScanningTicket}
+                  onClick={() => runTicketScan(flightTicketFile)}
+                  className="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer shadow-2xs"
+                  title="إعادة فحص التذكرة بالذكاء الاصطناعي"
+                >
+                  <RotateCcw className={`w-3.5 h-3.5 ${isScanningTicket ? "animate-spin" : ""}`} />
+                  <span>إعادة الفحص بالذكاء الاصطناعي</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleTicketFileChange(null)}
+                  className="px-3 py-1.5 bg-white hover:bg-red-50 text-red-600 border border-red-200 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>إزالة الملف</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <input
+                type="file"
+                id="sharedFlightTicketFile"
+                accept=".pdf,.jpg,.jpeg,.png"
+                onChange={(e) => handleTicketFileChange(e.target.files?.[0] || null)}
+                className="hidden"
+              />
+              <label
+                htmlFor="sharedFlightTicketFile"
+                className="w-full flex flex-col items-center justify-center py-6 px-4 border-2 border-dashed border-sky-300 hover:border-sky-500 rounded-xl cursor-pointer bg-sky-50/30 hover:bg-sky-50/70 transition-all text-center group"
+              >
+                <div className="w-12 h-12 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                  <Upload className="w-6 h-6" />
+                </div>
+                <span className="text-sm font-bold text-sky-700">
+                  اضغط هنا لرفع تذكرة الطيران المشتركة (صورة أو PDF)
+                </span>
+                <span className="text-xs text-gray-500 mt-1">
+                  يقوم الذكاء الاصطناعي بقراءة وتعبئة جميع الحقول أدناه تلقائياً بدقة تامة
+                </span>
+              </label>
+            </div>
+          )}
+        </div>
+
+        {/* 6 Form Fields Extracted by AI */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-1">
+          {/* 1. نوع / شركة الطيران */}
+          <div className="bg-gray-50/70 p-3.5 rounded-xl border border-gray-200 hover:border-sky-300 transition-colors">
+            <label className="block text-xs font-bold text-gray-800 mb-1.5 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Plane className="w-3.5 h-3.5 text-sky-600" />
+                <span>نوع / شركة الطيران</span>
+              </span>
+              {ticketScanSuccess && airline && (
+                <span className="text-[10px] text-emerald-700 font-semibold flex items-center gap-0.5">
+                  <CheckCircle2 className="w-3 h-3" /> تم التعرف
+                </span>
+              )}
+            </label>
+            <input
+              type="text"
+              value={airline}
+              onChange={(e) => setAirline(e.target.value)}
+              placeholder="مثال: الخطوط السعودية، مصر للطيران..."
+              className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 bg-white transition-all text-gray-800 font-medium"
+            />
+            <span className="text-[11px] text-gray-500 mt-1.5 block">شركة النقل الجوي للرحلة</span>
+          </div>
+
+          {/* 2. رقم الرحلة */}
+          <div className="bg-gray-50/70 p-3.5 rounded-xl border border-gray-200 hover:border-sky-300 transition-colors">
+            <label className="block text-xs font-bold text-gray-800 mb-1.5 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Ticket className="w-3.5 h-3.5 text-sky-600" />
+                <span>رقم الرحلة</span>
+              </span>
+              {ticketScanSuccess && flightNumber && (
+                <span className="text-[10px] text-emerald-700 font-semibold flex items-center gap-0.5">
+                  <CheckCircle2 className="w-3 h-3" /> تم التعرف
+                </span>
+              )}
+            </label>
+            <input
+              type="text"
+              value={flightNumber}
+              onChange={(e) => setFlightNumber(e.target.value)}
+              placeholder="مثال: SV123 أو MS665"
+              className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 bg-white transition-all text-gray-800 font-bold uppercase"
+            />
+            <span className="text-[11px] text-gray-500 mt-1.5 block">رقم رحلة الطيران المجدولة</span>
+          </div>
+
+          {/* 3. تاريخ الذهاب */}
+          <div className="bg-gray-50/70 p-3.5 rounded-xl border border-gray-200 hover:border-sky-300 transition-colors">
+            <label className="block text-xs font-bold text-gray-800 mb-1.5 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-sky-600" />
+                <span>تاريخ الذهاب</span>
+              </span>
+              {ticketScanSuccess && departureDate && (
+                <span className="text-[10px] text-emerald-700 font-semibold flex items-center gap-0.5">
+                  <CheckCircle2 className="w-3 h-3" /> تم التعرف
+                </span>
+              )}
+            </label>
+            <input
+              type="date"
+              value={departureDate}
+              onChange={(e) => setDepartureDate(e.target.value)}
+              className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 bg-white transition-all text-gray-800 font-medium"
+            />
+            <span className="text-[11px] text-gray-500 mt-1.5 block">تاريخ انطلاق رحلة الذهاب</span>
+          </div>
+
+          {/* 4. تاريخ العودة */}
+          <div className="bg-gray-50/70 p-3.5 rounded-xl border border-gray-200 hover:border-teal-300 transition-colors">
+            <label className="block text-xs font-bold text-gray-800 mb-1.5 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-teal-600" />
+                <span>تاريخ العودة</span>
+              </span>
+              {ticketScanSuccess && returnDate && (
+                <span className="text-[10px] text-emerald-700 font-semibold flex items-center gap-0.5">
+                  <CheckCircle2 className="w-3 h-3" /> تم التعرف
+                </span>
+              )}
+            </label>
+            <input
+              type="date"
+              value={returnDate}
+              onChange={(e) => setReturnDate(e.target.value)}
+              className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white transition-all text-gray-800 font-medium"
+            />
+            <span className="text-[11px] text-gray-500 mt-1.5 block">تاريخ رحلة العودة (اختياري)</span>
+          </div>
+
+          {/* 5. وقت إقلاع طائرة الذهاب */}
+          <div className="bg-gray-50/70 p-3.5 rounded-xl border border-gray-200 hover:border-indigo-300 transition-colors">
+            <label className="block text-xs font-bold text-gray-800 mb-1.5 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-indigo-600" />
+                <span>وقت إقلاع طائرة الذهاب</span>
+              </span>
+              {ticketScanSuccess && flightDepartureTime && (
+                <span className="text-[10px] text-emerald-700 font-semibold flex items-center gap-0.5">
+                  <CheckCircle2 className="w-3 h-3" /> تم التعرف
+                </span>
+              )}
+            </label>
+            <input
+              type="time"
+              value={flightDepartureTime}
+              onChange={(e) => handleDepartureTimeChange(e.target.value)}
+              className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white transition-all text-gray-800 font-medium text-center"
+            />
+            <span className="text-[11px] text-gray-500 mt-1.5 block">موعد إقلاع الطيران المحدد</span>
+          </div>
+
+          {/* 6. وقت تواجد المسافر في المطار (قبل الإقلاع بـ 3 ساعات) */}
+          <div className="bg-amber-50/50 p-3.5 rounded-xl border border-amber-200 hover:border-amber-400 transition-colors">
+            <label className="block text-xs font-bold text-amber-900 mb-1.5 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-amber-600" />
+                <span>وقت تواجد المسافر في المطار</span>
+              </span>
+              <span className="text-[10px] bg-amber-200/70 text-amber-800 px-1.5 py-0.5 rounded font-bold">
+                قبل الإقلاع بـ 3 ساعات تلقائياً
+              </span>
+            </label>
+            <input
+              type="time"
+              value={airportArrivalTime}
+              onChange={(e) => setAirportArrivalTime(e.target.value)}
+              className="w-full px-3 py-2 text-sm rounded-lg border border-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white transition-all text-gray-900 font-bold text-center"
+            />
+            <span className="text-[11px] text-amber-700 mt-1.5 block font-medium">
+              محسوب تلقائياً قبل إقلاع الطائرة بـ 3 ساعات
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Section 3: Travelers & Documents (Passport & Photo only) */}
       <div className="space-y-4">
         <div className="flex items-center justify-between bg-blue-50/60 p-4 rounded-xl border border-blue-200">
           <div>
@@ -760,7 +1095,7 @@ export default function UnifiedNewRequestPage() {
               قائمة المسافرين والمستندات ({travelers.length})
             </h2>
             <p className="text-xs text-gray-600 mt-0.5">
-              ارفع مستندات كل مسافر مباشرة (جواز السفر، الصورة، وتذكرة الطيران).
+              ارفع جواز السفر والصورة الشخصية لكل مسافر (التذكرة موحدة لجميع المسافرين بالأعلى).
             </p>
           </div>
           <button
@@ -898,8 +1233,8 @@ export default function UnifiedNewRequestPage() {
                 </div>
               </div>
 
-              {/* Direct Document Upload Cards (3 items) */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Direct Document Upload Cards (Passport & Photo) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* 1. Passport Upload */}
                 <div
                   className={`rounded-xl border-2 border-dashed p-3.5 transition-colors ${
@@ -1079,80 +1414,6 @@ export default function UnifiedNewRequestPage() {
                     </div>
                   )}
                 </div>
-
-                {/* 3. Ticket Upload (NO "(اختياري)" - fourth requirement fulfilled) */}
-                <div
-                  className={`rounded-xl border-2 border-dashed p-3.5 transition-colors ${
-                    traveler.ticketFile
-                      ? "border-green-400 bg-green-50/50"
-                      : "border-gray-300 hover:border-amber-400 bg-gray-50/40"
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-gray-800">
-                      <Ticket className="w-4 h-4 text-amber-600" />
-                      <span>تذكرة الطيران</span>
-                    </div>
-                    {traveler.ticketFile && (
-                      <span className="text-[10px] text-green-700 bg-green-100 px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5">
-                        <CheckCircle2 className="w-3 h-3" /> تم التحديد
-                      </span>
-                    )}
-                  </div>
-
-                  {traveler.ticketFile ? (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-12 h-12 bg-amber-100 text-amber-800 rounded-lg flex items-center justify-center font-bold text-xs shrink-0">
-                          DOC
-                        </div>
-                        <div className="overflow-hidden flex-1">
-                          <p className="text-xs font-bold text-gray-800 truncate">
-                            {traveler.ticketFile.name}
-                          </p>
-                          <p className="text-[10px] text-gray-500">
-                            {formatFileSize(traveler.ticketFile.size)}
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleFileChange(traveler.id, "ticket", null)}
-                        className="text-[11px] text-red-600 hover:text-red-800 font-medium flex items-center gap-1"
-                      >
-                        <X className="w-3 h-3" /> إزالة واستبدال
-                      </button>
-                    </div>
-                  ) : (
-                    <div>
-                      <input
-                        type="file"
-                        id={`ticket-${traveler.id}`}
-                        accept=".pdf,.jpg,.jpeg,.png"
-                        onChange={(e) =>
-                          handleFileChange(
-                            traveler.id,
-                            "ticket",
-                            e.target.files?.[0] || null
-                          )
-                        }
-                        className="hidden"
-                      />
-                      <label
-                        htmlFor={`ticket-${traveler.id}`}
-                        className="w-full flex flex-col items-center justify-center py-4 px-2 border border-gray-200 rounded-lg cursor-pointer hover:bg-white hover:border-amber-300 transition-colors"
-                      >
-                        <Upload className="w-5 h-5 text-gray-400 mb-1" />
-                        <span className="text-xs font-bold text-amber-600">
-                          اضغط لاختيار التذكرة
-                        </span>
-                        <span className="text-[10px] text-gray-400 mt-0.5">
-                          PDF, JPG, PNG
-                        </span>
-                      </label>
-                    </div>
-                  )}
-                </div>
               </div>
             </div>
           ))}
@@ -1167,90 +1428,6 @@ export default function UnifiedNewRequestPage() {
           <Plus className="w-4 h-4" />
           + إضافة مسافر آخر إلى هذه المعاملة
         </button>
-      </div>
-
-      {/* Section 3: Flight & Travel Dates (مواعيد وتفاصيل الرحلة والطيران) */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-4">
-        <div className="flex items-center justify-between border-b border-gray-100 pb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0 border border-sky-100 shadow-xs">
-              <Plane className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-gray-900">
-                بيانات ومواعيد الرحلة والطيران
-              </h2>
-              <p className="text-xs text-gray-500">
-                حدد تواريخ الذهاب والعودة ومواعيد إقلاع الطائرة وتواجد المسافرين في المطار
-              </p>
-            </div>
-          </div>
-          <span className="text-xs bg-sky-50 text-sky-800 font-semibold px-2.5 py-1 rounded-md border border-sky-200">
-            مواعيد السفر
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-1">
-          {/* 1. تاريخ ذهاب */}
-          <div className="bg-gray-50/60 p-3.5 rounded-xl border border-gray-200/80 hover:border-sky-300 transition-colors">
-            <label className="block text-xs font-bold text-gray-800 mb-1.5 flex items-center gap-1.5">
-              <Calendar className="w-3.5 h-3.5 text-sky-600" />
-              <span>تاريخ ذهاب</span>
-            </label>
-            <input
-              type="date"
-              value={departureDate}
-              onChange={(e) => setDepartureDate(e.target.value)}
-              className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 bg-white transition-all text-gray-800 font-medium"
-            />
-            <span className="text-[11px] text-gray-500 mt-1.5 block">تاريخ انطلاق الرحلة</span>
-          </div>
-
-          {/* 2. تاريخ عودة */}
-          <div className="bg-gray-50/60 p-3.5 rounded-xl border border-gray-200/80 hover:border-teal-300 transition-colors">
-            <label className="block text-xs font-bold text-gray-800 mb-1.5 flex items-center gap-1.5">
-              <Calendar className="w-3.5 h-3.5 text-teal-600" />
-              <span>تاريخ عودة</span>
-            </label>
-            <input
-              type="date"
-              value={returnDate}
-              onChange={(e) => setReturnDate(e.target.value)}
-              className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white transition-all text-gray-800 font-medium"
-            />
-            <span className="text-[11px] text-gray-500 mt-1.5 block">تاريخ رحلة العودة</span>
-          </div>
-
-          {/* 3. وقت إقلاع الطائرة */}
-          <div className="bg-gray-50/60 p-3.5 rounded-xl border border-gray-200/80 hover:border-indigo-300 transition-colors">
-            <label className="block text-xs font-bold text-gray-800 mb-1.5 flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5 text-indigo-600" />
-              <span>وقت إقلاع الطائرة</span>
-            </label>
-            <input
-              type="time"
-              value={flightDepartureTime}
-              onChange={(e) => setFlightDepartureTime(e.target.value)}
-              className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white transition-all text-gray-800 font-medium text-center"
-            />
-            <span className="text-[11px] text-gray-500 mt-1.5 block">موعد إقلاع الطيران المحدد</span>
-          </div>
-
-          {/* 4. وقت تواجد المسافر في المطار */}
-          <div className="bg-gray-50/60 p-3.5 rounded-xl border border-gray-200/80 hover:border-amber-300 transition-colors">
-            <label className="block text-xs font-bold text-gray-800 mb-1.5 flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5 text-amber-600" />
-              <span>وقت تواجد المسافر في المطار</span>
-            </label>
-            <input
-              type="time"
-              value={airportArrivalTime}
-              onChange={(e) => setAirportArrivalTime(e.target.value)}
-              className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white transition-all text-gray-800 font-medium text-center"
-            />
-            <span className="text-[11px] text-gray-500 mt-1.5 block">الحضور بصالة السفر قبل الإقلاع</span>
-          </div>
-        </div>
       </div>
 
       {/* Floating Action Bar - Docked at Bottom (Never overlaps sidebar) */}
@@ -1270,9 +1447,15 @@ export default function UnifiedNewRequestPage() {
             </span>
             <span className="text-gray-300">|</span>
             <span className="flex items-center gap-1.5">
-              <span>التذاكر:</span>
-              <strong className="text-amber-600 font-bold text-sm bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-100">
-                {travelers.filter((t) => t.ticketFile).length}
+              <span>التذكرة المشتركة:</span>
+              <strong
+                className={`text-sm px-2 py-0.5 rounded-lg border font-bold ${
+                  flightTicketFile
+                    ? "text-sky-700 bg-sky-50 border-sky-200"
+                    : "text-gray-500 bg-gray-50 border-gray-200"
+                }`}
+              >
+                {flightTicketFile ? "مرفوعة ✓" : "غير مرفوعة"}
               </strong>
             </span>
           </div>

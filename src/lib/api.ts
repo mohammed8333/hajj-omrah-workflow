@@ -112,6 +112,8 @@ export const api = {
       returnDate?: string;
       flightDepartureTime?: string;
       airportArrivalTime?: string;
+      airline?: string;
+      flightNumber?: string;
       destination?: string;
       notes?: string;
       hasHosting: boolean;
@@ -137,6 +139,9 @@ export const api = {
         returnDate?: string;
         flightDepartureTime?: string;
         airportArrivalTime?: string;
+        airline?: string;
+        flightNumber?: string;
+        flightTicketDocumentId?: string;
         destination?: string;
         notes?: string;
         hasHosting?: boolean;

@@ -930,6 +930,8 @@ class LocalDatabaseEngine {
         returnDate: r.returnDate,
         flightDepartureTime: r.flightDepartureTime,
         airportArrivalTime: r.airportArrivalTime,
+        airline: r.airline,
+        flightNumber: r.flightNumber,
         destination: r.destination,
         travelersCount: r.travelers.length,
         documentsCount: docCount,
@@ -995,6 +997,16 @@ class LocalDatabaseEngine {
       }
     }
 
+    if (!req.flightTicketDocument) {
+      const ticketDoc = req.groupDocuments?.find(
+        (d) => d.documentType === "FlightTicket" || d.id === req.flightTicketDocumentId
+      );
+      if (ticketDoc) {
+        req.flightTicketDocument = ticketDoc;
+        req.flightTicketDocumentId = ticketDoc.id;
+      }
+    }
+
     return JSON.parse(JSON.stringify(req));
   }
 
@@ -1007,6 +1019,8 @@ class LocalDatabaseEngine {
       returnDate?: string;
       flightDepartureTime?: string;
       airportArrivalTime?: string;
+      airline?: string;
+      flightNumber?: string;
       destination?: string;
       notes?: string;
       hasHosting: boolean;
@@ -1048,6 +1062,8 @@ class LocalDatabaseEngine {
       returnDate: data.returnDate,
       flightDepartureTime: data.flightDepartureTime,
       airportArrivalTime: data.airportArrivalTime,
+      airline: data.airline,
+      flightNumber: data.flightNumber,
       destination: data.destination || "مكة المكرمة والمدينة المنورة",
       notes: data.notes,
       createdAt: now,
@@ -1105,6 +1121,9 @@ class LocalDatabaseEngine {
       returnDate?: string;
       flightDepartureTime?: string;
       airportArrivalTime?: string;
+      airline?: string;
+      flightNumber?: string;
+      flightTicketDocumentId?: string;
       destination?: string;
       notes?: string;
       hasHosting?: boolean;
@@ -1127,6 +1146,9 @@ class LocalDatabaseEngine {
     if (data.returnDate !== undefined) req.returnDate = data.returnDate;
     if (data.flightDepartureTime !== undefined) req.flightDepartureTime = data.flightDepartureTime;
     if (data.airportArrivalTime !== undefined) req.airportArrivalTime = data.airportArrivalTime;
+    if (data.airline !== undefined) req.airline = data.airline;
+    if (data.flightNumber !== undefined) req.flightNumber = data.flightNumber;
+    if (data.flightTicketDocumentId !== undefined) req.flightTicketDocumentId = data.flightTicketDocumentId;
     if (data.destination !== undefined) req.destination = data.destination;
     if (data.notes !== undefined) req.notes = data.notes;
     if (data.hasHosting !== undefined) req.hasHosting = data.hasHosting;
@@ -1770,6 +1792,15 @@ class LocalDatabaseEngine {
 
         // Remove previous HostId document from groupDocuments if any
         const prevIdx = req.groupDocuments.findIndex((d) => d.documentType === "HostId");
+        if (prevIdx !== -1) {
+          req.groupDocuments.splice(prevIdx, 1);
+        }
+      } else if (documentType === "FlightTicket") {
+        req.flightTicketDocumentId = docId;
+        req.flightTicketDocument = docItem;
+
+        // Remove previous group FlightTicket document from groupDocuments if any
+        const prevIdx = req.groupDocuments.findIndex((d) => d.documentType === "FlightTicket");
         if (prevIdx !== -1) {
           req.groupDocuments.splice(prevIdx, 1);
         }
