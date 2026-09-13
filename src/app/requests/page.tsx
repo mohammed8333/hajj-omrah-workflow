@@ -23,10 +23,12 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useDialog } from "@/lib/dialog-context";
 
 export default function RequestsListPage() {
   const { user, role } = useAuth();
   const router = useRouter();
+  const { confirm, prompt, alert } = useDialog();
   const [requests, setRequests] = useState<GroupRequestSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -72,40 +74,63 @@ export default function RequestsListPage() {
 
   const handleAdminArchive = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm("هل أنت متأكد من رغبتك في أرشفة هذه المعاملة؟")) return;
+    const ok = await confirm({
+      title: "أرشفة المعاملة",
+      message: "هل أنت متأكد من رغبتك في أرشفة هذه المعاملة؟",
+      confirmText: "أرشفة المعاملة",
+      cancelText: "إلغاء",
+      variant: "warning",
+    });
+    if (!ok) return;
     try {
       await api.requests.archive(id, "أرشفة يدوية بواسطة مدير النظام");
       await loadRequests();
     } catch (err: unknown) {
-      if (err instanceof Error) alert(err.message);
+      if (err instanceof Error) await alert({ title: "خطأ", message: err.message, variant: "danger" });
     }
   };
 
   const handleAdminUnarchive = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm("هل ترغب في إلغاء أرشفة هذه المعاملة واستعادتها للحالة النشطة؟")) return;
+    const ok = await confirm({
+      title: "إلغاء أرشفة المعاملة",
+      message: "هل ترغب في إلغاء أرشفة هذه المعاملة واستعادتها للحالة النشطة؟",
+      confirmText: "استعادة المعاملة",
+      cancelText: "إلغاء",
+      variant: "info",
+    });
+    if (!ok) return;
     try {
       await api.requests.unarchive(id);
       await loadRequests();
     } catch (err: unknown) {
-      if (err instanceof Error) alert(err.message);
+      if (err instanceof Error) await alert({ title: "خطأ", message: err.message, variant: "danger" });
     }
   };
 
   const handleAdminDelete = async (id: string, reqNumber: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    const confirmation = prompt(
-      `تحذير أمني: أنت على وشك مسح المعاملة (${reqNumber}) وكافة وثائقها نهائياً!\nللتأكيد النهائي، اكتب (حذف) أو (delete):`
-    );
+    const confirmation = await prompt({
+      title: "تحذير أمني: مسح المعاملة نهائياً",
+      message: `أنت على وشك مسح المعاملة (${reqNumber}) وكافة وثائقها وملفاتها نهائياً من النظام!\n\nللتأكيد النهائي، اكتب (حذف) أو (delete):`,
+      placeholder: "اكتب (حذف) هنا...",
+      confirmText: "حذف نهائي",
+      cancelText: "إلغاء",
+      variant: "danger",
+    });
     if (!confirmation || (confirmation.trim() !== "حذف" && confirmation.trim().toLowerCase() !== "delete")) {
       return;
     }
     try {
       await api.requests.delete(id);
-      alert("تم حذف المعاملة بالكامل بنجاح.");
+      await alert({
+        title: "تم الحذف بنجاح",
+        message: "تم حذف المعاملة بالكامل بنجاح.",
+        variant: "success",
+      });
       await loadRequests();
     } catch (err: unknown) {
-      if (err instanceof Error) alert(err.message);
+      if (err instanceof Error) await alert({ title: "خطأ", message: err.message, variant: "danger" });
     }
   };
 

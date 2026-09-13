@@ -50,6 +50,7 @@ import {
 } from "lucide-react";
 import { scanPassportMRZ, translateEnglishNameToArabic } from "@/lib/mrzScanner";
 import { scanHostId } from "@/lib/hostIdScanner";
+import { useDialog } from "@/lib/dialog-context";
 
 export default function RequestDetailPage({
   requestId: propRequestId,
@@ -63,6 +64,7 @@ export default function RequestDetailPage({
   const requestId = (rawId || "").split("?")[0];
   const router = useRouter();
   const { user, role } = useAuth();
+  const { confirm, prompt, alert } = useDialog();
 
   const [request, setRequest] = useState<GroupRequestDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -379,7 +381,11 @@ export default function RequestDetailPage({
 
   const handleScanExistingHostId = async (doc: DocumentItem) => {
     if (doc.mimeType && !doc.mimeType.startsWith("image/")) {
-      alert("الفحص التلقائي متاح فقط لملفات الصور (JPG, PNG). لملفات PDF يرجى إدخال البيانات يدوياً.");
+      await alert({
+        title: "تنبيه الفحص التلقائي",
+        message: "الفحص التلقائي متاح فقط لملفات الصور (JPG, PNG). لملفات PDF يرجى إدخال البيانات يدوياً.",
+        variant: "info",
+      });
       return;
     }
     try {
@@ -429,7 +435,14 @@ export default function RequestDetailPage({
   };
 
   const handleDeleteDocument = async (docId: string) => {
-    if (!confirm("هل أنت متأكد من رغبتك في حذف هذا المستند؟")) return;
+    const ok = await confirm({
+      title: "حذف المستند",
+      message: "هل أنت متأكد من رغبتك في حذف هذا المستند نهائياً؟",
+      confirmText: "حذف المستند",
+      cancelText: "إلغاء",
+      variant: "danger",
+    });
+    if (!ok) return;
     try {
       setActionLoading(true);
       await api.documents.delete(docId);
@@ -473,7 +486,14 @@ export default function RequestDetailPage({
   };
 
   const handleSubmitRequest = async () => {
-    if (!confirm("هل أنت متأكد من تقديم الطلب لموظف الصفا للمراجعة؟")) return;
+    const ok = await confirm({
+      title: "تقديم الطلب للمراجعة",
+      message: "هل أنت متأكد من تقديم الطلب لموظف الصفا للمراجعة والتدقيق؟",
+      confirmText: "تأكيد التقديم",
+      cancelText: "إلغاء",
+      variant: "primary",
+    });
+    if (!ok) return;
     try {
       setActionLoading(true);
       setError(null);
@@ -527,11 +547,25 @@ export default function RequestDetailPage({
   ) => {
     let finalNote = note;
     if (newStatus === "NeedsCorrection" && !finalNote) {
-      const input = prompt("اكتب ملاحظة أو سبب طلب التصحيح (اختياري):");
+      const input = await prompt({
+        title: "طلب تصحيح للمستند",
+        message: "اكتب ملاحظة أو سبب طلب التصحيح للمرسل (اختياري):",
+        placeholder: "اكتب سبب طلب التصحيح هنا...",
+        confirmText: "طلب التصحيح",
+        cancelText: "إلغاء",
+        variant: "warning",
+      });
       if (input === null) return;
       finalNote = input.trim() || undefined;
     } else if (newStatus === "Rejected" && !finalNote) {
-      const input = prompt("اكتب سبب رفض المستند (اختياري):");
+      const input = await prompt({
+        title: "رفض المستند",
+        message: "اكتب سبب رفض المستند للمرسل (اختياري):",
+        placeholder: "اكتب سبب الرفض هنا...",
+        confirmText: "تأكيد الرفض",
+        cancelText: "إلغاء",
+        variant: "danger",
+      });
       if (input === null) return;
       finalNote = input.trim() || undefined;
     }
@@ -679,11 +713,19 @@ export default function RequestDetailPage({
   const handleCompleteSafa = async () => {
     const docCheckResult = checkAllDocumentsAccepted();
     if (!docCheckResult.isAllAccepted) {
-      alert(docCheckResult.reason || "لا يمكن إدخال رقم نسك إلا بعد قبول جميع المستندات.");
+      await alert({
+        title: "تنبيه تدقيق المستندات",
+        message: docCheckResult.reason || "لا يمكن إدخال رقم نسك إلا بعد قبول جميع المستندات.",
+        variant: "warning",
+      });
       return;
     }
     if (!nusukInput.trim()) {
-      alert("يرجى إدخال رقم مجموعة نسك.");
+      await alert({
+        title: "تنبيه",
+        message: "يرجى إدخال رقم مجموعة نسك لمتابعة الإجراء.",
+        variant: "warning",
+      });
       return;
     }
     try {
@@ -702,7 +744,14 @@ export default function RequestDetailPage({
   };
 
   const handleSendToSaudiAgent = async () => {
-    if (!confirm("هل أنت متأكد من إحالة المعاملة المكتملة إلى الوكيل السعودي؟")) return;
+    const ok = await confirm({
+      title: "إحالة للوكيل السعودي",
+      message: "هل أنت متأكد من إحالة المعاملة المكتملة إلى الوكيل السعودي؟",
+      confirmText: "تأكيد الإحالة",
+      cancelText: "إلغاء",
+      variant: "primary",
+    });
+    if (!ok) return;
     try {
       setActionLoading(true);
       setError(null);
@@ -731,7 +780,14 @@ export default function RequestDetailPage({
   };
 
   const handleAgentComplete = async () => {
-    if (!confirm("هل أنت متأكد من اكتمال كافة الإجراءات واعتماد المعاملة نهائياً؟")) return;
+    const ok = await confirm({
+      title: "اعتماد المعاملة نهائياً",
+      message: "هل أنت متأكد من اكتمال كافة الإجراءات واعتماد المعاملة نهائياً؟",
+      confirmText: "اعتماد المعاملة ✓",
+      cancelText: "إلغاء",
+      variant: "success",
+    });
+    if (!ok) return;
     try {
       setActionLoading(true);
       await api.requests.agentComplete(requestId, "تم إنجاز كافة التأشيرات والخدمات بنجاح");
@@ -802,7 +858,11 @@ export default function RequestDetailPage({
 
   const handleSubmitCorrection = async () => {
     if (!correctionReason.trim()) {
-      alert("يرجى كتابة سبب طلب التصحيح.");
+      await alert({
+        title: "تنبيه",
+        message: "يرجى كتابة سبب طلب التصحيح لتوضيح المطلوب للمرسل.",
+        variant: "warning",
+      });
       return;
     }
     try {
@@ -838,7 +898,14 @@ export default function RequestDetailPage({
   };
 
   const handleAdminArchive = async () => {
-    if (!confirm("هل أنت متأكد من رغبتك في أرشفة هذه المعاملة؟")) return;
+    const ok = await confirm({
+      title: "أرشفة المعاملة",
+      message: "هل أنت متأكد من رغبتك في أرشفة هذه المعاملة؟",
+      confirmText: "أرشفة المعاملة",
+      cancelText: "إلغاء",
+      variant: "warning",
+    });
+    if (!ok) return;
     try {
       setActionLoading(true);
       setError(null);
@@ -854,7 +921,14 @@ export default function RequestDetailPage({
   };
 
   const handleAdminUnarchive = async () => {
-    if (!confirm("هل ترغب في إلغاء أرشفة هذه المعاملة واستعادتها للحالة النشطة؟")) return;
+    const ok = await confirm({
+      title: "إلغاء أرشفة المعاملة",
+      message: "هل ترغب في إلغاء أرشفة هذه المعاملة واستعادتها للحالة النشطة؟",
+      confirmText: "استعادة المعاملة",
+      cancelText: "إلغاء",
+      variant: "info",
+    });
+    if (!ok) return;
     try {
       setActionLoading(true);
       setError(null);
@@ -870,9 +944,14 @@ export default function RequestDetailPage({
   };
 
   const handleAdminDelete = async () => {
-    const confirmation = prompt(
-      `تحذير أمني: أنت على وشك مسح هذه المعاملة وكافة وثائقها وملفاتها نهائياً من النظام!\nللتأكيد النهائي، اكتب (حذف) أو (delete) في المربع أدناه:`
-    );
+    const confirmation = await prompt({
+      title: "تحذير أمني: مسح المعاملة نهائياً",
+      message: `أنت على وشك مسح هذه المعاملة وكافة وثائقها وملفاتها نهائياً من النظام!\n\nللتأكيد النهائي، اكتب (حذف) أو (delete) في المربع أدناه:`,
+      placeholder: "اكتب (حذف) هنا...",
+      confirmText: "حذف نهائي",
+      cancelText: "إلغاء",
+      variant: "danger",
+    });
     if (!confirmation || (confirmation.trim() !== "حذف" && confirmation.trim().toLowerCase() !== "delete")) {
       return;
     }
@@ -880,7 +959,11 @@ export default function RequestDetailPage({
       setActionLoading(true);
       setError(null);
       await api.requests.delete(requestId);
-      alert("تم حذف المعاملة بالكامل وجميع مستنداتها بنجاح.");
+      await alert({
+        title: "تم الحذف بنجاح",
+        message: "تم حذف المعاملة بالكامل وجميع مستنداتها بنجاح.",
+        variant: "success",
+      });
       router.push("/requests");
     } catch (err: unknown) {
       if (err instanceof Error) setError(err.message);
@@ -1035,10 +1118,14 @@ export default function RequestDetailPage({
                 <>
                   <button
                     type="button"
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       e.preventDefault();
                       if (!canCompleteSafa) {
-                        alert(docCheck.reason || "لا يمكن إدخال رقم نسك إلا بعد قبول جميع المستندات.");
+                        await alert({
+                          title: "تنبيه تدقيق المستندات",
+                          message: docCheck.reason || "لا يمكن إدخال رقم نسك إلا بعد قبول جميع المستندات.",
+                          variant: "warning",
+                        });
                         return;
                       }
                       setShowNusukModal(true);

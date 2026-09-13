@@ -19,10 +19,12 @@ import {
   Trash2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useDialog } from "@/lib/dialog-context";
 
 export default function UsersManagementPage() {
   const { user: currentUser, role } = useAuth();
   const router = useRouter();
+  const { confirm, alert } = useDialog();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -70,7 +72,11 @@ export default function UsersManagementPage() {
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName.trim() || !username.trim() || !password) {
-      alert("يرجى ملء جميع الحقول الإلزامية.");
+      await alert({
+        title: "تنبيه",
+        message: "يرجى ملء جميع الحقول الإلزامية لإنشاء المستخدم.",
+        variant: "warning",
+      });
       return;
     }
 
@@ -123,7 +129,11 @@ export default function UsersManagementPage() {
   const handleUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editFullName.trim() || !editUsername.trim()) {
-      alert("يرجى ملء الاسم الكامل واسم الدخول.");
+      await alert({
+        title: "تنبيه",
+        message: "يرجى ملء الاسم الكامل واسم الدخول.",
+        variant: "warning",
+      });
       return;
     }
 
@@ -150,7 +160,14 @@ export default function UsersManagementPage() {
   };
 
   const handleDeleteUser = async (userId: string, userName: string) => {
-    if (!confirm(`تحذير: هل أنت متأكد من حذف حساب المستخدم (${userName}) نهائياً؟`)) {
+    const ok = await confirm({
+      title: "تأكيد حذف المستخدم",
+      message: `تحذير: هل أنت متأكد من حذف حساب المستخدم (${userName}) نهائياً؟\nلا يمكن التراجع عن هذا الإجراء.`,
+      confirmText: "حذف المستخدم نهائياً",
+      cancelText: "إلغاء",
+      variant: "danger",
+    });
+    if (!ok) {
       return;
     }
     try {

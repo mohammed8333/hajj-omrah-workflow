@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { api } from "@/lib/api";
 import { Download, Upload, RotateCcw, X, Check, AlertCircle, Database } from "lucide-react";
+import { useDialog } from "@/lib/dialog-context";
 
 interface BackupModalProps {
   isOpen: boolean;
@@ -9,6 +10,7 @@ interface BackupModalProps {
 }
 
 export function BackupModal({ isOpen, onClose, onDataChanged }: BackupModalProps) {
+  const { confirm } = useDialog();
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -58,8 +60,15 @@ export function BackupModal({ isOpen, onClose, onDataChanged }: BackupModalProps
     reader.readAsText(file);
   };
 
-  const handleReset = () => {
-    if (confirm("هل أنت متأكد من رغبتك في استعادة البيانات التجريبية الافتراضية؟ سيتم مسح التعديلات المحلية.")) {
+  const handleReset = async () => {
+    const ok = await confirm({
+      title: "استعادة البيانات التجريبية",
+      message: "هل أنت متأكد من رغبتك في استعادة البيانات التجريبية الافتراضية؟\nسيتم مسح كافة التعديلات والمعاملات المحلية غير المحفوظة.",
+      confirmText: "استعادة ومسح التعديلات",
+      cancelText: "إلغاء",
+      variant: "danger",
+    });
+    if (ok) {
       api.system.resetDefaults();
       setSuccessMsg("تمت استعادة البيانات التجريبية الافتراضية بنجاح.");
       if (onDataChanged) onDataChanged();

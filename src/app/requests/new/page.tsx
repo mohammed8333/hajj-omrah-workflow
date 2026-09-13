@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { scanPassportMRZ, translateEnglishNameToArabic } from "@/lib/mrzScanner";
 import { scanHostId } from "@/lib/hostIdScanner";
+import { useDialog } from "@/lib/dialog-context";
 
 interface TravelerDraft {
   id: string;
@@ -52,6 +53,7 @@ interface TravelerDraft {
 export default function UnifiedNewRequestPage() {
   const router = useRouter();
   const { user } = useAuth();
+  const { confirm, alert } = useDialog();
 
   // Hosting
   const [hasHosting, setHasHosting] = useState(false);
@@ -96,9 +98,13 @@ export default function UnifiedNewRequestPage() {
     }
   };
 
-  const handleHostIdFileChange = (file: File | null) => {
+  const handleHostIdFileChange = async (file: File | null) => {
     if (file && file.size > 10 * 1024 * 1024) {
-      alert("حجم ملف هوية المستضيف يتجاوز الحد الأقصى (10 ميجابايت).");
+      await alert({
+        title: "تنبيه حجم الملف",
+        message: "حجم ملف هوية المستضيف يتجاوز الحد الأقصى المسموح به (10 ميجابايت).",
+        variant: "warning",
+      });
       return;
     }
     setHostIdFile(file);
@@ -151,9 +157,13 @@ export default function UnifiedNewRequestPage() {
   };
 
   // Remove traveler
-  const removeTraveler = (id: string) => {
+  const removeTraveler = async (id: string) => {
     if (travelers.length <= 1) {
-      alert("يجب أن تحتوي المعاملة على مسافر واحد على الأقل.");
+      await alert({
+        title: "تنبيه",
+        message: "يجب أن تحتوي المعاملة على مسافر واحد على الأقل.",
+        variant: "warning",
+      });
       return;
     }
     setTravelers((prev) => prev.filter((t) => t.id !== id));
@@ -236,13 +246,17 @@ export default function UnifiedNewRequestPage() {
   };
 
   // Handle document file changes
-  const handleFileChange = (
+  const handleFileChange = async (
     travelerId: string,
     docType: "passport" | "photo" | "ticket",
     file: File | null
   ) => {
     if (file && file.size > 10 * 1024 * 1024) {
-      alert("حجم الملف يتجاوز الحد الأقصى المسموح به (10 ميجابايت).");
+      await alert({
+        title: "تنبيه حجم الملف",
+        message: "حجم الملف يتجاوز الحد الأقصى المسموح به (10 ميجابايت).",
+        variant: "warning",
+      });
       return;
     }
 
@@ -322,9 +336,13 @@ export default function UnifiedNewRequestPage() {
     if (submitDirectlyToSafa) {
       const missingPassports = travelers.filter((t) => !t.passportFile);
       if (missingPassports.length > 0) {
-        const confirmSend = confirm(
-          `تنبيه: لم يتم إرفاق صورة جواز السفر لعدد (${missingPassports.length}) مسافر. هل ترغب في إرسال المعاملة على أي حال؟`
-        );
+        const confirmSend = await confirm({
+          title: "تنبيه نقص صور الجوازات",
+          message: `تنبيه: لم يتم إرفاق صورة جواز السفر لعدد (${missingPassports.length}) مسافر. هل ترغب في إرسال المعاملة على أي حال للمراجعة؟`,
+          confirmText: "إرسال على أي حال",
+          cancelText: "الرجوع للاستكمال",
+          variant: "warning",
+        });
         if (!confirmSend) return;
       }
     }
