@@ -1124,6 +1124,7 @@ class LocalDatabaseEngine {
       airline?: string;
       flightNumber?: string;
       flightTicketDocumentId?: string;
+      nusukGroupNumber?: string;
       destination?: string;
       notes?: string;
       hasHosting?: boolean;
@@ -1149,6 +1150,7 @@ class LocalDatabaseEngine {
     if (data.airline !== undefined) req.airline = data.airline;
     if (data.flightNumber !== undefined) req.flightNumber = data.flightNumber;
     if (data.flightTicketDocumentId !== undefined) req.flightTicketDocumentId = data.flightTicketDocumentId;
+    if (data.nusukGroupNumber !== undefined) req.nusukGroupNumber = data.nusukGroupNumber;
     if (data.destination !== undefined) req.destination = data.destination;
     if (data.notes !== undefined) req.notes = data.notes;
     if (data.hasHosting !== undefined) req.hasHosting = data.hasHosting;

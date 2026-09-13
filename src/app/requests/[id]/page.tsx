@@ -16,6 +16,9 @@ import {
 import { DocumentStatusBadge, RequestStatusBadge } from "@/components/ui/StatusBadge";
 import { DOCUMENT_TYPE_LABELS, REVIEW_STATUS_MAP } from "@/lib/constants";
 import { RequestLifecycleTimer } from "@/components/ui/RequestLifecycleTimer";
+import { SaudiAgentView } from "@/components/requests/SaudiAgentView";
+import { SafaEmployeeView } from "@/components/requests/SafaEmployeeView";
+import JSZip from "jszip";
 import {
   Plane,
   Home,
@@ -86,10 +89,11 @@ export default function RequestDetailPage({
   const [reviewStatus, setReviewStatus] = useState<DocumentReviewStatus>("Accepted");
   const [reviewNote, setReviewNote] = useState("");
 
-  // Safa Complete Modal
+  // Safa Complete Modal & Nusuk Number
   const [showNusukModal, setShowNusukModal] = useState(false);
   const [nusukInput, setNusukInput] = useState("");
   const [nusukNote, setNusukNote] = useState("");
+  const [editingNusuk, setEditingNusuk] = useState(false);
 
   // Correction Request Modal
   const [showCorrectionModal, setShowCorrectionModal] = useState(false);
@@ -115,6 +119,9 @@ export default function RequestDetailPage({
   const [editFlightDepartureTime, setEditFlightDepartureTime] = useState("");
   const [editAirportArrivalTime, setEditAirportArrivalTime] = useState("");
   const [isScanningFlightTicketDoc, setIsScanningFlightTicketDoc] = useState(false);
+
+  // Batch download state
+  const [isDownloadingAll, setIsDownloadingAll] = useState(false);
 
   // Traveler Inline Edit / MRZ Scanning
   const [editingTravelerId, setEditingTravelerId] = useState<string | null>(null);
@@ -518,6 +525,116 @@ export default function RequestDetailPage({
       setError("فشل تنزيل الملف، يرجى المحاولة مرة أخرى.");
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleDownloadAllDocs = async () => {
+    if (!request) return;
+    try {
+      setIsDownloadingAll(true);
+      setError(null);
+
+      const docEntries: { doc: DocumentItem; customName: string }[] = [];
+
+      // 1. Host ID Document
+      const hostDoc =
+        request.hostingInfo?.hostIdDocument ||
+        request.groupDocuments?.find((d) => d.documentType === "HostId");
+      if (hostDoc) {
+        const ext =
+          hostDoc.originalFileName?.split(".").pop() ||
+          (hostDoc.mimeType?.includes("pdf") ? "pdf" : "jpg");
+        docEntries.push({
+          doc: hostDoc,
+          customName: `1_هوية_المستضيف.${ext}`,
+        });
+      }
+
+      // 2. Shared Flight Ticket Document
+      const ticketDoc =
+        request.flightTicketDocument ||
+        request.groupDocuments?.find((d) => d.documentType === "FlightTicket");
+      if (ticketDoc) {
+        const ext =
+          ticketDoc.originalFileName?.split(".").pop() ||
+          (ticketDoc.mimeType?.includes("pdf") ? "pdf" : "jpg");
+        docEntries.push({
+          doc: ticketDoc,
+          customName: `2_تذكرة_الطيران_المشتركة.${ext}`,
+        });
+      }
+
+      // 3. Traveler Documents (Passport & Photo)
+      request.travelers?.forEach((traveler, tIdx) => {
+        const safeName = (traveler.fullName || `مسافر_${tIdx + 1}`).replace(
+          /[\/\\:*?"<>|]/g,
+          "_"
+        );
+        const passDoc = traveler.documents?.find((d) => d.documentType === "Passport");
+        if (passDoc) {
+          const ext =
+            passDoc.originalFileName?.split(".").pop() ||
+            (passDoc.mimeType?.includes("pdf") ? "pdf" : "jpg");
+          docEntries.push({
+            doc: passDoc,
+            customName: `مسافر_${tIdx + 1}_${safeName}_جواز_السفر.${ext}`,
+          });
+        }
+        const photoDoc = traveler.documents?.find(
+          (d) => d.documentType === "PersonalPhoto"
+        );
+        if (photoDoc) {
+          const ext =
+            photoDoc.originalFileName?.split(".").pop() ||
+            (photoDoc.mimeType?.includes("pdf") ? "pdf" : "jpg");
+          docEntries.push({
+            doc: photoDoc,
+            customName: `مسافر_${tIdx + 1}_${safeName}_الصورة_الشخصية.${ext}`,
+          });
+        }
+      });
+
+      if (docEntries.length === 0) {
+        await alert({
+          title: "لا توجد مستندات",
+          message: "لا توجد أي مستندات مرفوعة في هذه المعاملة حالياً لتحميلها.",
+          variant: "warning",
+        });
+        return;
+      }
+
+      const zip = new JSZip();
+
+      for (const entry of docEntries) {
+        try {
+          const streamUrl = await api.documents.getStreamUrl(entry.doc.id);
+          const response = await fetch(streamUrl);
+          const blob = await response.blob();
+          zip.file(entry.customName, blob);
+        } catch (fileErr) {
+          console.error(`Failed to package doc ${entry.customName}`, fileErr);
+        }
+      }
+
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      const downloadUrl = URL.createObjectURL(zipBlob);
+      const a = document.createElement("a");
+      a.href = downloadUrl;
+      a.download = `معاملة_${request.requestNumber || request.id}_كافة_المستندات.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(downloadUrl);
+
+      setSuccess(
+        `تم بنجاح تحميل كافة المستندات (${docEntries.length} ملفات) في ملف مضغوط ZIP.`
+      );
+    } catch (err: unknown) {
+      console.error("Batch download error:", err);
+      if (err instanceof Error) setError(err.message);
+      else setError("حدث خطأ أثناء تجميع وتحميل كافة المستندات.");
+    } finally {
+      setIsDownloadingAll(false);
     }
   };
 
@@ -961,6 +1078,26 @@ export default function RequestDetailPage({
     }
   };
 
+  const handleSaveNusukNumber = async (val?: string) => {
+    const num = val !== undefined ? val : nusukInput;
+    if (!request) return;
+    try {
+      setActionLoading(true);
+      setError(null);
+      await api.requests.update(requestId, {
+        nusukGroupNumber: num.trim() || undefined,
+      });
+      setSuccess("تم حفظ وتحديث رقم مجموعة نسك بنجاح.");
+      setEditingNusuk(false);
+      await loadRequest(false);
+    } catch (err: unknown) {
+      if (err instanceof Error) setError(err.message);
+      else setError("فشل حفظ رقم مجموعة نسك.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleSendToSaudiAgent = async () => {
     const ok = await confirm({
       title: "إحالة للوكيل السعودي",
@@ -1246,15 +1383,32 @@ export default function RequestDetailPage({
     canEditDocs ||
     hasItemsNeedingCorrection;
 
+  const isAdmin = role === "Admin";
+  const isSafaEmployee = role === "SafaEmployee";
+  const isSaudiAgent = role === "SaudiAgent";
+  const isSender = role === "Sender";
+
   const isSafaReviewer = role === "SafaEmployee" || role === "Admin";
   const isAgent = role === "SaudiAgent" || role === "Admin";
-  const isSender = role === "Sender" || role === "Admin";
   const canEditTraveler =
     role === "Admin" ||
     role === "Sender" ||
     role === "SafaEmployee" ||
     role === "SaudiAgent" ||
     canEditAnyData;
+
+  const hostDoc =
+    request.hostingInfo?.hostIdDocument ||
+    request.groupDocuments?.find((d) => d.documentType === "HostId");
+  const ticketDoc =
+    request.flightTicketDocument ||
+    request.groupDocuments?.find((d) => d.documentType === "FlightTicket");
+
+  let totalDocsCount = (hostDoc ? 1 : 0) + (ticketDoc ? 1 : 0);
+  request.travelers?.forEach((t) => {
+    if (t.documents?.some((d) => d.documentType === "Passport")) totalDocsCount++;
+    if (t.documents?.some((d) => d.documentType === "PersonalPhoto")) totalDocsCount++;
+  });
 
   const docCheck = checkAllDocumentsAccepted();
   const canCompleteSafa = docCheck.isAllAccepted;
@@ -1779,8 +1933,40 @@ export default function RequestDetailPage({
         </div>
       )}
 
-      {/* Hosting Information Card */}
-      {request.hasHosting && (
+      {/* Role-Customized Layouts */}
+      {isSaudiAgent ? (
+        <SaudiAgentView
+          request={request}
+          ticketDoc={ticketDoc}
+          hostDoc={hostDoc}
+          onPreviewDoc={setPreviewDoc}
+          onDownloadDoc={handleDownloadDoc}
+          onUpdateTraveler={handleUpdateTraveler}
+          onSaveNusukNumber={handleSaveNusukNumber}
+          actionLoading={actionLoading}
+        />
+      ) : isSafaEmployee ? (
+        <SafaEmployeeView
+          request={request}
+          ticketDoc={ticketDoc}
+          hostDoc={hostDoc}
+          totalDocsCount={totalDocsCount}
+          isDownloadingAll={isDownloadingAll}
+          onDownloadAllDocs={handleDownloadAllDocs}
+          onPreviewDoc={setPreviewDoc}
+          onDownloadDoc={handleDownloadDoc}
+          onQuickReview={handleQuickReview}
+          onUpdateTraveler={handleUpdateTraveler}
+          onRequestCorrection={(target) => {
+            setCorrectionTarget(target);
+            setShowCorrectionModal(true);
+          }}
+          actionLoading={actionLoading}
+        />
+      ) : (
+        <>
+          {/* Hosting Information Card */}
+          {request.hasHosting && (
         <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-xs space-y-4">
           <div className="flex items-center justify-between border-b border-gray-100 pb-3">
             <div className="flex items-center gap-2">
@@ -2429,22 +2615,38 @@ export default function RequestDetailPage({
       </div>
 
       {/* Request Lifecycle Timer: 30-Day Auto-Deletion & Travel Auto-Archival */}
-      <RequestLifecycleTimer
-        createdAt={request.createdAt}
-        travelDate={request.travelDate}
-        departureDate={request.departureDate}
-        flightDepartureTime={request.flightDepartureTime}
-        status={request.status}
-        mode="detailed"
-      />
+      {isAdmin && (
+        <RequestLifecycleTimer
+          createdAt={request.createdAt}
+          travelDate={request.travelDate}
+          departureDate={request.departureDate}
+          flightDepartureTime={request.flightDepartureTime}
+          status={request.status}
+          mode="detailed"
+        />
+      )}
 
       {/* Travelers & Documents Section */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
             <Users className="w-5 h-5 text-emerald-600" />
             <span>بيانات ووثائق المسافرين ({request.travelers.length})</span>
           </h2>
+
+          <button
+            type="button"
+            onClick={handleDownloadAllDocs}
+            disabled={isDownloadingAll || totalDocsCount === 0}
+            className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-all self-start sm:self-auto"
+          >
+            {isDownloadingAll ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Download className="w-3.5 h-3.5" />
+            )}
+            <span>تحميل كافة المستندات ({totalDocsCount}) ZIP</span>
+          </button>
         </div>
 
         {request.travelers.map((traveler, tIndex) => (
@@ -2842,41 +3044,45 @@ export default function RequestDetailPage({
           </div>
         ))}
       </div>
+        </>
+      )}
 
       {/* Status Timeline History */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-xs space-y-4">
-        <h2 className="text-base font-bold text-gray-900 flex items-center gap-2 border-b border-gray-100 pb-3">
-          <Clock className="w-5 h-5 text-gray-600" />
-          <span>سجل تتبع الحالات والإجراءات</span>
-        </h2>
+      {isAdmin && (
+        <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-xs space-y-4">
+          <h2 className="text-base font-bold text-gray-900 flex items-center gap-2 border-b border-gray-100 pb-3">
+            <Clock className="w-5 h-5 text-gray-600" />
+            <span>سجل تتبع الحالات والإجراءات</span>
+          </h2>
 
-        <div className="space-y-3">
-          {request.statusHistories.map((h, i) => (
-            <div
-              key={h.id}
-              className="flex items-start gap-3 text-xs border-r-2 border-sky-600 pr-3 py-1"
-            >
-              <div className="w-2 h-2 rounded-full bg-sky-600 -mr-[17px] mt-1.5 ring-4 ring-white" />
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <RequestStatusBadge status={h.toStatus} />
-                  <span className="font-semibold text-gray-700">
-                    بواسطة: {h.changedByName}
-                  </span>
-                  <span className="text-gray-400">
-                    ({new Date(h.createdAt).toLocaleString("ar-SA")})
-                  </span>
+          <div className="space-y-3">
+            {request.statusHistories.map((h, i) => (
+              <div
+                key={h.id}
+                className="flex items-start gap-3 text-xs border-r-2 border-sky-600 pr-3 py-1"
+              >
+                <div className="w-2 h-2 rounded-full bg-sky-600 -mr-[17px] mt-1.5 ring-4 ring-white" />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <RequestStatusBadge status={h.toStatus} />
+                    <span className="font-semibold text-gray-700">
+                      بواسطة: {h.changedByName}
+                    </span>
+                    <span className="text-gray-400">
+                      ({new Date(h.createdAt).toLocaleString("ar-SA")})
+                    </span>
+                  </div>
+                  {h.note && (
+                    <p className="text-gray-600 mt-1 text-[11px] bg-gray-50 p-2 rounded-lg">
+                      {h.note}
+                    </p>
+                  )}
                 </div>
-                {h.note && (
-                  <p className="text-gray-600 mt-1 text-[11px] bg-gray-50 p-2 rounded-lg">
-                    {h.note}
-                  </p>
-                )}
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* --- MODAL 1: Secure Document Previewer --- */}
       {previewDoc && (

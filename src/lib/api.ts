@@ -142,6 +142,7 @@ export const api = {
         airline?: string;
         flightNumber?: string;
         flightTicketDocumentId?: string;
+        nusukGroupNumber?: string;
         destination?: string;
         notes?: string;
         hasHosting?: boolean;

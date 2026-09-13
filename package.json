@@ -10,7 +10,9 @@
     "build:docs": "vite build --outDir docs"
   },
   "dependencies": {
+    "@types/jszip": "^3.4.0",
     "clsx": "^2.1.1",
+    "jszip": "^3.10.2",
     "lucide-react": "^1.45.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
