@@ -39,7 +39,7 @@ import {
 } from "@/lib/geminiVision";
 
 export default function AdminSettingsPage() {
-  const { role, user } = useAuth();
+  const { role, user, loading: authLoading } = useAuth();
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
@@ -141,12 +141,17 @@ export default function AdminSettingsPage() {
   };
 
   useEffect(() => {
-    if (role && role !== "Admin") {
+    if (authLoading) return;
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+    if (role !== "Admin") {
       router.push("/dashboard");
       return;
     }
     loadStats();
-  }, [role, router]);
+  }, [user, role, authLoading, router]);
 
   // Handle Export to Excel
   const handleExportExcel = async () => {
@@ -224,6 +229,47 @@ export default function AdminSettingsPage() {
       setActionLoading(false);
     }
   };
+
+  if (authLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-gray-500">
+        <div className="w-10 h-10 border-4 border-sky-600 border-t-transparent rounded-full animate-spin mb-3"></div>
+        <span className="text-sm font-medium">جاري التحقق من صلاحيات النظام...</span>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="bg-white p-8 rounded-2xl border border-gray-200 text-center max-w-md mx-auto my-12 shadow-xs">
+        <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-3" />
+        <h2 className="text-lg font-bold text-gray-800 mb-1">تسجيل الدخول مطلوب</h2>
+        <p className="text-xs text-gray-500 mb-4">يرجى تسجيل الدخول بحساب مدير النظام للوصول إلى الإعدادات.</p>
+        <button
+          onClick={() => router.push("/login")}
+          className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
+        >
+          الانتقال لصفحة تسجيل الدخول
+        </button>
+      </div>
+    );
+  }
+
+  if (role !== "Admin") {
+    return (
+      <div className="bg-white p-8 rounded-2xl border border-gray-200 text-center max-w-md mx-auto my-12 shadow-xs">
+        <AlertTriangle className="w-12 h-12 text-rose-500 mx-auto mb-3" />
+        <h2 className="text-lg font-bold text-gray-800 mb-1">غير مصرح بالدخول</h2>
+        <p className="text-xs text-gray-500 mb-4">هذه الصفحة مخصصة لمدير النظام (Admin) فقط.</p>
+        <button
+          onClick={() => router.push("/dashboard")}
+          className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
+        >
+          العودة للوحة التحكم
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-12">
