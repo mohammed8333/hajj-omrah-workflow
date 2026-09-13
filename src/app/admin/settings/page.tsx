@@ -24,7 +24,19 @@ import {
   Clock,
   Archive,
   Plane,
+  Sparkles,
+  Key,
+  Eye,
+  EyeOff,
+  ExternalLink,
+  Zap,
 } from "lucide-react";
+import {
+  getGeminiApiKey,
+  setGeminiApiKey,
+  removeGeminiApiKey,
+  testGeminiApiKey,
+} from "@/lib/geminiVision";
 
 export default function AdminSettingsPage() {
   const { role, user } = useAuth();
@@ -35,6 +47,72 @@ export default function AdminSettingsPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Gemini AI Vision State
+  const [geminiKey, setGeminiKey] = useState("");
+  const [showGeminiKey, setShowGeminiKey] = useState(false);
+  const [testingGemini, setTestingGemini] = useState(false);
+  const [geminiTestStatus, setGeminiTestStatus] = useState<{
+    checked: boolean;
+    valid: boolean;
+    message: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const saved = getGeminiApiKey();
+    if (saved) {
+      setGeminiKey(saved);
+    }
+  }, []);
+
+  const handleSaveGeminiKey = () => {
+    if (!geminiKey.trim()) {
+      removeGeminiApiKey();
+      setSuccess("تم حذف مفتاح Gemini AI والاعتماد على المحرك الافتراضي.");
+      setGeminiTestStatus(null);
+      return;
+    }
+    setGeminiApiKey(geminiKey.trim());
+    setSuccess("تم حفظ مفتاح Google Gemini AI بنجاح! سيتم استخدامه فوراً في جميع عمليات فحص الوثائق.");
+  };
+
+  const handleTestGeminiKey = async () => {
+    if (!geminiKey.trim()) {
+      setError("يرجى كتابة أو لصق مفتاح الـ API أولاً قبل الاختبار.");
+      return;
+    }
+    try {
+      setTestingGemini(true);
+      setGeminiTestStatus(null);
+      const res = await testGeminiApiKey(geminiKey.trim());
+      setGeminiTestStatus({
+        checked: true,
+        valid: res.success,
+        message: res.message,
+      });
+      if (res.success) {
+        setGeminiApiKey(geminiKey.trim());
+        setSuccess("المفتاح سليم 100%! تم حفظه وتفعيله كمحرك الفحص الذكي في النظام.");
+      } else {
+        setError(`فشل الاتصال: ${res.message}`);
+      }
+    } catch (e: any) {
+      setGeminiTestStatus({
+        checked: true,
+        valid: false,
+        message: e.message || "فشل الاتصال بخادم Google Gemini",
+      });
+    } finally {
+      setTestingGemini(false);
+    }
+  };
+
+  const handleRemoveGeminiKey = () => {
+    removeGeminiApiKey();
+    setGeminiKey("");
+    setGeminiTestStatus(null);
+    setSuccess("تم مسح مفتاح Gemini AI من النظام بنجاح.");
+  };
 
   // Storage Stats
   const [stats, setStats] = useState({
@@ -231,6 +309,144 @@ export default function AdminSettingsPage() {
           </div>
           <div className="text-2xl font-bold text-gray-900">
             {stats.storageSizeKb} <span className="text-xs font-normal text-gray-500">KB</span>
+          </div>
+        </div>
+      </div>
+
+      {/* AI Vision Engine Settings (Google Gemini) */}
+      <div className="bg-white rounded-2xl border border-indigo-200 p-6 shadow-xs relative overflow-hidden space-y-4">
+        <div className="absolute top-0 right-0 left-0 h-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600" />
+
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="p-3 rounded-xl bg-indigo-50 text-indigo-700">
+              <Sparkles className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-bold text-gray-900">
+                  محرك الذكاء الاصطناعي لفحص المستندات (Google Gemini AI Vision)
+                </h2>
+                <span className="text-[11px] bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold px-2 py-0.5 rounded-full shadow-2xs">
+                  مجاني 100%
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 mt-0.5">
+                فحص صور الجوازات والهويات الوطنية وتذاكر الطيران واستخراج البيانات بالعربية والإنجليزية بدقة فائقة.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <a
+              href="https://aistudio.google.com/app/apikey"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-3 py-2 rounded-xl transition-colors cursor-pointer"
+            >
+              <span>احصل على مفتاح مجاني (Google AI Studio)</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <label className="block text-xs font-bold text-gray-700">
+            مفتاح Google Gemini API Key:
+          </label>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            <div className="relative flex-1">
+              <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-400">
+                <Key className="w-4 h-4" />
+              </div>
+              <input
+                type={showGeminiKey ? "text" : "password"}
+                value={geminiKey}
+                onChange={(e) => {
+                  setGeminiKey(e.target.value);
+                  setGeminiTestStatus(null);
+                }}
+                placeholder="AIzaSy..."
+                className="w-full pr-9 pl-10 py-2.5 text-xs font-mono border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-gray-50/50"
+                dir="ltr"
+              />
+              <button
+                type="button"
+                onClick={() => setShowGeminiKey(!showGeminiKey)}
+                className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400 hover:text-gray-600 cursor-pointer"
+                title={showGeminiKey ? "إخفاء المفتاح" : "إظهار المفتاح"}
+              >
+                {showGeminiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleTestGeminiKey}
+                disabled={testingGemini || !geminiKey.trim()}
+                className="px-4 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                title="اختبار اتصال المفتاح مع سيرفرات جوجل"
+              >
+                <Zap className={`w-3.5 h-3.5 ${testingGemini ? "animate-spin" : "text-amber-500"}`} />
+                <span>{testingGemini ? "جاري الفحص..." : "اختبار الاتصال"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSaveGeminiKey}
+                className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>حفظ المفتاح</span>
+              </button>
+
+              {geminiKey && (
+                <button
+                  type="button"
+                  onClick={handleRemoveGeminiKey}
+                  className="px-3 py-2.5 bg-gray-100 hover:bg-rose-50 text-gray-600 hover:text-rose-600 rounded-xl text-xs font-medium transition-colors cursor-pointer border border-gray-200"
+                  title="مسح المفتاح"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Test Status Banner */}
+          {geminiTestStatus && (
+            <div
+              className={`p-3 rounded-xl border text-xs flex items-center gap-2 ${
+                geminiTestStatus.valid
+                  ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+                  : "bg-rose-50 border-rose-200 text-rose-800"
+              }`}
+            >
+              {geminiTestStatus.valid ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              ) : (
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              )}
+              <span>{geminiTestStatus.message}</span>
+            </div>
+          )}
+
+          {/* Feature Highlights */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-[11px] text-gray-600">
+            <div className="bg-gray-50 p-2.5 rounded-xl border border-gray-100 flex items-start gap-2">
+              <span className="text-emerald-600 font-black">✓</span>
+              <span><strong>قراءة الجوازات بدقة 100%:</strong> فحص الاسم العربي، وترجمة الإنجليزي، والجنسية ورقم الجواز والميلاد.</span>
+            </div>
+            <div className="bg-gray-50 p-2.5 rounded-xl border border-gray-100 flex items-start gap-2">
+              <span className="text-emerald-600 font-black">✓</span>
+              <span><strong>الهويات الوطنية والإقامات:</strong> استخراج اسم المستضيف رباعياً ورقم الهوية وتاريخ الميلاد.</span>
+            </div>
+            <div className="bg-gray-50 p-2.5 rounded-xl border border-gray-100 flex items-start gap-2">
+              <span className="text-emerald-600 font-black">✓</span>
+              <span><strong>حصري ومجاني:</strong> يعطيك 1,500 عملية فحص مجانية يومياً من جوجل وبدون دفع أي رسوم.</span>
+            </div>
           </div>
         </div>
       </div>

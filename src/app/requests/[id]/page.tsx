@@ -54,6 +54,7 @@ import {
 } from "lucide-react";
 import { scanPassportMRZ, translateEnglishNameToArabic } from "@/lib/mrzScanner";
 import { scanHostId } from "@/lib/hostIdScanner";
+import { getGeminiApiKey, setGeminiApiKey } from "@/lib/geminiVision";
 import { useDialog } from "@/lib/dialog-context";
 
 export default function RequestDetailPage({
@@ -402,6 +403,23 @@ export default function RequestDetailPage({
       setError("لا يوجد جواز سفر مرفوع لهذا المسافر لفحصه.");
       return;
     }
+
+    const currentKey = getGeminiApiKey();
+    if (!currentKey) {
+      const enteredKey = await prompt({
+        title: "تفعيل فحص الجواز بالذكاء الاصطناعي (Google Gemini AI)",
+        message:
+          "للحصول على قراءة دقيقة 100% للجواز وترجمة الاسم واستخراج الجنسية والميلاد، الصق مفتاح Google Gemini المجاني هنا (أو اتركه فارغاً للمتابعة بالفحص العادي):",
+        placeholder: "AIzaSy...",
+        confirmText: "فحص بالذكاء الاصطناعي ✨",
+        cancelText: "فحص عادي",
+        variant: "primary",
+      });
+      if (enteredKey && enteredKey.trim()) {
+        setGeminiApiKey(enteredKey.trim());
+      }
+    }
+
     try {
       setIsMrzScanningTravelerId(traveler.id);
       setError(null);
@@ -414,10 +432,13 @@ export default function RequestDetailPage({
           nationality: scanResult.nationality || traveler.nationality,
           dateOfBirth: scanResult.dateOfBirth || traveler.dateOfBirth,
         });
-        setSuccess(`تم بنجاح فحص الجواز وتحديث الاسم إلى: (${scanResult.fullNameArabic})`);
+        const hasGemini = !!getGeminiApiKey();
+        setSuccess(
+          `تم بنجاح فحص الجواز ${hasGemini ? "بالذكاء الاصطناعي (Gemini Vision AI ✨)" : ""} وتحديث الاسم إلى: (${scanResult.fullNameArabic})`
+        );
         await loadRequest();
       } else {
-        setError("تعذر قراءة شريط الـ MRZ بوضوح من صورة الجواز، يمكنك تعديل الاسم يدوياً.");
+        setError("تعذر قراءة بيانات الجواز بوضوح، يرجى التأكد من وضوح الصورة أو تعديل الاسم يدوياً.");
       }
     } catch (err: unknown) {
       if (err instanceof Error) setError(err.message);
@@ -449,14 +470,31 @@ export default function RequestDetailPage({
   };
 
   const handleScanExistingHostId = async (doc: DocumentItem) => {
-    if (doc.mimeType && !doc.mimeType.startsWith("image/")) {
-      await alert({
-        title: "تنبيه الفحص التلقائي",
-        message: "الفحص التلقائي متاح فقط لملفات الصور (JPG, PNG). لملفات PDF يرجى إدخال البيانات يدوياً.",
-        variant: "info",
+    const currentKey = getGeminiApiKey();
+    if (!currentKey) {
+      if (doc.mimeType && !doc.mimeType.startsWith("image/")) {
+        await alert({
+          title: "تنبيه الفحص التلقائي",
+          message: "الفحص التلقائي العادي متاح فقط لملفات الصور (JPG, PNG). لتفعيل فحص ملفات PDF يرجى إدخال مفتاح الذكاء الاصطناعي (Gemini) في الإعدادات.",
+          variant: "info",
+        });
+        return;
+      }
+
+      const enteredKey = await prompt({
+        title: "تفعيل فحص الهوية بالذكاء الاصطناعي (Google Gemini AI)",
+        message:
+          "للحصول على قراءة دقيقة 100% لبيانات هوية المستضيف وتاريخ الميلاد ورقم الهوية، الصق مفتاح Google Gemini المجاني هنا (أو اتركه فارغاً للمتابعة بالفحص العادي):",
+        placeholder: "AIzaSy...",
+        confirmText: "فحص بالذكاء الاصطناعي ✨",
+        cancelText: "فحص عادي",
+        variant: "primary",
       });
-      return;
+      if (enteredKey && enteredKey.trim()) {
+        setGeminiApiKey(enteredKey.trim());
+      }
     }
+
     try {
       setIsScanningHostIdDoc(true);
       setError(null);
@@ -470,10 +508,11 @@ export default function RequestDetailPage({
           hostNationalId: scanResult.idNumber || request?.hostingInfo?.hostNationalId,
           hostPhone: request?.hostingInfo?.hostPhone,
         });
+        const hasGemini = !!getGeminiApiKey();
         setSuccess(
-          `تم بنجاح فحص هوية المستضيف: ${scanResult.hostName || ""} ${
+          `تم بنجاح فحص هوية المستضيف ${hasGemini ? "بالذكاء الاصطناعي (Gemini Vision AI ✨)" : ""}: ${scanResult.hostName || ""} ${
             scanResult.hostBirthDate ? `(تاريخ الميلاد: ${scanResult.hostBirthDate})` : ""
-          }`
+          } ${scanResult.idNumber ? `(رقم الهوية: ${scanResult.idNumber})` : ""}`
         );
         await loadRequest();
       } else {
@@ -481,7 +520,7 @@ export default function RequestDetailPage({
       }
     } catch (err: unknown) {
       console.error("Host ID scan failed:", err);
-      setError("حدث خطأ أثناء فحص صورة هوية المستضيف.");
+      setError("حدث خطأ أثناء فحص صورة هوية المستضيف بالذكاء الاصطناعي.");
     } finally {
       setIsScanningHostIdDoc(false);
     }

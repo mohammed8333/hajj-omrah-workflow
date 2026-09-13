@@ -1,5 +1,6 @@
 import { createWorker } from "tesseract.js";
 import { parseMrzLines } from "./mrzScanner";
+import { scanHostIdWithGemini, getGeminiApiKey } from "./geminiVision";
 
 export interface ScannedHostIdData {
   hostName?: string;
@@ -186,6 +187,31 @@ export async function scanHostId(
   fileOrUrl: File | string,
   onProgress?: (step: string) => void
 ): Promise<ScannedHostIdData | null> {
+  // 1. Try Google Gemini Vision AI if API key is configured
+  const geminiKey = getGeminiApiKey();
+  if (geminiKey) {
+    try {
+      onProgress?.("جاري الفحص الذكي للهوية عبر Google Gemini Vision AI...");
+      const geminiResult = await scanHostIdWithGemini(fileOrUrl, geminiKey);
+      if (
+        geminiResult &&
+        (geminiResult.hostName ||
+          geminiResult.hostBirthDate ||
+          geminiResult.idNumber)
+      ) {
+        return {
+          hostName: geminiResult.hostName,
+          hostBirthDate: geminiResult.hostBirthDate,
+          idNumber: geminiResult.idNumber,
+          rawText: "Gemini Vision AI extraction",
+        };
+      }
+    } catch (geminiErr) {
+      console.warn("Gemini vision host ID scan failed, falling back to local OCR:", geminiErr);
+    }
+  }
+
+  // 2. Fallback to local Tesseract OCR
   let worker: any = null;
   try {
     onProgress?.("جاري تجهيز صورة هوية المستضيف...");

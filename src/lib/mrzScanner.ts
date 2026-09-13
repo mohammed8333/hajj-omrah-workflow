@@ -1,4 +1,5 @@
 import { createWorker } from "tesseract.js";
+import { scanPassportWithGemini, getGeminiApiKey } from "./geminiVision";
 
 export interface ScannedPassportData {
   fullNameArabic: string;
@@ -498,6 +499,35 @@ export async function scanPassportMRZ(
   fileOrUrl: File | string,
   onProgress?: (step: string) => void
 ): Promise<ScannedPassportData | null> {
+  // 1. Try Google Gemini Vision AI if API key is configured
+  const geminiKey = getGeminiApiKey();
+  if (geminiKey) {
+    try {
+      onProgress?.("جاري الفحص الذكي عبر Google Gemini Vision AI...");
+      const geminiResult = await scanPassportWithGemini(fileOrUrl, geminiKey);
+      if (
+        geminiResult &&
+        (geminiResult.fullNameArabic ||
+          geminiResult.fullNameEnglish ||
+          geminiResult.passportNumber)
+      ) {
+        return {
+          fullNameArabic: geminiResult.fullNameArabic || "",
+          fullNameEnglish: geminiResult.fullNameEnglish || "",
+          passportNumber: geminiResult.passportNumber || "",
+          nationality: geminiResult.nationality || "",
+          dateOfBirth: geminiResult.dateOfBirth || "",
+          expiryDate: geminiResult.expiryDate || "",
+          sex: geminiResult.sex || "",
+          rawMrz: [],
+        };
+      }
+    } catch (geminiErr) {
+      console.warn("Gemini vision passport scan failed, falling back to local OCR:", geminiErr);
+    }
+  }
+
+  // 2. Fallback to local Tesseract OCR
   let worker: any = null;
   try {
     onProgress?.("جاري تجهيز الصورة وفحص منطقة الـ MRZ...");
