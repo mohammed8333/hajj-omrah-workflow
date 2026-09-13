@@ -50,7 +50,6 @@ import {
   ScanText,
   Undo2,
   Upload,
-  UploadCloud,
 } from "lucide-react";
 import { scanPassportMRZ, translateEnglishNameToArabic } from "@/lib/mrzScanner";
 import { scanHostId } from "@/lib/hostIdScanner";
@@ -456,8 +455,7 @@ export default function RequestDetailPage({
       link.href = url;
       link.download =
         doc.originalFileName ||
-        doc.fileName ||
-        `document-${doc.documentType}.${doc.contentType?.includes("pdf") ? "pdf" : "jpg"}`;
+        `document-${doc.documentType}.${doc.mimeType?.includes("pdf") ? "pdf" : "jpg"}`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
