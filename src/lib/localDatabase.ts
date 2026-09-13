@@ -984,6 +984,8 @@ class LocalDatabaseEngine {
       hasHosting: boolean;
       hostName?: string;
       hostPhone?: string;
+      hostBirthDate?: string;
+      hostNationalId?: string;
       hostAddress?: string;
     },
     currentUser: User
@@ -1027,6 +1029,8 @@ class LocalDatabaseEngine {
             groupRequestId: "",
             hostName: data.hostName && data.hostName.trim() ? data.hostName.trim() : "مستضيف داخل المملكة",
             hostPhone: data.hostPhone && data.hostPhone.trim() ? data.hostPhone.trim() : "",
+            hostBirthDate: data.hostBirthDate,
+            hostNationalId: data.hostNationalId,
             hostAddress: data.hostAddress || "",
           }
         : undefined,
@@ -1064,8 +1068,8 @@ class LocalDatabaseEngine {
   public updateRequest(
     id: string,
     data: {
-      groupName: string;
-      contactPhone: string;
+      groupName?: string;
+      contactPhone?: string;
       travelDate?: string;
       departureDate?: string;
       returnDate?: string;
@@ -1073,9 +1077,11 @@ class LocalDatabaseEngine {
       airportArrivalTime?: string;
       destination?: string;
       notes?: string;
-      hasHosting: boolean;
+      hasHosting?: boolean;
       hostName?: string;
       hostPhone?: string;
+      hostBirthDate?: string;
+      hostNationalId?: string;
       hostAddress?: string;
     },
     currentUser?: User
@@ -1083,31 +1089,35 @@ class LocalDatabaseEngine {
     const req = this.requests.find((r) => r.id === id);
     if (!req) throw new Error("المعاملة غير موجودة");
 
-    req.groupName = data.groupName;
-    req.contactPhone = data.contactPhone;
-    req.travelDate = data.departureDate || data.travelDate;
+    if (data.groupName !== undefined) req.groupName = data.groupName;
+    if (data.contactPhone !== undefined) req.contactPhone = data.contactPhone;
+    if (data.travelDate !== undefined) req.travelDate = data.departureDate || data.travelDate;
     if (data.departureDate !== undefined) req.departureDate = data.departureDate;
     if (data.returnDate !== undefined) req.returnDate = data.returnDate;
     if (data.flightDepartureTime !== undefined) req.flightDepartureTime = data.flightDepartureTime;
     if (data.airportArrivalTime !== undefined) req.airportArrivalTime = data.airportArrivalTime;
-    req.destination = data.destination;
-    req.notes = data.notes;
-    req.hasHosting = data.hasHosting;
+    if (data.destination !== undefined) req.destination = data.destination;
+    if (data.notes !== undefined) req.notes = data.notes;
+    if (data.hasHosting !== undefined) req.hasHosting = data.hasHosting;
     req.updatedAt = new Date().toISOString();
 
-    if (data.hasHosting) {
+    if (data.hasHosting || req.hasHosting) {
       if (!req.hostingInfo) {
         req.hostingInfo = {
           id: "host-" + Date.now(),
           groupRequestId: req.id,
           hostName: data.hostName || "",
           hostPhone: data.hostPhone || "",
+          hostBirthDate: data.hostBirthDate,
+          hostNationalId: data.hostNationalId,
           hostAddress: data.hostAddress || "",
         };
       } else {
-        req.hostingInfo.hostName = data.hostName || "";
-        req.hostingInfo.hostPhone = data.hostPhone || "";
-        req.hostingInfo.hostAddress = data.hostAddress || "";
+        if (data.hostName !== undefined) req.hostingInfo.hostName = data.hostName;
+        if (data.hostPhone !== undefined) req.hostingInfo.hostPhone = data.hostPhone;
+        if (data.hostBirthDate !== undefined) req.hostingInfo.hostBirthDate = data.hostBirthDate;
+        if (data.hostNationalId !== undefined) req.hostingInfo.hostNationalId = data.hostNationalId;
+        if (data.hostAddress !== undefined) req.hostingInfo.hostAddress = data.hostAddress;
       }
     }
 

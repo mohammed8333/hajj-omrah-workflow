@@ -30,6 +30,7 @@ import {
   Languages,
 } from "lucide-react";
 import { scanPassportMRZ, translateEnglishNameToArabic } from "@/lib/mrzScanner";
+import { scanHostId } from "@/lib/hostIdScanner";
 
 interface TravelerDraft {
   id: string;
@@ -54,8 +55,63 @@ export default function UnifiedNewRequestPage() {
 
   // Hosting
   const [hasHosting, setHasHosting] = useState(false);
+  const [hostName, setHostName] = useState("");
+  const [hostBirthDate, setHostBirthDate] = useState("");
+  const [hostNationalId, setHostNationalId] = useState("");
   const [hostPhone, setHostPhone] = useState("");
   const [hostIdFile, setHostIdFile] = useState<File | null>(null);
+  const [isScanningHostId, setIsScanningHostId] = useState(false);
+  const [hostScanSuccess, setHostScanSuccess] = useState(false);
+  const [hostScanMessage, setHostScanMessage] = useState("");
+
+  // Run OCR scan on host ID file
+  const runHostIdScan = async (file: File) => {
+    if (!file.type.startsWith("image/")) return;
+    setIsScanningHostId(true);
+    setHostScanSuccess(false);
+    setHostScanMessage("جاري فحص وقراءة هوية المستضيف (OCR)...");
+    try {
+      const result = await scanHostId(file, (msg) => {
+        setHostScanMessage(msg);
+      });
+      if (result && (result.hostName || result.hostBirthDate || result.idNumber)) {
+        if (result.hostName) setHostName(result.hostName);
+        if (result.hostBirthDate) setHostBirthDate(result.hostBirthDate);
+        if (result.idNumber) setHostNationalId(result.idNumber);
+        setHostScanSuccess(true);
+        setHostScanMessage(
+          `تم استخراج البيانات بنجاح: ${result.hostName || ""} ${
+            result.hostBirthDate ? `(الميلاد: ${result.hostBirthDate})` : ""
+          }`
+        );
+      } else {
+        setHostScanSuccess(false);
+        setHostScanMessage("لم يتم استخراج البيانات بوضوح، يمكنك إدخالها يدوياً.");
+      }
+    } catch {
+      setHostScanSuccess(false);
+      setHostScanMessage("تعذر فحص الهوية، يرجى كتابة البيانات يدوياً.");
+    } finally {
+      setIsScanningHostId(false);
+    }
+  };
+
+  const handleHostIdFileChange = (file: File | null) => {
+    if (file && file.size > 10 * 1024 * 1024) {
+      alert("حجم ملف هوية المستضيف يتجاوز الحد الأقصى (10 ميجابايت).");
+      return;
+    }
+    setHostIdFile(file);
+    if (file && file.type.startsWith("image/")) {
+      setTimeout(() => {
+        runHostIdScan(file);
+      }, 50);
+    } else {
+      setIsScanningHostId(false);
+      setHostScanSuccess(false);
+      setHostScanMessage("");
+    }
+  };
 
   // Flight & Travel Details
   const [departureDate, setDepartureDate] = useState("");
@@ -283,6 +339,9 @@ export default function UnifiedNewRequestPage() {
         groupName: "",
         contactPhone: "",
         hasHosting,
+        hostName: hasHosting && hostName.trim() ? hostName.trim() : undefined,
+        hostBirthDate: hasHosting && hostBirthDate.trim() ? hostBirthDate.trim() : undefined,
+        hostNationalId: hasHosting && hostNationalId.trim() ? hostNationalId.trim() : undefined,
         hostPhone: hasHosting ? hostPhone.trim() : undefined,
         departureDate: departureDate || undefined,
         returnDate: returnDate || undefined,
@@ -470,84 +529,181 @@ export default function UnifiedNewRequestPage() {
           </div>
         </div>
 
-        {/* When Hosting is active: Host phone + Host ID upload */}
+        {/* When Hosting is active: Host fields + OCR scanning + Host ID upload */}
         {hasHosting && (
           <div className="pt-4 border-t border-gray-100 space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1.5">
-                رقم هاتف المستضيف داخل المملكة <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="tel"
-                required
-                value={hostPhone}
-                onChange={(e) => setHostPhone(e.target.value)}
-                placeholder="05XXXXXXXX"
-                dir="ltr"
-                className="w-full sm:max-w-md px-3.5 py-2.5 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-amber-500 text-right bg-white transition-all"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-gray-700 mb-2">
-                مرفق هوية المستضيف (PDF / صورة) <span className="text-red-500">*</span>
-              </label>
-            <div className="relative">
-              <input
-                type="file"
-                id="host-id-file"
-                accept=".pdf,.jpg,.jpeg,.png"
-                onChange={(e) => setHostIdFile(e.target.files?.[0] || null)}
-                className="hidden"
-              />
-              <label
-                htmlFor="host-id-file"
-                className={`w-full flex items-center justify-between p-4 text-sm rounded-xl border-2 border-dashed cursor-pointer transition-colors ${
-                  hostIdFile
-                    ? "bg-green-50/60 border-green-400 text-green-900"
-                    : "bg-gray-50/50 border-gray-300 hover:border-amber-400 hover:bg-amber-50/30 text-gray-700"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-xs shrink-0">
-                    ID
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold">
-                      {hostIdFile ? hostIdFile.name : "اضغط لاختيار أو سحب ملف هوية المستضيف"}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {hostIdFile
-                        ? `${formatFileSize(hostIdFile.size)} - جاهز للرفع`
-                        : "الصيغ المسموحة: PDF, JPG, PNG (حد أقصى 10MB)"}
-                    </p>
-                  </div>
-                </div>
+            {/* Status Indicator */}
+            {isScanningHostId ? (
+              <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-700 animate-pulse">
+                <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                <span>{hostScanMessage || "جاري فحص هوية المستضيف وقراءة الاسم وتاريخ الميلاد (OCR)..."}</span>
+              </div>
+            ) : hostScanSuccess ? (
+              <div className="flex items-center justify-between p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800">
                 <div className="flex items-center gap-2">
-                  {hostIdFile ? (
-                    <span className="text-xs font-bold text-green-700 bg-green-100 px-2.5 py-1 rounded-full flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> تم التحديد
-                    </span>
-                  ) : (
-                    <Upload className="w-5 h-5 text-gray-400" />
-                  )}
+                  <Sparkles className="w-4 h-4 text-emerald-600" />
+                  <span className="font-semibold">{hostScanMessage}</span>
                 </div>
-              </label>
+                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold">
+                  تم الاستخراج تلقائياً ✓
+                </span>
+              </div>
+            ) : hostScanMessage && hostIdFile ? (
+              <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
+                <AlertCircle className="w-4 h-4 text-amber-600" />
+                <span>{hostScanMessage}</span>
+              </div>
+            ) : null}
 
-              {hostIdFile && (
-                <button
-                  type="button"
-                  onClick={() => setHostIdFile(null)}
-                  className="absolute top-2 left-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 shadow-sm"
-                  title="إزالة واستبدال"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+            {/* Fields ABOVE the image upload box as requested */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-amber-50/40 p-4 rounded-xl border border-amber-200">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1 flex items-center justify-between">
+                  <span>اسم المستضيف</span>
+                  {hostScanSuccess && hostName && (
+                    <span className="text-[10px] text-emerald-700 font-semibold flex items-center gap-0.5">
+                      <CheckCircle2 className="w-3 h-3" /> تم التعرف
+                    </span>
+                  )}
+                </label>
+                <input
+                  type="text"
+                  value={hostName}
+                  onChange={(e) => setHostName(e.target.value)}
+                  placeholder="اسم المستضيف (يُملأ تلقائياً من الهوية)"
+                  className="w-full text-xs px-3 py-2.5 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1 flex items-center justify-between">
+                  <span>تاريخ ميلاد المستضيف</span>
+                  {hostScanSuccess && hostBirthDate && (
+                    <span className="text-[10px] text-emerald-700 font-semibold flex items-center gap-0.5">
+                      <CheckCircle2 className="w-3 h-3" /> تم التعرف
+                    </span>
+                  )}
+                </label>
+                <input
+                  type="text"
+                  value={hostBirthDate}
+                  onChange={(e) => setHostBirthDate(e.target.value)}
+                  placeholder="مثال: 1405/06/12 أو 1985/02/10"
+                  className="w-full text-xs px-3 py-2.5 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  رقم هاتف المستضيف داخل المملكة <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  required
+                  value={hostPhone}
+                  onChange={(e) => setHostPhone(e.target.value)}
+                  placeholder="05XXXXXXXX"
+                  dir="ltr"
+                  className="w-full text-xs px-3 py-2.5 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 text-right font-mono"
+                />
+              </div>
+
+              {hostNationalId && (
+                <div className="sm:col-span-3 pt-1">
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    رقم هوية / إقامة المستضيف (مستخرج)
+                  </label>
+                  <input
+                    type="text"
+                    value={hostNationalId}
+                    onChange={(e) => setHostNationalId(e.target.value)}
+                    placeholder="رقم الهوية أو الإقامة"
+                    className="w-full sm:max-w-xs text-xs px-3 py-2 bg-white border border-gray-300 rounded-lg font-mono"
+                  />
+                </div>
               )}
             </div>
+
+            {/* Host ID Document Upload Box */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-xs font-bold text-gray-700">
+                  مرفق هوية المستضيف (PDF / صورة) <span className="text-red-500">*</span>
+                </label>
+                {hostIdFile && hostIdFile.type.startsWith("image/") && (
+                  <button
+                    type="button"
+                    disabled={isScanningHostId}
+                    onClick={() => runHostIdScan(hostIdFile)}
+                    className="text-[11px] text-amber-700 hover:text-amber-900 font-medium flex items-center gap-1 disabled:opacity-50 cursor-pointer"
+                    title="إعادة فحص هوية المستضيف وقراءة البيانات"
+                  >
+                    <RotateCcw className={`w-3 h-3 ${isScanningHostId ? "animate-spin" : ""}`} />
+                    <span>إعادة فحص الهوية (OCR)</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="relative">
+                <input
+                  type="file"
+                  id="host-id-file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={(e) => handleHostIdFileChange(e.target.files?.[0] || null)}
+                  className="hidden"
+                />
+                <label
+                  htmlFor="host-id-file"
+                  className={`w-full flex items-center justify-between p-4 text-sm rounded-xl border-2 border-dashed cursor-pointer transition-colors ${
+                    hostIdFile
+                      ? "bg-green-50/60 border-green-400 text-green-900"
+                      : "bg-gray-50/50 border-gray-300 hover:border-amber-400 hover:bg-amber-50/30 text-gray-700"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-xs shrink-0">
+                      ID
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold">
+                        {hostIdFile ? hostIdFile.name : "اضغط لاختيار أو سحب ملف هوية المستضيف"}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {hostIdFile
+                          ? `${formatFileSize(hostIdFile.size)} - جاهز للرفع (يتم الفحص التلقائي)`
+                          : "الصيغ المسموحة: PDF, JPG, PNG (حد أقصى 10MB) - يتم استخراج الاسم والميلاد تلقائياً"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {hostIdFile ? (
+                      <span className="text-xs font-bold text-green-700 bg-green-100 px-2.5 py-1 rounded-full flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> تم التحديد
+                      </span>
+                    ) : (
+                      <Upload className="w-5 h-5 text-gray-400" />
+                    )}
+                  </div>
+                </label>
+
+                {hostIdFile && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHostIdFile(null);
+                      setHostScanSuccess(false);
+                      setHostScanMessage("");
+                    }}
+                    className="absolute top-2 left-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 shadow-sm cursor-pointer"
+                    title="إزالة واستبدال"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        )}
     </div>
 
       {/* Section 2: Travelers & Documents in Place (NO scalar inputs, only upload boxes) */}

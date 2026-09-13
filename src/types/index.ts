@@ -91,6 +91,8 @@ export interface HostingInfo {
   groupRequestId: string;
   hostName: string;
   hostPhone: string;
+  hostBirthDate?: string;
+  hostNationalId?: string;
   hostAddress?: string;
   hostIdDocumentId?: string;
   hostIdDocument?: DocumentItem;

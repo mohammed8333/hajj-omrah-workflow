@@ -117,6 +117,8 @@ export const api = {
       hasHosting: boolean;
       hostName?: string;
       hostPhone?: string;
+      hostBirthDate?: string;
+      hostNationalId?: string;
       hostAddress?: string;
     }): Promise<GroupRequestDetail> => {
       await delay();
@@ -127,8 +129,8 @@ export const api = {
     update: async (
       id: string,
       data: {
-        groupName: string;
-        contactPhone: string;
+        groupName?: string;
+        contactPhone?: string;
         travelDate?: string;
         departureDate?: string;
         returnDate?: string;
@@ -136,9 +138,11 @@ export const api = {
         airportArrivalTime?: string;
         destination?: string;
         notes?: string;
-        hasHosting: boolean;
+        hasHosting?: boolean;
         hostName?: string;
         hostPhone?: string;
+        hostBirthDate?: string;
+        hostNationalId?: string;
         hostAddress?: string;
       }
     ): Promise<void> => {

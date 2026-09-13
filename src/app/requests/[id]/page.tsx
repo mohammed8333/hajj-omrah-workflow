@@ -44,9 +44,11 @@ import {
   Edit2,
   Sparkles,
   Loader2,
+  Download,
   Languages,
 } from "lucide-react";
 import { scanPassportMRZ, translateEnglishNameToArabic } from "@/lib/mrzScanner";
+import { scanHostId } from "@/lib/hostIdScanner";
 
 export default function RequestDetailPage({
   requestId: propRequestId,
@@ -107,6 +109,7 @@ export default function RequestDetailPage({
   const [editTravelerName, setEditTravelerName] = useState("");
   const [editTravelerPassport, setEditTravelerPassport] = useState("");
   const [isMrzScanningTravelerId, setIsMrzScanningTravelerId] = useState<string | null>(null);
+  const [isScanningHostIdDoc, setIsScanningHostIdDoc] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -222,8 +225,31 @@ export default function RequestDetailPage({
       setError(null);
       await api.documents.upload(requestId, file, docType, travelerId);
 
-      // If uploading a passport image, scan MRZ and update traveler name if generic
-      if (docType === "Passport" && travelerId && file.type.startsWith("image/")) {
+      // If uploading a Host ID image, scan OCR and update hostingInfo
+      if (docType === "HostId" && file.type.startsWith("image/")) {
+        try {
+          const scanResult = await scanHostId(file);
+          if (scanResult && (scanResult.hostName || scanResult.hostBirthDate || scanResult.idNumber)) {
+            await api.requests.update(requestId, {
+              hasHosting: true,
+              hostName: scanResult.hostName || request?.hostingInfo?.hostName,
+              hostBirthDate: scanResult.hostBirthDate || request?.hostingInfo?.hostBirthDate,
+              hostNationalId: scanResult.idNumber || request?.hostingInfo?.hostNationalId,
+              hostPhone: request?.hostingInfo?.hostPhone,
+            });
+            setSuccess(
+              `تم رفع هوية المستضيف واستخراج البيانات بنجاح: ${scanResult.hostName || ""} ${
+                scanResult.hostBirthDate ? `(تاريخ الميلاد: ${scanResult.hostBirthDate})` : ""
+              }`
+            );
+          } else {
+            setSuccess(`تم رفع مستند (${DOCUMENT_TYPE_LABELS[docType]}) بنجاح.`);
+          }
+        } catch (hostScanErr) {
+          console.warn("Host ID auto-scan error:", hostScanErr);
+          setSuccess(`تم رفع مستند (${DOCUMENT_TYPE_LABELS[docType]}) بنجاح.`);
+        }
+      } else if (docType === "Passport" && travelerId && file.type.startsWith("image/")) {
         try {
           const scanResult = await scanPassportMRZ(file);
           if (scanResult && scanResult.fullNameArabic) {
@@ -326,6 +352,62 @@ export default function RequestDetailPage({
       else setError("حدث خطأ أثناء فحص صورة الجواز.");
     } finally {
       setIsMrzScanningTravelerId(null);
+    }
+  };
+
+  const handleDownloadDoc = async (doc: DocumentItem) => {
+    try {
+      setActionLoading(true);
+      const url = await api.documents.getStreamUrl(doc.id);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download =
+        doc.originalFileName ||
+        doc.fileName ||
+        `document-${doc.documentType}.${doc.contentType?.includes("pdf") ? "pdf" : "jpg"}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (e) {
+      console.error("Download failed", e);
+      setError("فشل تنزيل الملف، يرجى المحاولة مرة أخرى.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleScanExistingHostId = async (doc: DocumentItem) => {
+    if (doc.mimeType && !doc.mimeType.startsWith("image/")) {
+      alert("الفحص التلقائي متاح فقط لملفات الصور (JPG, PNG). لملفات PDF يرجى إدخال البيانات يدوياً.");
+      return;
+    }
+    try {
+      setIsScanningHostIdDoc(true);
+      setError(null);
+      const streamUrl = await api.documents.getStreamUrl(doc.id);
+      const scanResult = await scanHostId(streamUrl);
+      if (scanResult && (scanResult.hostName || scanResult.hostBirthDate || scanResult.idNumber)) {
+        await api.requests.update(requestId, {
+          hasHosting: true,
+          hostName: scanResult.hostName || request?.hostingInfo?.hostName,
+          hostBirthDate: scanResult.hostBirthDate || request?.hostingInfo?.hostBirthDate,
+          hostNationalId: scanResult.idNumber || request?.hostingInfo?.hostNationalId,
+          hostPhone: request?.hostingInfo?.hostPhone,
+        });
+        setSuccess(
+          `تم بنجاح فحص هوية المستضيف: ${scanResult.hostName || ""} ${
+            scanResult.hostBirthDate ? `(تاريخ الميلاد: ${scanResult.hostBirthDate})` : ""
+          }`
+        );
+        await loadRequest();
+      } else {
+        setError("تعذر قراءة بيانات هوية المستضيف بوضوح، يرجى التأكد من وضوح الصورة.");
+      }
+    } catch (err: unknown) {
+      console.error("Host ID scan failed:", err);
+      setError("حدث خطأ أثناء فحص صورة هوية المستضيف.");
+    } finally {
+      setIsScanningHostIdDoc(false);
     }
   };
 
@@ -1365,11 +1447,18 @@ export default function RequestDetailPage({
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
             <div className="bg-gray-50 p-3 rounded-xl">
               <span className="text-gray-400 block mb-0.5">اسم المستضيف:</span>
               <span className="font-bold text-gray-800 text-sm">
                 {request.hostingInfo?.hostName || "مستضيف داخل المملكة"}
+              </span>
+            </div>
+
+            <div className="bg-gray-50 p-3 rounded-xl">
+              <span className="text-gray-400 block mb-0.5">تاريخ ميلاد المستضيف:</span>
+              <span className="font-bold text-gray-800 text-sm">
+                {request.hostingInfo?.hostBirthDate || "غير محدد"}
               </span>
             </div>
 
@@ -1381,9 +1470,11 @@ export default function RequestDetailPage({
             </div>
 
             <div className="bg-gray-50 p-3 rounded-xl">
-              <span className="text-gray-400 block mb-0.5">العنوان والسكن:</span>
+              <span className="text-gray-400 block mb-0.5">العنوان أو الهوية:</span>
               <span className="font-bold text-gray-800 text-sm">
-                {request.hostingInfo?.hostAddress || "غير محدد"}
+                {request.hostingInfo?.hostNationalId
+                  ? `هوية: ${request.hostingInfo.hostNationalId}`
+                  : request.hostingInfo?.hostAddress || "غير محدد"}
               </span>
             </div>
           </div>
@@ -1424,10 +1515,36 @@ export default function RequestDetailPage({
                         e.preventDefault();
                         setPreviewDoc(hostDoc);
                       }}
-                      className="p-1.5 text-gray-600 hover:text-sky-600 hover:bg-gray-200 rounded-lg"
+                      className="p-1.5 text-gray-600 hover:text-sky-600 hover:bg-gray-200 rounded-lg cursor-pointer"
                       title="معاينة المستند"
                     >
                       <Eye className="w-4 h-4" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleDownloadDoc(hostDoc);
+                      }}
+                      className="p-1.5 text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                      title="تنزيل هوية المستضيف"
+                    >
+                      <Download className="w-4 h-4" />
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={isScanningHostIdDoc}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleScanExistingHostId(hostDoc);
+                      }}
+                      className="px-2 py-1 text-[11px] text-amber-700 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-md font-semibold flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-50"
+                      title="فحص هوية المستضيف واستخراج الاسم وتاريخ الميلاد تلقائياً"
+                    >
+                      <RotateCcw className={`w-3.5 h-3.5 ${isScanningHostIdDoc ? "animate-spin" : ""}`} />
+                      <span>{isScanningHostIdDoc ? "جاري الفحص..." : "فحص الهوية (OCR)"}</span>
                     </button>
 
                     {/* Quick Review Buttons when Pending */}
@@ -1820,6 +1937,19 @@ export default function RequestDetailPage({
                               <span>معاينة</span>
                             </button>
 
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handleDownloadDoc(doc);
+                              }}
+                              className="px-2.5 py-1 text-xs bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-md font-medium flex items-center gap-1 cursor-pointer transition-colors"
+                              title="تنزيل الملف"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              <span>تنزيل</span>
+                            </button>
+
                             {/* Quick Review Buttons when Pending */}
                             {(isSafaReviewer || isAgent) && doc.reviewStatus === "Pending" && (
                               <div className="flex items-center gap-1">
@@ -1976,6 +2106,15 @@ export default function RequestDetailPage({
                 </span>
               </div>
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleDownloadDoc(previewDoc)}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                  title="تنزيل الملف على جهازك"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>تنزيل الملف</span>
+                </button>
                 {previewDocUrl && (
                   <a
                     href={previewDocUrl}
