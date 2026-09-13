@@ -1,8 +1,8 @@
-"use client";
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { ShieldCheck, UserCheck, AlertCircle, KeyRound, User } from "lucide-react";
+import { ShieldCheck, UserCheck, AlertCircle, KeyRound, User, Cloud, CloudOff } from "lucide-react";
+import { isSupabaseConfigured } from "@/lib/supabaseClient";
+import { CloudSettingsModal } from "@/components/ui/CloudSettingsModal";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -10,6 +10,12 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isCloud, setIsCloud] = useState(false);
+  const [cloudModalOpen, setCloudModalOpen] = useState(false);
+
+  useEffect(() => {
+    setIsCloud(isSupabaseConfigured());
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,7 +30,13 @@ export default function LoginPage() {
       await login(username.trim(), password);
     } catch (err: unknown) {
       if (err instanceof Error) {
-        setError(err.message);
+        if (!isCloud && err.message.includes("غير موجود")) {
+          setError(
+            `${err.message} (أنت تعمل حالياً في الوضع المحلي دون اتصال بالسحابة. إذا كانت حساباتك في سحابة Supabase، اضغط على زر "وضع محلي" بالأعلى لربط السحابة).`
+          );
+        } else {
+          setError(err.message);
+        }
       } else {
         setError("فشل تسجيل الدخول. تحقق من صحة البيانات.");
       }
@@ -36,6 +48,34 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-sky-50 via-gray-50 to-teal-50">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
+        {/* Connection status bar */}
+        <div className="flex items-center justify-between pb-3 mb-6 border-b border-gray-100">
+          <span className="text-xs text-gray-400 font-medium">حالة الاتصال:</span>
+          <button
+            type="button"
+            onClick={() => setCloudModalOpen(true)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border transition-colors cursor-pointer ${
+              isCloud
+                ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 shadow-2xs"
+                : "bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100"
+            }`}
+          >
+            {isCloud ? (
+              <>
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <Cloud className="w-3.5 h-3.5 text-emerald-600" />
+                <span>🟢 متصل بالسحابة (أونلاين)</span>
+              </>
+            ) : (
+              <>
+                <span className="w-2 h-2 rounded-full bg-amber-500" />
+                <CloudOff className="w-3.5 h-3.5 text-amber-600" />
+                <span>⚪ وضع محلي (اضغط للربط بالسحابة)</span>
+              </>
+            )}
+          </button>
+        </div>
+
         {/* Header */}
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-gradient-to-tr from-sky-600 to-teal-500 rounded-2xl flex items-center justify-center text-white text-3xl font-extrabold mx-auto shadow-md mb-4">
@@ -116,6 +156,13 @@ export default function LoginPage() {
           <span>منظومة آمنة ومحمية بسجل تدقيق رقمي</span>
         </div>
       </div>
+
+      {/* Cloud Settings Modal */}
+      <CloudSettingsModal
+        isOpen={cloudModalOpen}
+        onClose={() => setCloudModalOpen(false)}
+        onConnectionChanged={(connected) => setIsCloud(connected)}
+      />
     </div>
   );
 }
