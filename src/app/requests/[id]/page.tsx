@@ -47,6 +47,8 @@ import {
   Download,
   Languages,
   ExternalLink,
+  ScanText,
+  Undo2,
 } from "lucide-react";
 import { scanPassportMRZ, translateEnglishNameToArabic } from "@/lib/mrzScanner";
 import { scanHostId } from "@/lib/hostIdScanner";
@@ -1628,10 +1630,14 @@ export default function RequestDetailPage({
                         e.preventDefault();
                         handleScanExistingHostId(hostDoc);
                       }}
-                      className="p-1.5 text-amber-700 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
-                      title="فحص هوية المستضيف واستخراج البيانات تلقائياً (OCR)"
+                      className="p-1.5 text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition-colors cursor-pointer disabled:opacity-50 shadow-2xs"
+                      title="فحص واستخراج بيانات هوية المستضيف تلقائياً (مسح ذكي OCR)"
                     >
-                      <RotateCcw className={`w-4 h-4 ${isScanningHostIdDoc ? "animate-spin" : ""}`} />
+                      {isScanningHostIdDoc ? (
+                        <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
+                      ) : (
+                        <ScanText className="w-4 h-4" />
+                      )}
                     </button>
 
                     {/* Quick Review Buttons when Pending */}
@@ -1686,9 +1692,9 @@ export default function RequestDetailPage({
                         }}
                         disabled={actionLoading}
                         className="p-1.5 bg-amber-50 hover:bg-amber-500 text-amber-800 hover:text-white border border-amber-300 rounded-lg transition-colors cursor-pointer shadow-2xs"
-                        title="إعادة فتح تدقيق المستند لموظف الصفا"
+                        title="إعادة فتح تدقيق المستند لموظف الصفا (إعادة التدقيق)"
                       >
-                        <RotateCcw className="w-4 h-4" />
+                        <Undo2 className="w-4 h-4" />
                       </button>
                     )}
 
@@ -2084,9 +2090,9 @@ export default function RequestDetailPage({
                                 }}
                                 disabled={actionLoading}
                                 className="p-1.5 bg-amber-50 hover:bg-amber-500 text-amber-800 hover:text-white border border-amber-300 rounded-lg transition-colors cursor-pointer shadow-2xs"
-                                title="إعادة فتح تدقيق المستند لموظف الصفا"
+                                title="إعادة فتح تدقيق المستند لموظف الصفا (إعادة التدقيق)"
                               >
-                                <RotateCcw className="w-4 h-4" />
+                                <Undo2 className="w-4 h-4" />
                               </button>
                             )}
 
