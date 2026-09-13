@@ -4,7 +4,8 @@
  */
 
 const GEMINI_API_KEY_STORAGE_KEY = "gemini_ai_api_key";
-const DEFAULT_GEMINI_MODEL = "gemini-1.5-flash";
+const GEMINI_SELECTED_MODEL_KEY = "gemini_selected_model";
+const DEFAULT_GEMINI_MODEL = "gemini-2.0-flash";
 
 export interface GeminiPassportResult {
   fullNameArabic?: string;
@@ -56,17 +57,105 @@ export function removeGeminiApiKey(): void {
   localStorage.removeItem(GEMINI_API_KEY_STORAGE_KEY);
 }
 
-// 2. Test API Key validity
+// 2. Dynamically discover and resolve the available Gemini model for the user's API key
+export async function resolveAvailableGeminiModel(apiKey: string): Promise<string> {
+  const cleanKey = apiKey.trim();
+
+  // Query Google's ModelService.ListModels endpoint directly
+  try {
+    const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${cleanKey}`;
+    const res = await fetch(listUrl);
+    if (res.ok) {
+      const data = await res.json();
+      const models: Array<{ name: string; supportedGenerationMethods?: string[] }> =
+        data.models || [];
+      const contentModels = models.filter((m) =>
+        m.supportedGenerationMethods?.includes("generateContent")
+      );
+
+      // Ranked preferences for Vision OCR tasks (Fastest & best multimodal models first)
+      const preferences = [
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-exp",
+        "gemini-1.5-flash-latest",
+        "gemini-1.5-flash-002",
+        "gemini-1.5-flash-001",
+        "gemini-1.5-flash",
+        "gemini-1.5-flash-8b",
+        "gemini-2.0-flash-lite",
+        "gemini-1.5-pro",
+        "gemini-1.5-pro-latest",
+        "gemini-pro-vision",
+      ];
+
+      for (const pref of preferences) {
+        const match = contentModels.find(
+          (m) => m.name === `models/${pref}` || m.name.endsWith(`/${pref}`)
+        );
+        if (match) {
+          const modelName = match.name.replace(/^models\//, "");
+          if (typeof window !== "undefined") {
+            localStorage.setItem(GEMINI_SELECTED_MODEL_KEY, modelName);
+          }
+          return modelName;
+        }
+      }
+
+      // If no exact match from preferences, pick any Gemini model with generateContent
+      const anyGemini = contentModels.find(
+        (m) =>
+          m.name.toLowerCase().includes("gemini") &&
+          !m.name.includes("embedding")
+      );
+      if (anyGemini) {
+        const modelName = anyGemini.name.replace(/^models\//, "");
+        if (typeof window !== "undefined") {
+          localStorage.setItem(GEMINI_SELECTED_MODEL_KEY, modelName);
+        }
+        return modelName;
+      }
+    } else {
+      const err = await res.json().catch(() => ({}));
+      if (err?.error?.message) {
+        throw new Error(err.error.message);
+      }
+    }
+  } catch (err: unknown) {
+    if (
+      err instanceof Error &&
+      (err.message.includes("API key not valid") ||
+        err.message.includes("API_KEY_INVALID"))
+    ) {
+      throw err;
+    }
+    console.warn("Could not list Gemini models from API, falling back to candidates:", err);
+  }
+
+  // Check cached model
+  if (typeof window !== "undefined") {
+    const cached = localStorage.getItem(GEMINI_SELECTED_MODEL_KEY);
+    if (cached) return cached;
+  }
+
+  return DEFAULT_GEMINI_MODEL;
+}
+
+// 3. Test API Key validity
 export async function testGeminiApiKey(
   apiKey: string
-): Promise<{ success: boolean; message: string }> {
-  if (!apiKey.trim()) {
+): Promise<{ success: boolean; message: string; modelName?: string }> {
+  const cleanKey = apiKey.trim();
+  if (!cleanKey) {
     return { success: false, message: "يرجى إدخال مفتاح الـ API أولاً." };
   }
 
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${DEFAULT_GEMINI_MODEL}:generateContent?key=${apiKey.trim()}`;
-    const response = await fetch(url, {
+    // 1. Resolve which model is active and available for this API key
+    const model = await resolveAvailableGeminiModel(cleanKey);
+
+    // 2. Test generateContent on the resolved model
+    const testUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanKey}`;
+    const response = await fetch(testUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -83,7 +172,9 @@ export async function testGeminiApiKey(
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      const msg = errorData?.error?.message || `خطأ رقم (${response.status}): المفتاح غير صالح أو الخدمة غير مفعلة`;
+      const msg =
+        errorData?.error?.message ||
+        `خطأ رقم (${response.status}): الموديل غير متاح لهذا الحساب`;
       return { success: false, message: msg };
     }
 
@@ -91,13 +182,15 @@ export async function testGeminiApiKey(
     if (data?.candidates?.[0]?.content?.parts?.[0]?.text) {
       return {
         success: true,
-        message: "تم الاتصال بنجاح بمحرك Google Gemini! المفتاح يعمل بشكل ممتاز وجاهز للاستخدام.",
+        message: `تم الاتصال بنجاح بمحرك Google Gemini (${model})! المفتاح يعمل بشكل ممتاز وجاهز للاستخدام.`,
+        modelName: model,
       };
     }
 
     return { success: false, message: "استجابة غير متوقعة من خادم Gemini." };
   } catch (err: unknown) {
-    const errMessage = err instanceof Error ? err.message : "فشل الاتصال بخادم Google Gemini.";
+    const errMessage =
+      err instanceof Error ? err.message : "فشل الاتصال بخادم Google Gemini.";
     return { success: false, message: errMessage };
   }
 }
@@ -180,7 +273,8 @@ async function callGeminiVision(
     },
   };
 
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${DEFAULT_GEMINI_MODEL}:generateContent?key=${apiKey}`;
+  const model = await resolveAvailableGeminiModel(apiKey);
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   const response = await fetch(endpoint, {
     method: "POST",
