@@ -33,12 +33,6 @@ export default function LoginPage() {
     }
   };
 
-  const handleQuickLogin = (u: string, p: string) => {
-    setUsername(u);
-    setPassword(p);
-    setError(null);
-  };
-
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-sky-50 via-gray-50 to-teal-50">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
@@ -115,49 +109,6 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* Quick Test Accounts */}
-        <div className="mt-8 pt-6 border-t border-gray-100">
-          <p className="text-xs font-semibold text-gray-500 mb-3 text-center">
-            حسابات الاختبار السريع (انقر للتعبئة الفورية):
-          </p>
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <button
-              type="button"
-              onClick={() => handleQuickLogin("sender", "Sender@123456")}
-              className="p-2.5 bg-blue-50 hover:bg-blue-100 text-blue-800 rounded-xl text-right font-medium transition-colors border border-blue-100 cursor-pointer"
-            >
-              <div className="font-bold">مرسل المعاملات</div>
-              <div className="text-[11px] text-blue-600">sender</div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleQuickLogin("safa_emp", "Safa@123456")}
-              className="p-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl text-right font-medium transition-colors border border-emerald-100 cursor-pointer"
-            >
-              <div className="font-bold">موظف الصفا</div>
-              <div className="text-[11px] text-emerald-600">safa_emp</div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleQuickLogin("saudi_agent", "Agent@123456")}
-              className="p-2.5 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl text-right font-medium transition-colors border border-amber-100 cursor-pointer"
-            >
-              <div className="font-bold">الوكيل السعودي</div>
-              <div className="text-[11px] text-amber-600">saudi_agent</div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleQuickLogin("admin", "Admin@123456")}
-              className="p-2.5 bg-purple-50 hover:bg-purple-100 text-purple-800 rounded-xl text-right font-medium transition-colors border border-purple-100 cursor-pointer"
-            >
-              <div className="font-bold">مدير النظام</div>
-              <div className="text-[11px] text-purple-600">admin</div>
-            </button>
-          </div>
-        </div>
 
         {/* Security badge */}
         <div className="mt-6 flex items-center justify-center gap-2 text-xs text-gray-400">
