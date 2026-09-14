@@ -5,7 +5,6 @@ import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { GroupRequestSummary } from "@/types";
 import { RequestStatusBadge } from "@/components/ui/StatusBadge";
-import { RequestLifecycleTimer } from "@/components/ui/RequestLifecycleTimer";
 import {
   FilePlus,
   Search,
@@ -554,18 +553,6 @@ export default function RequestsListPage() {
                                           : "لم يُحدد"}
                                       </span>
                                     </div>
-                                    {(r.departureDate || r.travelDate) && (
-                                      <div className="pt-0.5">
-                                        <RequestLifecycleTimer
-                                          createdAt={r.createdAt}
-                                          travelDate={r.travelDate}
-                                          departureDate={r.departureDate}
-                                          flightDepartureTime={r.flightDepartureTime}
-                                          status={r.status}
-                                          mode="compact"
-                                        />
-                                      </div>
-                                    )}
                                   </div>
                                 </td>
                               </>
