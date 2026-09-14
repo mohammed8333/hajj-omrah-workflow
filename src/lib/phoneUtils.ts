@@ -22,8 +22,8 @@ export interface PhoneValidationResult {
 
 /**
  * التحقق من رقم المستضيف:
- * - يجب أن يتكون من 10 أرقام ويبدأ بـ 05
- * - يتم تنسيقه ليبدأ بـ +966 متبوعاً بالرقم بدون الصفر الأولي (مثال: +9665xxxxxxxx)
+ * - يقبل الرقم سواء بدأ بـ 05 (10 أرقام) أو بدأ بـ +966 أو 00966 أو 966
+ * - يتم تنسيقه دائماً ليبدأ بـ +966 متبوعاً بالرقم بدون الصفر الأولي (مثال: +9665xxxxxxxx)
  */
 export function validateHostPhone(rawPhone?: string): PhoneValidationResult {
   if (!rawPhone || !rawPhone.trim()) {
@@ -39,14 +39,14 @@ export function validateHostPhone(rawPhone?: string): PhoneValidationResult {
   const raw = rawPhone.trim();
   let digits = raw.replace(/\D/g, "");
 
-  // إذا تم إدخال الرقم بكود دولي 00966 أو 966
+  // إذا تم إدخال الرقم بمفتاح دولي +966 أو 00966 أو 966
   if (digits.startsWith("00966")) {
     digits = digits.substring(5);
   } else if (digits.startsWith("966")) {
     digits = digits.substring(3);
   }
 
-  // إذا بدأ بـ 5 وكان 9 أرقام، نعتبره بدون الصفر الأولي
+  // إذا تم إدخال الرقم كـ 9 أرقام تبدأ بـ 5 (مثل 5xxxxxxxx أو بعد نزع 966)
   if (digits.startsWith("5") && digits.length === 9) {
     digits = "0" + digits;
   }
@@ -55,7 +55,7 @@ export function validateHostPhone(rawPhone?: string): PhoneValidationResult {
   if (!digits.startsWith("05") || digits.length !== 10) {
     return {
       isValid: false,
-      error: "رقم المستضيف يجب أن يتكون من 10 أرقام ويبدأ بـ 05 (مثال: 05XXXXXXXX)",
+      error: "رقم المستضيف يجب أن يتكون من 10 أرقام ويبدأ بـ 05 (أو يبدأ بـ +966)",
       formatted: raw,
       cleanDigits: digits,
       whatsappDigits: digits,
@@ -76,8 +76,8 @@ export function validateHostPhone(rawPhone?: string): PhoneValidationResult {
 
 /**
  * التحقق من رقم المسافر:
- * - يجب أن يتكون من 11 رقم ويبدأ بـ 010 أو 011 أو 012 أو 015
- * - يتم تنسيقه ليبدأ بـ +20 متبوعاً بالرقم بدون الصفر الأولي (مثال: +2010xxxxxxxx)
+ * - يقبل الرقم سواء بدأ بـ 010 أو 011 أو 012 أو 015 (11 رقماً) أو بدأ بـ +20 أو 0020 أو 20
+ * - يتم تنسيقه دائماً ليبدأ بـ +20 متبوعاً بالرقم بدون الصفر الأولي (مثال: +2010xxxxxxxx)
  */
 export function validateTravelerPhone(rawPhone?: string): PhoneValidationResult {
   if (!rawPhone || !rawPhone.trim()) {
@@ -93,14 +93,14 @@ export function validateTravelerPhone(rawPhone?: string): PhoneValidationResult 
   const raw = rawPhone.trim();
   let digits = raw.replace(/\D/g, "");
 
-  // إذا تم إدخال الرقم بكود دولي 0020 أو 20
+  // إذا تم إدخال الرقم بمفتاح دولي +20 أو 0020 أو 20
   if (digits.startsWith("0020")) {
     digits = digits.substring(4);
-  } else if (digits.startsWith("20") && digits.length === 12) {
+  } else if (digits.startsWith("20")) {
     digits = digits.substring(2);
   }
 
-  // إذا دخل 10 أرقام تبدأ بـ 10 أو 11 أو 12 أو 15 (بدون الصفر الأولي)
+  // إذا كان الرقم 10 أرقام ويبدأ بـ 10 أو 11 أو 12 أو 15 (مثل بعد نزع كود 20)
   if (
     digits.length === 10 &&
     (digits.startsWith("10") ||
@@ -111,7 +111,7 @@ export function validateTravelerPhone(rawPhone?: string): PhoneValidationResult 
     digits = "0" + digits;
   }
 
-  // الشرط: 11 رقم ويبدأ بـ 010 أو 011 أو 012 أو 015
+  // الشرط: 11 رقماً ويبدأ بـ 010 أو 011 أو 012 أو 015
   const isEgyptianMobile =
     digits.length === 11 &&
     (digits.startsWith("010") ||
@@ -122,7 +122,7 @@ export function validateTravelerPhone(rawPhone?: string): PhoneValidationResult 
   if (!isEgyptianMobile) {
     return {
       isValid: false,
-      error: "رقم المسافر يجب أن يتكون من 11 رقماً ويبدأ بـ 010 أو 011 أو 012 أو 015 (مثال: 010XXXXXXXX)",
+      error: "رقم المسافر يجب أن يتكون من 11 رقماً ويبدأ بـ 010 أو 011 أو 012 أو 015 (أو يبدأ بـ +20)",
       formatted: raw,
       cleanDigits: digits,
       whatsappDigits: digits,
