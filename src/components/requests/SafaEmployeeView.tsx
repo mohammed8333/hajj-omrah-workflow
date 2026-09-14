@@ -15,9 +15,11 @@ import {
   X,
   Loader2,
   Edit2,
+  MessageSquare,
 } from "lucide-react";
 import { DocumentItem, DocumentReviewStatus, GroupRequestDetail } from "@/types";
 import { DocumentStatusBadge } from "@/components/ui/StatusBadge";
+import { getWhatsAppUrl, getTelUrl, normalizePhone } from "@/lib/phoneUtils";
 
 interface SafaEmployeeViewProps {
   request: GroupRequestDetail;
@@ -354,14 +356,27 @@ export const SafaEmployeeView: React.FC<SafaEmployeeViewProps> = ({
                     </span>
                   )}
                   {traveler.phoneNumber && (
-                    <a
-                      href={`tel:${traveler.phoneNumber}`}
-                      className="inline-flex items-center gap-1 text-emerald-700 hover:text-emerald-900 font-mono bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded-md border border-emerald-200 text-xs font-semibold"
-                      dir="ltr"
-                    >
-                      <Phone className="w-3 h-3 text-emerald-600" />
-                      <span>{traveler.phoneNumber}</span>
-                    </a>
+                    <div className="inline-flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg">
+                      <a
+                        href={getWhatsAppUrl(traveler.phoneNumber)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-emerald-800 hover:text-emerald-950 font-mono font-bold text-xs hover:underline"
+                        title="مراسلة المسافر عبر واتساب"
+                        dir="ltr"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5 fill-emerald-600 text-emerald-600 shrink-0" />
+                        <span>{normalizePhone(traveler.phoneNumber).displayFormatted || traveler.phoneNumber}</span>
+                      </a>
+                      <span className="text-emerald-300">|</span>
+                      <a
+                        href={getTelUrl(traveler.phoneNumber)}
+                        className="p-0.5 text-emerald-700 hover:text-emerald-900 rounded hover:bg-emerald-100 transition-colors"
+                        title="اتصال هاتفي بالمسافر"
+                      >
+                        <Phone className="w-3 h-3 shrink-0" />
+                      </a>
+                    </div>
                   )}
                   {traveler.nationality && (
                     <span className="text-xs text-gray-500">

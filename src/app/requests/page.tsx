@@ -28,6 +28,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useDialog } from "@/lib/dialog-context";
+import { getWhatsAppUrl } from "@/lib/phoneUtils";
 
 // اقتطاع الاسم الثلاثي فقط (3 مقاطع كحد أقصى)
 function getThreePartName(fullName?: string): string {
@@ -289,19 +290,10 @@ ${travelersLines}
 علما بان المعتمر المذكور تحت مسئولية حضرتك حتى خروجه من المملكة .
 وشكرا`;
 
-    // تنسيق رقم الهاتف الدولي
-    let cleanPhone = phone.replace(/\D/g, "");
-    if (cleanPhone.startsWith("00")) {
-      cleanPhone = cleanPhone.substring(2);
+    const whatsappUrl = getWhatsAppUrl(phone, message);
+    if (whatsappUrl) {
+      window.open(whatsappUrl, "_blank");
     }
-    if (cleanPhone.startsWith("05") && cleanPhone.length === 10) {
-      cleanPhone = "966" + cleanPhone.substring(1);
-    } else if (cleanPhone.startsWith("5") && cleanPhone.length === 9) {
-      cleanPhone = "966" + cleanPhone;
-    }
-
-    const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
-    window.open(whatsappUrl, "_blank");
   };
 
   const filtered = requests.filter((r) => {
