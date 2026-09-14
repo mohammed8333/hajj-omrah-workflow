@@ -22,10 +22,123 @@ import {
   Plane,
   Calendar,
   User,
+  Clock,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useDialog } from "@/lib/dialog-context";
+
+// اقتطاع الاسم الثلاثي فقط (3 مقاطع كحد أقصى)
+function getThreePartName(fullName?: string): string {
+  if (!fullName) return "بدون اسم";
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length <= 3) return parts.join(" ");
+  return parts.slice(0, 3).join(" ");
+}
+
+// تنسيق التاريخ يوم وشهر فقط بخط واضح
+function formatDayMonth(dateStr?: string): string {
+  if (!dateStr) return "لم يُحدد";
+  try {
+    const dateOnly = dateStr.split("T")[0];
+    const [y, m, d] = dateOnly.split("-").map(Number);
+    if (y && m && d) {
+      const dateObj = new Date(y, m - 1, d);
+      return dateObj.toLocaleDateString("ar-EG-u-nu-latn", {
+        day: "numeric",
+        month: "long",
+      });
+    }
+    const fallback = new Date(dateStr);
+    return fallback.toLocaleDateString("ar-EG-u-nu-latn", {
+      day: "numeric",
+      month: "long",
+    });
+  } catch {
+    return dateStr;
+  }
+}
+
+// حساب المدة المتبقية على موعد السفر (السفر خلال قد ايه)
+function getTravelCountdown(
+  departureDate?: string,
+  travelDate?: string,
+  flightDepartureTime?: string
+): { text: string; colorClass: string } | null {
+  const effectiveDate = departureDate || travelDate;
+  if (!effectiveDate) return null;
+
+  try {
+    const now = Date.now();
+    let travelEpoch: number | null = null;
+    const dateOnly = effectiveDate.split("T")[0];
+    const [y, m, d] = dateOnly.split("-").map(Number);
+
+    if (y && m && d) {
+      if (
+        flightDepartureTime &&
+        /^\d{1,2}:\d{2}$/.test(flightDepartureTime.trim())
+      ) {
+        const [hh, mm] = flightDepartureTime.trim().split(":").map(Number);
+        const dt = new Date(y, m - 1, d, hh, mm, 0);
+        if (!isNaN(dt.getTime())) travelEpoch = dt.getTime();
+      }
+      if (travelEpoch === null) {
+        const dt = new Date(y, m - 1, d, 23, 59, 59);
+        if (!isNaN(dt.getTime())) travelEpoch = dt.getTime();
+      }
+    }
+
+    if (travelEpoch === null) {
+      const dt = new Date(effectiveDate);
+      if (!isNaN(dt.getTime())) travelEpoch = dt.getTime();
+    }
+
+    if (!travelEpoch) return null;
+
+    const diffMs = travelEpoch - now;
+    if (diffMs <= 0) {
+      return {
+        text: "انتهى موعد السفر",
+        colorClass: "bg-gray-100 text-gray-700 border-gray-200",
+      };
+    }
+
+    const days = Math.floor(diffMs / (24 * 3600 * 1000));
+    const hours = Math.floor((diffMs % (24 * 3600 * 1000)) / (3600 * 1000));
+
+    if (days === 0) {
+      if (hours === 0) {
+        const minutes = Math.max(1, Math.floor((diffMs % (3600 * 1000)) / (60 * 1000)));
+        return {
+          text: `السفر خلال ${minutes} دقيقة`,
+          colorClass: "bg-rose-50 text-rose-800 border-rose-200",
+        };
+      }
+      return {
+        text: `السفر خلال ${hours} ساعة`,
+        colorClass: "bg-rose-50 text-rose-800 border-rose-200",
+      };
+    } else if (days === 1) {
+      return {
+        text: `السفر غداً (${hours} س)`,
+        colorClass: "bg-amber-50 text-amber-800 border-amber-200",
+      };
+    } else if (days <= 3) {
+      return {
+        text: `السفر خلال ${days} أيام`,
+        colorClass: "bg-amber-50 text-amber-800 border-amber-200",
+      };
+    } else {
+      return {
+        text: `السفر خلال ${days} يوم`,
+        colorClass: "bg-sky-50 text-sky-800 border-sky-200",
+      };
+    }
+  } catch {
+    return null;
+  }
+}
 
 export default function RequestsListPage() {
   const { user, role } = useAuth();
@@ -305,7 +418,7 @@ export default function RequestsListPage() {
         </div>
       ) : (
         <>
-          {/* Mobile Cards View (phones) */}
+          {/* Mobile Cards View (phones) - بناءً على الرسم التخطيطي المطلوب */}
           <div className="block md:hidden space-y-3">
             {filtered.map((r) => {
               const travelers =
@@ -313,22 +426,34 @@ export default function RequestsListPage() {
                   ? r.travelersList
                   : [{ id: `fb-${r.id}`, fullName: r.groupName || "بدون اسم", passportNumber: undefined, photoUrl: undefined }];
 
+              const travelCountdown = getTravelCountdown(
+                r.departureDate,
+                r.travelDate,
+                r.flightDepartureTime
+              );
+
               return (
                 <div
                   key={r.id}
-                  className="bg-white rounded-2xl border border-gray-200 p-4 shadow-xs space-y-3"
+                  onClick={() => router.push(`/requests/${r.id}`)}
+                  className="bg-white rounded-2xl border border-gray-200 p-3.5 shadow-xs hover:border-sky-300 hover:shadow-md transition-all cursor-pointer active:scale-[0.99] space-y-2.5"
                 >
-                  <div className="flex justify-between items-start gap-2">
-                    {/* رقم مجموعة نسك */}
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs text-gray-500 font-medium">نسك:</span>
+                  {/* الشريط العلوي: يمين = رقم مجموعة نسك مع النسخ، شمال = حالة المجموعة */}
+                  <div className="flex items-center justify-between gap-2">
+                    {/* المستطيل فوق على اليمين: مجموعة نسك وجنبيها علامة النسخ */}
+                    <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 px-2.5 py-1 rounded-xl">
+                      <span className="text-[11px] text-gray-500 font-bold">نسك:</span>
                       {r.nusukGroupNumber ? (
-                        <div className="flex items-center gap-1">
-                          <span className="font-mono font-bold text-emerald-800 bg-emerald-50 border border-emerald-300 px-2 py-0.5 rounded-md text-xs">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono font-bold text-emerald-800 text-xs">
                             {r.nusukGroupNumber}
                           </span>
                           <button
-                            onClick={(e) => copyToClipboard(r.nusukGroupNumber!, e)}
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              copyToClipboard(r.nusukGroupNumber!, e);
+                            }}
                             className="text-gray-400 hover:text-emerald-700 p-0.5 cursor-pointer"
                             title="نسخ رقم نسك"
                           >
@@ -343,109 +468,120 @@ export default function RequestsListPage() {
                         <span className="text-gray-400 text-xs italic">قيد التسجيل</span>
                       )}
                     </div>
-                    <RequestStatusBadge status={r.status} />
-                  </div>
 
-                  {/* بيانات الرحلة وتاريخ السفر */}
-                  <div className="flex items-center justify-between text-xs bg-gray-50/80 p-2.5 rounded-xl border border-gray-100">
+                    {/* المستطيل فوق على الشمال: حالة المجموعة + أزرار الأدمن إن وجدت */}
                     <div className="flex items-center gap-1.5">
-                      <Plane className="w-3.5 h-3.5 text-sky-600 shrink-0" />
-                      <span className="font-bold text-gray-800 font-mono">
-                        {r.flightNumber || r.airline || "تذكرة مشتركة"}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1 text-gray-600">
-                      <Calendar className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                      <span>
-                        {r.departureDate || r.travelDate
-                          ? new Date(r.departureDate || r.travelDate!).toLocaleDateString("ar-SA")
-                          : "لم يُحدد"}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* قائمة المعتمرين مع الصور */}
-                  <div className="space-y-1.5 pt-1">
-                    <span className="text-[11px] font-bold text-gray-500 block">
-                      المعتمرون ({travelers.length}):
-                    </span>
-                    <div className="space-y-1.5">
-                      {travelers.map((t, idx) => (
-                        <div
-                          key={t.id || idx}
-                          className="flex items-center gap-2.5 bg-gray-50/60 p-2 rounded-xl border border-gray-100"
-                        >
-                          {t.photoUrl ? (
-                            <img
-                              src={t.photoUrl}
-                              alt={t.fullName}
-                              className="w-8 h-8 rounded-full object-cover border border-purple-300 shrink-0 shadow-2xs"
-                            />
+                      <RequestStatusBadge status={r.status} />
+                      {role === "Admin" && (
+                        <div className="flex items-center gap-1">
+                          {r.status === "Archived" ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAdminUnarchive(r.id, e);
+                              }}
+                              className="p-1 text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg cursor-pointer transition-colors"
+                              title="إلغاء الأرشفة"
+                            >
+                              <Archive className="w-3.5 h-3.5" />
+                            </button>
                           ) : (
-                            <div className="w-8 h-8 rounded-full bg-purple-50 text-purple-700 border border-purple-200 flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
-                              {t.fullName && t.fullName.trim() ? (
-                                t.fullName.trim().charAt(0)
-                              ) : (
-                                <User className="w-4 h-4 text-purple-600" />
-                              )}
-                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAdminArchive(r.id, e);
+                              }}
+                              className="p-1 text-purple-800 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-lg cursor-pointer transition-colors"
+                              title="أرشفة"
+                            >
+                              <Archive className="w-3.5 h-3.5" />
+                            </button>
                           )}
-                          <div className="flex-1 min-w-0">
-                            <span className="text-xs font-bold text-gray-900 truncate block">
-                              {t.fullName}
-                            </span>
-                            {t.passportNumber && (
-                              <span className="text-[10px] text-gray-400 font-mono block">
-                                جواز: {t.passportNumber}
-                              </span>
-                            )}
-                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAdminDelete(r.id, r.requestNumber, e);
+                            }}
+                            className="p-1 text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg cursor-pointer transition-colors"
+                            title="مسح المعاملة"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
-                      ))}
+                      )}
                     </div>
                   </div>
 
-                  {/* Actions on Mobile */}
-                  <div className="pt-2 border-t border-gray-100 flex items-center justify-between gap-2">
-                    <Link
-                      href={`/requests/${r.id}`}
-                      className="inline-flex items-center justify-center gap-1.5 text-xs font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-3 py-1.5 rounded-xl transition-colors cursor-pointer"
-                    >
-                      <span>عرض التفاصيل</span>
-                      <ArrowRight className="w-3.5 h-3.5 rotate-180" />
-                    </Link>
-
-                    {role === "Admin" && (
-                      <div className="flex items-center gap-1.5">
-                        {r.status === "Archived" ? (
-                          <button
-                            type="button"
-                            onClick={(e) => handleAdminUnarchive(r.id, e)}
-                            className="p-1.5 text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-xl transition-colors cursor-pointer"
-                            title="إلغاء الأرشفة"
-                          >
-                            <Archive className="w-3.5 h-3.5" />
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={(e) => handleAdminArchive(r.id, e)}
-                            className="p-1.5 text-purple-800 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-xl transition-colors cursor-pointer"
-                            title="أرشفة"
-                          >
-                            <Archive className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={(e) => handleAdminDelete(r.id, r.requestNumber, e)}
-                          className="p-1.5 text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-xl transition-colors cursor-pointer"
-                          title="مسح المعاملة"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                  {/* الجزء السفلي: شبكة من عمودين مطابقة للرسم التخطيطي */}
+                  <div className="grid grid-cols-2 gap-2.5 items-stretch">
+                    {/* 1. المربع الأيمن (تحت مجموعة نسك): بيانات الرحلة ومؤشر موعد السفر */}
+                    <div className="flex flex-col gap-1.5">
+                      {/* مربع بيانات الرحلة: رقم الرحلة والتاريخ يوم وشهر وخط أكبر */}
+                      <div className="bg-sky-50/60 border border-sky-100 rounded-xl p-2.5 flex-1 flex flex-col justify-center gap-1">
+                        <div className="flex items-center gap-1.5">
+                          <Plane className="w-4 h-4 text-sky-600 shrink-0" />
+                          <span className="font-mono font-bold text-gray-900 text-sm tracking-wide truncate">
+                            {r.flightNumber || r.airline || "تذكرة مشتركة"}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-gray-800">
+                          <Calendar className="w-4 h-4 text-sky-600 shrink-0" />
+                          <span className="font-bold text-sm">
+                            {formatDayMonth(r.departureDate || r.travelDate)}
+                          </span>
+                        </div>
                       </div>
-                    )}
+
+                      {/* المستطيل الصغير تحته: السفر خلال قد ايه */}
+                      {travelCountdown ? (
+                        <div
+                          className={`border rounded-xl px-2 py-1 text-center flex items-center justify-center gap-1 text-[11px] font-bold shadow-2xs ${travelCountdown.colorClass}`}
+                        >
+                          <Clock className="w-3.5 h-3.5 shrink-0" />
+                          <span className="truncate">{travelCountdown.text}</span>
+                        </div>
+                      ) : (
+                        <div className="border border-gray-200 bg-gray-50 rounded-xl px-2 py-1 text-center text-[10px] text-gray-400 font-medium">
+                          موعد السفر غير محدد
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 2. المستطيل الكبير على الشمال: أسماء المسافرين (ثلاثية) مع الصور */}
+                    <div className="bg-gray-50/70 border border-gray-200 rounded-xl p-2.5 flex flex-col justify-center min-h-[105px]">
+                      <div className="space-y-2 max-h-36 overflow-y-auto pr-0.5">
+                        {travelers.map((t, idx) => (
+                          <div key={t.id || idx} className="flex items-center gap-2 min-w-0">
+                            {t.photoUrl ? (
+                              <img
+                                src={t.photoUrl}
+                                alt={t.fullName}
+                                className="w-8 h-8 rounded-full object-cover border border-purple-300 shrink-0 shadow-2xs"
+                              />
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-700 border border-purple-200 flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
+                                {t.fullName && t.fullName.trim() ? (
+                                  t.fullName.trim().charAt(0)
+                                ) : (
+                                  <User className="w-4 h-4 text-purple-600" />
+                                )}
+                              </div>
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <span
+                                className="text-xs font-bold text-gray-900 block truncate leading-tight"
+                                title={t.fullName}
+                              >
+                                {getThreePartName(t.fullName)}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </div>
               );
@@ -478,6 +614,11 @@ export default function RequestsListPage() {
                       : [{ id: `fb-${r.id}`, fullName: r.groupName || "بدون اسم", passportNumber: undefined, photoUrl: undefined }];
 
                   const rowCount = travelers.length;
+                  const travelCountdown = getTravelCountdown(
+                    r.departureDate,
+                    r.travelDate,
+                    r.flightDepartureTime
+                  );
 
                   return (
                     <tbody
@@ -533,7 +674,7 @@ export default function RequestsListPage() {
                                   <RequestStatusBadge status={r.status} />
                                 </td>
 
-                                {/* 3. بيانات الرحلة: رقم الرحلة فوق وتحتيها التاريخ */}
+                                {/* 3. بيانات الرحلة: رقم الرحلة فوق وتحتيها التاريخ والسفر خلال قد ايه */}
                                 <td
                                   rowSpan={rowCount}
                                   className="py-3.5 px-4 align-middle border-l border-gray-100"
@@ -553,6 +694,16 @@ export default function RequestsListPage() {
                                           : "لم يُحدد"}
                                       </span>
                                     </div>
+                                    {travelCountdown && (
+                                      <div className="pt-0.5">
+                                        <span
+                                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border ${travelCountdown.colorClass}`}
+                                        >
+                                          <Clock className="w-3 h-3 shrink-0" />
+                                          <span>{travelCountdown.text}</span>
+                                        </span>
+                                      </div>
+                                    )}
                                   </div>
                                 </td>
                               </>
