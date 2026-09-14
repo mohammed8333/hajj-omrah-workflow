@@ -23,6 +23,7 @@ import {
   Calendar,
   User,
   Clock,
+  MessageSquare,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -249,6 +250,60 @@ export default function RequestsListPage() {
     }
   };
 
+  // فتح محادثة واتساب مع المستضيف برسالة الاستضافة المعتمدة
+  const handleOpenHostWhatsApp = (
+    r: GroupRequestSummary,
+    e: React.MouseEvent
+  ) => {
+    e.stopPropagation();
+    const phone = (r.hostPhone || (r.hasHosting ? r.contactPhone : "") || "").trim();
+    if (!phone) return;
+
+    // اسم المستضيف الأول فقط
+    const hostFirstName = r.hostName?.trim().split(/\s+/)[0] || "";
+    const salutation = hostFirstName
+      ? `السلام عليكم يا أستاذ ${hostFirstName}`
+      : "السلام عليكم يا أستاذ";
+
+    // اسم الشخص اللي عامل login وضغط علي الزر
+    const currentUserName = user?.fullName?.trim() || user?.username || "ممثل شركة إيواء";
+
+    // تكرار السيد ورقم الجواز إذا كان فيه أكثر من مسافر
+    const travelers =
+      r.travelersList && r.travelersList.length > 0
+        ? r.travelersList
+        : [{ fullName: r.groupName || "المعتمر", passportNumber: "" }];
+
+    const travelersLines = travelers
+      .map(
+        (t) =>
+          `السيد ${t.fullName?.trim() || "المعتمر"}\nرقم جواز ${t.passportNumber?.trim() || ""}`.trim()
+      )
+      .join("\n");
+
+    const message = `${salutation}
+مع حضرتك ${currentUserName}
+من شركة إيواء للعمرة 
+ارجو قبول استضافة 
+${travelersLines}
+علما بان المعتمر المذكور تحت مسئولية حضرتك حتى خروجه من المملكة .
+وشكرا`;
+
+    // تنسيق رقم الهاتف الدولي
+    let cleanPhone = phone.replace(/\D/g, "");
+    if (cleanPhone.startsWith("00")) {
+      cleanPhone = cleanPhone.substring(2);
+    }
+    if (cleanPhone.startsWith("05") && cleanPhone.length === 10) {
+      cleanPhone = "966" + cleanPhone.substring(1);
+    } else if (cleanPhone.startsWith("5") && cleanPhone.length === 9) {
+      cleanPhone = "966" + cleanPhone;
+    }
+
+    const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, "_blank");
+  };
+
   const filtered = requests.filter((r) => {
     const term = search.trim().toLowerCase();
     const matchesTerm =
@@ -256,6 +311,8 @@ export default function RequestsListPage() {
       r.groupName.toLowerCase().includes(term) ||
       r.requestNumber.toLowerCase().includes(term) ||
       (r.nusukGroupNumber && r.nusukGroupNumber.toLowerCase().includes(term)) ||
+      (r.hostName && r.hostName.toLowerCase().includes(term)) ||
+      (r.hostPhone && r.hostPhone.includes(term)) ||
       r.contactPhone.includes(term);
 
     if (!matchesTerm) return false;
@@ -583,6 +640,22 @@ export default function RequestsListPage() {
                       </div>
                     </div>
                   </div>
+
+                  {/* زر واتساب المستضيف في نهاية الكارت إذا كان هناك رقم للمستضيف */}
+                  {(r.hostPhone || (r.hasHosting && r.contactPhone)) && (
+                    <button
+                      type="button"
+                      onClick={(e) => handleOpenHostWhatsApp(r, e)}
+                      className="w-full mt-2.5 py-2 px-3 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl flex items-center justify-center gap-2 text-xs font-bold transition-all shadow-xs cursor-pointer"
+                      title="مراسلة المستضيف عبر واتساب"
+                    >
+                      <MessageSquare className="w-4 h-4 fill-white" />
+                      <span>واتساب المستضيف</span>
+                      <span className="text-[11px] font-mono opacity-90 dir-ltr">
+                        ({r.hostPhone || r.contactPhone})
+                      </span>
+                    </button>
+                  )}
                 </div>
               );
             })}
@@ -761,6 +834,18 @@ export default function RequestsListPage() {
                                     <span>فتح</span>
                                     <ArrowRight className="w-3.5 h-3.5 rotate-180" />
                                   </Link>
+
+                                  {(r.hostPhone || (r.hasHosting && r.contactPhone)) && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => handleOpenHostWhatsApp(r, e)}
+                                      className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-2.5 py-1.5 rounded-xl transition-colors shadow-2xs cursor-pointer"
+                                      title="واتساب المستضيف"
+                                    >
+                                      <MessageSquare className="w-3.5 h-3.5 fill-emerald-600 text-emerald-600" />
+                                      <span>واتساب</span>
+                                    </button>
+                                  )}
 
                                   {role === "Admin" && (
                                     <div className="flex items-center gap-1 border-r border-gray-200 pr-1.5 mr-0.5">

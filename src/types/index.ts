@@ -163,6 +163,8 @@ export interface GroupRequestSummary {
   status: RequestStatus;
   nusukGroupNumber?: string;
   hasHosting: boolean;
+  hostName?: string;
+  hostPhone?: string;
   contactPhone: string;
   travelDate?: string;
   departureDate?: string;

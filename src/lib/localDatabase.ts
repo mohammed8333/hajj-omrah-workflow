@@ -938,6 +938,8 @@ class LocalDatabaseEngine {
         status: r.status,
         nusukGroupNumber: r.nusukGroupNumber,
         hasHosting: r.hasHosting,
+        hostName: r.hostingInfo?.hostName,
+        hostPhone: r.hostingInfo?.hostPhone || (r.hasHosting ? r.contactPhone : undefined),
         contactPhone: r.contactPhone,
         travelDate: r.travelDate,
         departureDate: r.departureDate || r.travelDate,

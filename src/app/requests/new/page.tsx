@@ -397,20 +397,13 @@ export default function UnifiedNewRequestPage() {
   const handleSubmit = async (submitDirectlyToSafa: boolean) => {
     setError(null);
 
-    // Validation
-    const isHostingActive = Boolean(hostIdFile || hostPhone.trim() || hasHosting);
-    if (isHostingActive) {
-      if (!hostPhone.trim()) {
-        setError("عند إرفاق هوية المستضيف، يرجى إدخال رقم هاتف المستضيف داخل المملكة.");
-        window.scrollTo({ top: 0, behavior: "smooth" });
-        return;
-      }
-      if (!hostIdFile) {
-        setError("عند إدخال رقم هاتف المستضيف، يرجى إرفاق صورة أو مستند هوية المستضيف.");
-        window.scrollTo({ top: 0, behavior: "smooth" });
-        return;
-      }
+    // رفع هوية المستضيف اختياري، ولو تم رفع هوية المستضيف يبقى لازم كتابة رقم المستضيف
+    if (hostIdFile && !hostPhone.trim()) {
+      setError("عند إرفاق هوية المستضيف، يرجى كتابة رقم المستضيف للمتابعة.");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
     }
+    const isHostingActive = Boolean(hostIdFile || hostPhone.trim() || hasHosting);
 
     if (travelers.length === 0) {
       setError("يرجى إضافة مسافر واحد على الأقل في المعاملة.");
@@ -590,9 +583,9 @@ export default function UnifiedNewRequestPage() {
       )}
 
       {/* استمارة المعاملة والمسافرين - مدمجة بدون سكرول للشاشة الواحدة */}
-      <div className="bg-white rounded-2xl sm:rounded-3xl shadow-xs border border-gray-200 p-2.5 sm:p-4 space-y-2 sm:space-y-3">
+      <div className="bg-white rounded-2xl sm:rounded-3xl shadow-xs border border-gray-200 p-3 sm:p-5 space-y-2.5 sm:space-y-3.5">
         {/* الصف 1: مربع التذكرة على اليمين (طيارة) | مربع هوية المستضيف على الشمال */}
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 items-stretch">
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-3.5 items-stretch">
           {/* 1. تذكرة الطيران (طيارة) */}
           <FileDropArea
             onFileDrop={(file) => handleTicketFileChange(file)}
@@ -604,7 +597,7 @@ export default function UnifiedNewRequestPage() {
             className="rounded-xl h-full"
           >
             {flightTicketFile ? (
-              <div className="relative h-16 sm:h-20 p-1.5 bg-sky-50/70 border border-sky-400 rounded-xl flex flex-col items-center justify-center text-center">
+              <div className="relative h-20 sm:h-24 p-2 bg-sky-50/70 border border-sky-400 rounded-xl flex flex-col items-center justify-center text-center">
                 <button
                   type="button"
                   onClick={(e) => {
@@ -614,26 +607,26 @@ export default function UnifiedNewRequestPage() {
                   className="absolute top-1 left-1 p-0.5 bg-red-100 hover:bg-red-200 text-red-600 rounded-full cursor-pointer transition-colors shadow-2xs"
                   title="إزالة واستبدال التذكرة"
                 >
-                  <X className="w-3 h-3" />
+                  <X className="w-3.5 h-3.5" />
                 </button>
-                <div className="w-6 h-6 rounded-md bg-sky-100 text-sky-700 flex items-center justify-center mb-0.5">
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center mb-0.5">
                   {isScanningTicket ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
-                    <Plane className="w-3.5 h-3.5" />
+                    <Plane className="w-4 h-4" />
                   )}
                 </div>
-                <span className="text-[10px] sm:text-xs font-bold text-gray-900 truncate max-w-[85%]" title={flightTicketFile.name}>
+                <span className="text-[11px] sm:text-xs font-bold text-gray-900 truncate max-w-[85%]" title={flightTicketFile.name}>
                   {flightTicketFile.name}
                 </span>
-                <span className="text-[9px] text-emerald-700 font-bold">
+                <span className="text-[10px] text-emerald-700 font-bold">
                   {isScanningTicket ? "جاري الاستخراج..." : "تم الرفع ✓"}
                 </span>
               </div>
             ) : (
               <label
                 htmlFor="topFlightTicketFile"
-                className="h-16 sm:h-20 flex flex-col items-center justify-center border border-dashed border-sky-300 hover:border-sky-500 bg-sky-50/40 hover:bg-sky-50/70 rounded-xl cursor-pointer transition-all p-1 text-center group"
+                className="h-20 sm:h-24 flex flex-col items-center justify-center border border-dashed border-sky-300 hover:border-sky-500 bg-sky-50/40 hover:bg-sky-50/70 rounded-xl cursor-pointer transition-all p-1.5 text-center group"
               >
                 <input
                   type="file"
@@ -642,10 +635,10 @@ export default function UnifiedNewRequestPage() {
                   onChange={(e) => handleTicketFileChange(e.target.files?.[0] || null)}
                   className="hidden"
                 />
-                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center group-hover:scale-105 transition-transform mb-0.5 shadow-2xs">
-                  <Plane className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center group-hover:scale-105 transition-transform mb-1 shadow-2xs">
+                  <Plane className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
                 </div>
-                <span className="text-[11px] sm:text-xs font-bold text-sky-950">تذكرة الطيران</span>
+                <span className="text-xs sm:text-sm font-bold text-sky-950">تذكرة الطيران</span>
               </label>
             )}
           </FileDropArea>
@@ -661,7 +654,7 @@ export default function UnifiedNewRequestPage() {
             className="rounded-xl h-full"
           >
             {hostIdFile ? (
-              <div className="relative h-16 sm:h-20 p-1.5 bg-amber-50/70 border border-amber-400 rounded-xl flex flex-col items-center justify-center text-center">
+              <div className="relative h-20 sm:h-24 p-2 bg-amber-50/70 border border-amber-400 rounded-xl flex flex-col items-center justify-center text-center">
                 <button
                   type="button"
                   onClick={(e) => {
@@ -673,26 +666,26 @@ export default function UnifiedNewRequestPage() {
                   className="absolute top-1 left-1 p-0.5 bg-red-100 hover:bg-red-200 text-red-600 rounded-full cursor-pointer transition-colors shadow-2xs"
                   title="إزالة واستبدال الهوية"
                 >
-                  <X className="w-3 h-3" />
+                  <X className="w-3.5 h-3.5" />
                 </button>
-                <div className="w-6 h-6 rounded-md bg-amber-100 text-amber-700 flex items-center justify-center mb-0.5 font-bold text-xs">
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center mb-0.5 font-bold text-xs">
                   {isScanningHostId ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
-                    <Home className="w-3.5 h-3.5" />
+                    <Home className="w-4 h-4" />
                   )}
                 </div>
-                <span className="text-[10px] sm:text-xs font-bold text-gray-900 truncate max-w-[85%]" title={hostIdFile.name}>
+                <span className="text-[11px] sm:text-xs font-bold text-gray-900 truncate max-w-[85%]" title={hostIdFile.name}>
                   {hostIdFile.name}
                 </span>
-                <span className="text-[9px] text-emerald-700 font-bold">
+                <span className="text-[10px] text-emerald-700 font-bold">
                   {isScanningHostId ? "جاري الفحص..." : "تم الرفع ✓"}
                 </span>
               </div>
             ) : (
               <label
                 htmlFor="topHostIdFile"
-                className="h-16 sm:h-20 flex flex-col items-center justify-center border border-dashed border-amber-300 hover:border-amber-500 bg-amber-50/40 hover:bg-amber-50/70 rounded-xl cursor-pointer transition-all p-1 text-center group"
+                className="h-20 sm:h-24 flex flex-col items-center justify-center border border-dashed border-amber-300 hover:border-amber-500 bg-amber-50/40 hover:bg-amber-50/70 rounded-xl cursor-pointer transition-all p-1.5 text-center group"
               >
                 <input
                   type="file"
@@ -701,42 +694,37 @@ export default function UnifiedNewRequestPage() {
                   onChange={(e) => handleHostIdFileChange(e.target.files?.[0] || null)}
                   className="hidden"
                 />
-                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center group-hover:scale-105 transition-transform mb-0.5 shadow-2xs">
-                  <Home className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center group-hover:scale-105 transition-transform mb-1 shadow-2xs">
+                  <Home className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
                 </div>
-                <span className="text-[11px] sm:text-xs font-bold text-amber-950">هوية المستضيف</span>
+                <span className="text-xs sm:text-sm font-bold text-amber-950">هوية المستضيف</span>
               </label>
             )}
           </FileDropArea>
         </div>
 
-        {/* الصف 2: مستطيل عريض لرقم المستضيف */}
-        <div className="space-y-0.5">
-          <label className="block text-[11px] sm:text-xs font-bold text-gray-700">
-            رقم المستضيف
-          </label>
-          <div className="relative">
-            <input
-              type="tel"
-              value={hostPhone}
-              onChange={(e) => setHostPhone(e.target.value)}
-              placeholder="اكتب رقم المستضيف (مثال: 05xxxxxxxx)"
-              dir="ltr"
-              className="w-full text-xs sm:text-sm py-1.5 sm:py-2 px-3 bg-gray-50/70 hover:bg-white focus:bg-white border border-gray-300 focus:border-amber-500 rounded-lg sm:rounded-xl focus:outline-none focus:ring-1 focus:ring-amber-500 text-right font-mono font-bold transition-all"
-            />
-            <Phone className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
+        {/* الصف 2: مستطيل رقم المستضيف (بدون label فوقه، placeholder: اكتب رقم المستضيف) */}
+        <div className="relative">
+          <input
+            type="tel"
+            value={hostPhone}
+            onChange={(e) => setHostPhone(e.target.value)}
+            placeholder="اكتب رقم المستضيف"
+            dir="ltr"
+            className="w-full text-xs sm:text-sm py-2 sm:py-2.5 px-3.5 bg-gray-50/70 hover:bg-white focus:bg-white border border-gray-300 focus:border-amber-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 text-right font-mono font-bold transition-all"
+          />
+          <Phone className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
         </div>
 
         {/* خط فاصل أنيق بين الاستضافة والمسافرين */}
         <div className="border-t border-gray-200/80 my-1"></div>
 
         {/* قائمة المسافرين */}
-        <div className="space-y-2 sm:space-y-3">
+        <div className="space-y-2.5 sm:space-y-3.5">
           {travelers.map((traveler, index) => (
             <div
               key={traveler.id}
-              className="bg-gray-50/50 border border-gray-200/90 rounded-xl sm:rounded-2xl p-2 sm:p-3 space-y-2 relative"
+              className="bg-gray-50/50 border border-gray-200/90 rounded-xl sm:rounded-2xl p-2.5 sm:p-3.5 space-y-2.5 relative"
             >
               {/* شريط رأس المسافر (يظهر عند وجود أكثر من مسافر، أو لإظهار الاسم المستخرج) */}
               {travelers.length > 1 ? (
@@ -773,7 +761,7 @@ export default function UnifiedNewRequestPage() {
               ) : null}
 
               {/* الصف 4: على اليمين جواز السفر (ID)، وعلى الشمال الصورة الشخصية (User) */}
-              <div className="grid grid-cols-2 gap-2 sm:gap-3 items-stretch">
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-3.5 items-stretch">
                 {/* 1. جواز السفر (أيكون الـ ID) */}
                 <FileDropArea
                   onFileDrop={(file) => handleFileChange(traveler.id, "passport", file)}
@@ -785,7 +773,7 @@ export default function UnifiedNewRequestPage() {
                   className="rounded-xl h-full"
                 >
                   {traveler.passportFile ? (
-                    <div className="relative h-16 sm:h-20 p-1.5 bg-blue-50/70 border border-blue-400 rounded-xl flex flex-col items-center justify-center text-center">
+                    <div className="relative h-20 sm:h-24 p-2 bg-blue-50/70 border border-blue-400 rounded-xl flex flex-col items-center justify-center text-center">
                       <button
                         type="button"
                         onClick={(e) => {
@@ -795,28 +783,28 @@ export default function UnifiedNewRequestPage() {
                         className="absolute top-1 left-1 p-0.5 bg-red-100 hover:bg-red-200 text-red-600 rounded-full cursor-pointer transition-colors shadow-2xs"
                         title="إزالة واستبدال الجواز"
                       >
-                        <X className="w-3 h-3" />
+                        <X className="w-3.5 h-3.5" />
                       </button>
-                      <div className="w-6 h-6 rounded-md bg-blue-100 text-blue-700 flex items-center justify-center mb-0.5 overflow-hidden">
+                      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center mb-0.5 overflow-hidden">
                         {traveler.isScanning ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <Loader2 className="w-4 h-4 animate-spin" />
                         ) : traveler.passportPreview ? (
                           <img src={traveler.passportPreview} alt="جواز السفر" className="w-full h-full object-cover" />
                         ) : (
-                          <IdCard className="w-3.5 h-3.5" />
+                          <IdCard className="w-4 h-4" />
                         )}
                       </div>
-                      <span className="text-[10px] sm:text-xs font-bold text-gray-900 truncate max-w-[85%]" title={traveler.passportFile.name}>
+                      <span className="text-[11px] sm:text-xs font-bold text-gray-900 truncate max-w-[85%]" title={traveler.passportFile.name}>
                         {traveler.passportFile.name}
                       </span>
-                      <span className="text-[9px] text-emerald-700 font-bold">
+                      <span className="text-[10px] text-emerald-700 font-bold">
                         {traveler.isScanning ? "جاري الفحص..." : "تم الرفع ✓"}
                       </span>
                     </div>
                   ) : (
                     <label
                       htmlFor={`passport-${traveler.id}`}
-                      className="h-16 sm:h-20 flex flex-col items-center justify-center border border-dashed border-blue-300 hover:border-blue-500 bg-blue-50/40 hover:bg-blue-50/70 rounded-xl cursor-pointer transition-all p-1 text-center group"
+                      className="h-20 sm:h-24 flex flex-col items-center justify-center border border-dashed border-blue-300 hover:border-blue-500 bg-blue-50/40 hover:bg-blue-50/70 rounded-xl cursor-pointer transition-all p-1.5 text-center group"
                     >
                       <input
                         type="file"
@@ -825,10 +813,10 @@ export default function UnifiedNewRequestPage() {
                         onChange={(e) => handleFileChange(traveler.id, "passport", e.target.files?.[0] || null)}
                         className="hidden"
                       />
-                      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center group-hover:scale-105 transition-transform mb-0.5 shadow-2xs">
-                        <IdCard className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+                      <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center group-hover:scale-105 transition-transform mb-1 shadow-2xs">
+                        <IdCard className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
                       </div>
-                      <span className="text-[11px] sm:text-xs font-bold text-blue-950">جواز السفر</span>
+                      <span className="text-xs sm:text-sm font-bold text-blue-950">جواز السفر</span>
                     </label>
                   )}
                 </FileDropArea>
@@ -844,7 +832,7 @@ export default function UnifiedNewRequestPage() {
                   className="rounded-xl h-full"
                 >
                   {traveler.photoFile ? (
-                    <div className="relative h-16 sm:h-20 p-1.5 bg-purple-50/70 border border-purple-400 rounded-xl flex flex-col items-center justify-center text-center">
+                    <div className="relative h-20 sm:h-24 p-2 bg-purple-50/70 border border-purple-400 rounded-xl flex flex-col items-center justify-center text-center">
                       <button
                         type="button"
                         onClick={(e) => {
@@ -854,26 +842,26 @@ export default function UnifiedNewRequestPage() {
                         className="absolute top-1 left-1 p-0.5 bg-red-100 hover:bg-red-200 text-red-600 rounded-full cursor-pointer transition-colors shadow-2xs"
                         title="إزالة واستبدال الصورة"
                       >
-                        <X className="w-3 h-3" />
+                        <X className="w-3.5 h-3.5" />
                       </button>
-                      <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center mb-0.5 overflow-hidden border border-purple-300">
+                      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center mb-0.5 overflow-hidden border border-purple-300">
                         {traveler.photoPreview ? (
                           <img src={traveler.photoPreview} alt="الصورة الشخصية" className="w-full h-full object-cover" />
                         ) : (
-                          <User className="w-3.5 h-3.5" />
+                          <User className="w-4 h-4" />
                         )}
                       </div>
-                      <span className="text-[10px] sm:text-xs font-bold text-gray-900 truncate max-w-[85%]" title={traveler.photoFile.name}>
+                      <span className="text-[11px] sm:text-xs font-bold text-gray-900 truncate max-w-[85%]" title={traveler.photoFile.name}>
                         {traveler.photoFile.name}
                       </span>
-                      <span className="text-[9px] text-emerald-700 font-bold">
+                      <span className="text-[10px] text-emerald-700 font-bold">
                         تم الرفع ✓
                       </span>
                     </div>
                   ) : (
                     <label
                       htmlFor={`photo-${traveler.id}`}
-                      className="h-16 sm:h-20 flex flex-col items-center justify-center border border-dashed border-purple-300 hover:border-purple-500 bg-purple-50/40 hover:bg-purple-50/70 rounded-xl cursor-pointer transition-all p-1 text-center group"
+                      className="h-20 sm:h-24 flex flex-col items-center justify-center border border-dashed border-purple-300 hover:border-purple-500 bg-purple-50/40 hover:bg-purple-50/70 rounded-xl cursor-pointer transition-all p-1.5 text-center group"
                     >
                       <input
                         type="file"
@@ -882,32 +870,27 @@ export default function UnifiedNewRequestPage() {
                         onChange={(e) => handleFileChange(traveler.id, "photo", e.target.files?.[0] || null)}
                         className="hidden"
                       />
-                      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center group-hover:scale-105 transition-transform mb-0.5 shadow-2xs">
-                        <User className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+                      <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center group-hover:scale-105 transition-transform mb-1 shadow-2xs">
+                        <User className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
                       </div>
-                      <span className="text-[11px] sm:text-xs font-bold text-purple-950">الصورة الشخصية</span>
+                      <span className="text-xs sm:text-sm font-bold text-purple-950">الصورة الشخصية</span>
                     </label>
                   )}
                 </FileDropArea>
               </div>
 
-              {/* الصف 5: رقم التليفون للمسافر - إجباري */}
-              <div className="space-y-0.5">
-                <label className="block text-[11px] sm:text-xs font-bold text-gray-700">
-                  رقم تليفون المسافر <span className="text-red-500 font-bold">* (إجباري)</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="tel"
-                    dir="ltr"
-                    required
-                    value={traveler.phoneNumber || ""}
-                    onChange={(e) => updateTravelerField(traveler.id, "phoneNumber", e.target.value)}
-                    placeholder="+966..."
-                    className="w-full text-xs sm:text-sm py-1.5 sm:py-2 px-3 bg-white border border-gray-300 focus:border-blue-500 rounded-lg sm:rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono font-bold text-right transition-all"
-                  />
-                  <Phone className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
+              {/* الصف 5: رقم التليفون للمسافر (بدون label فوقه، placeholder: اكتب رقم المسافر) */}
+              <div className="relative">
+                <input
+                  type="tel"
+                  dir="ltr"
+                  required
+                  value={traveler.phoneNumber || ""}
+                  onChange={(e) => updateTravelerField(traveler.id, "phoneNumber", e.target.value)}
+                  placeholder="اكتب رقم المسافر"
+                  className="w-full text-xs sm:text-sm py-2 sm:py-2.5 px-3.5 bg-white border border-gray-300 focus:border-blue-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-mono font-bold text-right transition-all"
+                />
+                <Phone className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
             </div>
           ))}
@@ -917,25 +900,25 @@ export default function UnifiedNewRequestPage() {
         <button
           type="button"
           onClick={addTraveler}
-          className="w-full py-2 sm:py-2.5 border border-dashed border-blue-300 hover:border-blue-500 rounded-xl text-blue-600 hover:text-blue-700 bg-blue-50/30 hover:bg-blue-50/60 flex items-center justify-center gap-1.5 text-xs sm:text-sm font-bold transition-all shadow-2xs cursor-pointer"
+          className="w-full py-2.5 sm:py-3 border border-dashed border-blue-300 hover:border-blue-500 rounded-xl text-blue-600 hover:text-blue-700 bg-blue-50/30 hover:bg-blue-50/60 flex items-center justify-center gap-1.5 text-xs sm:text-sm font-bold transition-all shadow-2xs cursor-pointer"
         >
-          <Plus className="w-3.5 h-3.5" />
+          <Plus className="w-4 h-4" />
           <span>+ إضافة مسافر جديد</span>
         </button>
 
         {/* شريط الإجراءات في الأسفل */}
-        <div className="pt-2 sm:pt-3 border-t border-gray-100 flex flex-col items-center gap-1.5 sm:gap-2">
+        <div className="pt-2.5 sm:pt-3.5 border-t border-gray-100 flex flex-col items-center gap-2">
           <div className="flex items-center justify-between w-full gap-2.5">
             {/* حفظ كمسودة (أيقونة + كلمة مسودة بخط صغير) */}
             <button
               type="button"
               disabled={loading}
               onClick={() => handleSubmit(false)}
-              className="flex items-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-xl border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 shadow-2xs transition-all disabled:opacity-50 cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 shadow-2xs transition-all disabled:opacity-50 cursor-pointer"
               title="حفظ كمسودة"
             >
-              <Save className="w-3.5 h-3.5 text-gray-500 shrink-0" />
-              <span className="text-[11px] sm:text-xs font-bold text-gray-600">مسودة</span>
+              <Save className="w-4 h-4 text-gray-500 shrink-0" />
+              <span className="text-xs font-bold text-gray-600">مسودة</span>
             </button>
 
             {/* حفظ وإرسال للمراجعة (أيقونة + كلمة إرسال) */}
@@ -943,10 +926,10 @@ export default function UnifiedNewRequestPage() {
               type="button"
               disabled={loading}
               onClick={() => handleSubmit(true)}
-              className="flex items-center gap-1.5 px-4 py-1.5 sm:py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm shadow-md hover:shadow-lg transition-all disabled:opacity-50 cursor-pointer shrink-0"
+              className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm shadow-md hover:shadow-lg transition-all disabled:opacity-50 cursor-pointer shrink-0"
               title="حفظ وإرسال للمراجعة مباشرة"
             >
-              <Send className="w-3.5 h-3.5 -rotate-90 shrink-0" />
+              <Send className="w-4 h-4 -rotate-90 shrink-0" />
               <span>إرسال</span>
             </button>
           </div>

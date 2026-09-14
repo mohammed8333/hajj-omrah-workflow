@@ -367,11 +367,20 @@ export const supabaseService = {
         .eq("status", "Pending")
         .in("group_request_id", requestIds);
 
+      // Fetch hosting infos
+      const { data: hostingInfos } = await client
+        .from("hosting_infos")
+        .select("group_request_id, host_name, host_phone")
+        .in("group_request_id", requestIds);
+
       return requests.map((r) => {
         const matchingTravelers = travelers?.filter((t) => t.group_request_id === r.id) || [];
         const tCount = matchingTravelers.length;
         const dCount = docs?.filter((d) => d.group_request_id === r.id).length || 0;
         const cCount = corrections?.filter((c) => c.group_request_id === r.id).length || 0;
+        const hostRow = hostingInfos?.find((h) => h.group_request_id === r.id);
+        const hostPhone = hostRow?.host_phone || (r.has_hosting ? r.contact_phone : undefined);
+        const hostName = hostRow?.host_name || undefined;
 
         const reqTravelers = matchingTravelers.map((t) => {
           const photoDoc = docs?.find(
@@ -405,6 +414,8 @@ export const supabaseService = {
           status: r.status as RequestStatus,
           nusukGroupNumber: r.nusuk_group_number || undefined,
           hasHosting: Boolean(r.has_hosting),
+          hostName: hostName,
+          hostPhone: hostPhone,
           contactPhone: r.contact_phone || "",
           travelDate: r.travel_date || undefined,
           departureDate: r.departure_date || undefined,
