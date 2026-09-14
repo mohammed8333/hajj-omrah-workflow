@@ -441,7 +441,7 @@ export const SafaEmployeeView: React.FC<SafaEmployeeViewProps> = ({
                         dir="ltr"
                         value={editTravelerPhone}
                         onChange={(e) => setEditTravelerPhone(e.target.value)}
-                        placeholder="05xxxxxxxx"
+                        placeholder="010xxxxxxxx"
                         className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg bg-white font-mono text-left"
                       />
                     </div>

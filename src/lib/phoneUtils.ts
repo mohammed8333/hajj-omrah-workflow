@@ -1,7 +1,7 @@
-﻿/**
+/**
  * أداة للتحقق من أرقام الهواتف وتطبيعها (سعودية / مصرية / دولية)
- * - الأرقام السعودية: تبدأ بـ 05 (10 أرقام) -> تصبح +9665xxxxxxxx
- * - الأرقام المصرية: تبدأ بـ 01 (010, 011, 012, 015) (11 رقم) -> تصبح +201xxxxxxxxx
+ * - أرقام المستضيفين: شرط أن تتكون من 10 أرقام وتبدأ بـ 05، وتبدأ بـ +966 متبوعة بالرقم بدون الصفر الأولي (+9665xxxxxxxx)
+ * - أرقام المسافرين: شرط أن تتكون من 11 رقم وتبدأ بـ 010 أو 011 أو 012 أو 015، وتبدأ بـ +20 متبوعة بالرقم بدون الصفر الأولي (+201xxxxxxxxx)
  */
 
 export interface NormalizedPhone {
@@ -10,6 +10,135 @@ export interface NormalizedPhone {
   whatsappDigits: string;
   displayFormatted: string;
   country: "SA" | "EG" | "OTHER";
+}
+
+export interface PhoneValidationResult {
+  isValid: boolean;
+  error?: string;
+  formatted: string;
+  cleanDigits: string;
+  whatsappDigits: string;
+}
+
+/**
+ * التحقق من رقم المستضيف:
+ * - يجب أن يتكون من 10 أرقام ويبدأ بـ 05
+ * - يتم تنسيقه ليبدأ بـ +966 متبوعاً بالرقم بدون الصفر الأولي (مثال: +9665xxxxxxxx)
+ */
+export function validateHostPhone(rawPhone?: string): PhoneValidationResult {
+  if (!rawPhone || !rawPhone.trim()) {
+    return {
+      isValid: false,
+      error: "يرجى إدخال رقم المستضيف.",
+      formatted: "",
+      cleanDigits: "",
+      whatsappDigits: "",
+    };
+  }
+
+  const raw = rawPhone.trim();
+  let digits = raw.replace(/\D/g, "");
+
+  // إذا تم إدخال الرقم بكود دولي 00966 أو 966
+  if (digits.startsWith("00966")) {
+    digits = digits.substring(5);
+  } else if (digits.startsWith("966")) {
+    digits = digits.substring(3);
+  }
+
+  // إذا بدأ بـ 5 وكان 9 أرقام، نعتبره بدون الصفر الأولي
+  if (digits.startsWith("5") && digits.length === 9) {
+    digits = "0" + digits;
+  }
+
+  // الشرط: 10 أرقام ويبدأ بـ 05
+  if (!digits.startsWith("05") || digits.length !== 10) {
+    return {
+      isValid: false,
+      error: "رقم المستضيف يجب أن يتكون من 10 أرقام ويبدأ بـ 05 (مثال: 05XXXXXXXX)",
+      formatted: raw,
+      cleanDigits: digits,
+      whatsappDigits: digits,
+    };
+  }
+
+  const withoutZero = digits.substring(1); // 5xxxxxxxx
+  const formatted = `+966${withoutZero}`;
+  const whatsappDigits = `966${withoutZero}`;
+
+  return {
+    isValid: true,
+    formatted,
+    cleanDigits: digits,
+    whatsappDigits,
+  };
+}
+
+/**
+ * التحقق من رقم المسافر:
+ * - يجب أن يتكون من 11 رقم ويبدأ بـ 010 أو 011 أو 012 أو 015
+ * - يتم تنسيقه ليبدأ بـ +20 متبوعاً بالرقم بدون الصفر الأولي (مثال: +2010xxxxxxxx)
+ */
+export function validateTravelerPhone(rawPhone?: string): PhoneValidationResult {
+  if (!rawPhone || !rawPhone.trim()) {
+    return {
+      isValid: false,
+      error: "يرجى إدخال رقم هاتف المسافر.",
+      formatted: "",
+      cleanDigits: "",
+      whatsappDigits: "",
+    };
+  }
+
+  const raw = rawPhone.trim();
+  let digits = raw.replace(/\D/g, "");
+
+  // إذا تم إدخال الرقم بكود دولي 0020 أو 20
+  if (digits.startsWith("0020")) {
+    digits = digits.substring(4);
+  } else if (digits.startsWith("20") && digits.length === 12) {
+    digits = digits.substring(2);
+  }
+
+  // إذا دخل 10 أرقام تبدأ بـ 10 أو 11 أو 12 أو 15 (بدون الصفر الأولي)
+  if (
+    digits.length === 10 &&
+    (digits.startsWith("10") ||
+      digits.startsWith("11") ||
+      digits.startsWith("12") ||
+      digits.startsWith("15"))
+  ) {
+    digits = "0" + digits;
+  }
+
+  // الشرط: 11 رقم ويبدأ بـ 010 أو 011 أو 012 أو 015
+  const isEgyptianMobile =
+    digits.length === 11 &&
+    (digits.startsWith("010") ||
+      digits.startsWith("011") ||
+      digits.startsWith("012") ||
+      digits.startsWith("015"));
+
+  if (!isEgyptianMobile) {
+    return {
+      isValid: false,
+      error: "رقم المسافر يجب أن يتكون من 11 رقماً ويبدأ بـ 010 أو 011 أو 012 أو 015 (مثال: 010XXXXXXXX)",
+      formatted: raw,
+      cleanDigits: digits,
+      whatsappDigits: digits,
+    };
+  }
+
+  const withoutZero = digits.substring(1); // 1xxxxxxxxx
+  const formatted = `+20${withoutZero}`;
+  const whatsappDigits = `20${withoutZero}`;
+
+  return {
+    isValid: true,
+    formatted,
+    cleanDigits: digits,
+    whatsappDigits,
+  };
 }
 
 export function normalizePhone(rawPhone?: string): NormalizedPhone {
@@ -38,12 +167,12 @@ export function normalizePhone(rawPhone?: string): NormalizedPhone {
       digits.startsWith("012") ||
       digits.startsWith("015"))
   ) {
-    const wa = "20" + digits.substring(1); // 201...
+    const wa = "20" + digits.substring(1);
     return {
       raw,
       cleanDigits: digits,
       whatsappDigits: wa,
-      displayFormatted: "+20 " + digits.substring(1),
+      displayFormatted: "+20" + digits.substring(1),
       country: "EG",
     };
   }
@@ -59,9 +188,9 @@ export function normalizePhone(rawPhone?: string): NormalizedPhone {
     const wa = "20" + digits;
     return {
       raw,
-      cleanDigits: digits,
+      cleanDigits: "0" + digits,
       whatsappDigits: wa,
-      displayFormatted: "+20 " + digits,
+      displayFormatted: "+20" + digits,
       country: "EG",
     };
   }
@@ -70,21 +199,21 @@ export function normalizePhone(rawPhone?: string): NormalizedPhone {
   if (digits.length === 12 && digits.startsWith("201")) {
     return {
       raw,
-      cleanDigits: digits,
+      cleanDigits: "0" + digits.substring(2),
       whatsappDigits: digits,
-      displayFormatted: "+20 " + digits.substring(2),
+      displayFormatted: "+20" + digits.substring(2),
       country: "EG",
     };
   }
 
   // 2. فحص الرقم السعودي: يبدأ بـ 05 وبطول 10 أرقام
   if (digits.length === 10 && digits.startsWith("05")) {
-    const wa = "966" + digits.substring(1); // 9665...
+    const wa = "966" + digits.substring(1);
     return {
       raw,
       cleanDigits: digits,
       whatsappDigits: wa,
-      displayFormatted: "+966 " + digits.substring(1),
+      displayFormatted: "+966" + digits.substring(1),
       country: "SA",
     };
   }
@@ -94,9 +223,9 @@ export function normalizePhone(rawPhone?: string): NormalizedPhone {
     const wa = "966" + digits;
     return {
       raw,
-      cleanDigits: digits,
+      cleanDigits: "0" + digits,
       whatsappDigits: wa,
-      displayFormatted: "+966 " + digits,
+      displayFormatted: "+966" + digits,
       country: "SA",
     };
   }
@@ -105,9 +234,9 @@ export function normalizePhone(rawPhone?: string): NormalizedPhone {
   if (digits.startsWith("9665") && digits.length >= 12) {
     return {
       raw,
-      cleanDigits: digits,
+      cleanDigits: "0" + digits.substring(3),
       whatsappDigits: digits,
-      displayFormatted: "+966 " + digits.substring(3),
+      displayFormatted: "+966" + digits.substring(3),
       country: "SA",
     };
   }
@@ -119,7 +248,7 @@ export function normalizePhone(rawPhone?: string): NormalizedPhone {
       raw,
       cleanDigits: digits,
       whatsappDigits: wa,
-      displayFormatted: "+966 " + digits.substring(1),
+      displayFormatted: "+966" + digits.substring(1),
       country: "SA",
     };
   }

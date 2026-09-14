@@ -37,6 +37,7 @@ import { scanHostId } from "@/lib/hostIdScanner";
 import { scanFlightTicket, calculateAirportArrivalTime } from "@/lib/flightTicketScanner";
 import { useDialog } from "@/lib/dialog-context";
 import { FileDropArea } from "@/components/ui/FileDropArea";
+import { validateHostPhone, validateTravelerPhone } from "@/lib/phoneUtils";
 
 interface TravelerDraft {
   id: string;
@@ -397,9 +398,18 @@ export default function UnifiedNewRequestPage() {
   const handleSubmit = async (submitDirectlyToSafa: boolean) => {
     setError(null);
 
-    // رفع هوية المستضيف اختياري، ولو تم رفع هوية المستضيف يبقى لازم كتابة رقم المستضيف
-    if (hostIdFile && !hostPhone.trim()) {
-      setError("عند إرفاق هوية المستضيف، يرجى كتابة رقم المستضيف للمتابعة.");
+    // التحقق من رقم المستضيف
+    let formattedHostPhone: string | undefined = undefined;
+    if (hostPhone.trim()) {
+      const hostValidation = validateHostPhone(hostPhone);
+      if (!hostValidation.isValid) {
+        setError(hostValidation.error || "رقم المستضيف غير صحيح");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+      formattedHostPhone = hostValidation.formatted; // يبدأ بـ +966 بعدين الرقم من غير الصفر
+    } else if (hostIdFile) {
+      setError("عند إرفاق هوية المستضيف، يرجى كتابة رقم المستضيف (يتكون من 10 أرقام ويبدأ بـ 05).");
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
@@ -410,13 +420,21 @@ export default function UnifiedNewRequestPage() {
       return;
     }
 
-    // Check that every traveler has a phone number (إجباري)
-    const missingPhoneTraveler = travelers.find(
-      (t) => !t.phoneNumber || !t.phoneNumber.trim()
-    );
-    if (missingPhoneTraveler) {
-      setError("رقم تليفون المسافر إجباري، يرجى إدخال رقم الهاتف لكل مسافر للمتابعة.");
-      return;
+    // التحقق من رقم هاتف كل مسافر (إجباري، 11 رقماً ويبدأ بـ 010 أو 011 أو 012 أو 015)
+    for (let i = 0; i < travelers.length; i++) {
+      const t = travelers[i];
+      const travelerLabel = t.fullName?.trim() || `المسافر #${i + 1}`;
+      if (!t.phoneNumber || !t.phoneNumber.trim()) {
+        setError(`رقم تليفون ${travelerLabel} إجباري للمتابعة.`);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+      const travelerValidation = validateTravelerPhone(t.phoneNumber);
+      if (!travelerValidation.isValid) {
+        setError(`رقم هاتف ${travelerLabel} غير صحيح: ${travelerValidation.error}`);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
     }
 
     // Check if at least one document is attached
@@ -454,8 +472,8 @@ export default function UnifiedNewRequestPage() {
           ? `مجموعة ${travelers[0].fullName.trim()}`
           : `طلب جديد ${new Date().toLocaleDateString("ar-SA")}`;
       const contactPhone =
-        hostPhone.trim() ||
-        travelers.find((t) => t.phoneNumber?.trim())?.phoneNumber?.trim() ||
+        formattedHostPhone ||
+        (travelers[0]?.phoneNumber ? validateTravelerPhone(travelers[0].phoneNumber).formatted : "") ||
         "";
 
       // 1. Create Request
@@ -467,7 +485,7 @@ export default function UnifiedNewRequestPage() {
         hostBirthDate: isHostingActive && hostBirthDate.trim() ? hostBirthDate.trim() : undefined,
         hostNationality: isHostingActive && hostNationality.trim() ? hostNationality.trim() : undefined,
         hostNationalId: isHostingActive && hostNationalId.trim() ? hostNationalId.trim() : undefined,
-        hostPhone: isHostingActive ? hostPhone.trim() : undefined,
+        hostPhone: isHostingActive ? formattedHostPhone : undefined,
         airline: airline.trim() || undefined,
         flightNumber: flightNumber.trim() || undefined,
         departureDate: departureDate || undefined,
@@ -507,10 +525,14 @@ export default function UnifiedNewRequestPage() {
         setProgressStep(`جاري تسجيل المسافر (${i + 1} من ${travelers.length})...`);
         setProgressPercent(20 + Math.floor((i / travelers.length) * 40));
 
+        const formattedPhone = t.phoneNumber?.trim()
+          ? validateTravelerPhone(t.phoneNumber).formatted
+          : undefined;
+
         const createdTraveler = await api.travelers.add(createdGroup.id, {
           fullName: t.fullName?.trim() || `مسافر #${i + 1}`,
           passportNumber: t.passportNumber?.trim() || undefined,
-          phoneNumber: t.phoneNumber?.trim() || undefined,
+          phoneNumber: formattedPhone,
           nationality: t.nationality?.trim() || undefined,
           dateOfBirth: t.dateOfBirth?.trim() || undefined,
         });

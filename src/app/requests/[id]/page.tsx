@@ -62,7 +62,7 @@ import { scanFlightTicket, calculateAirportArrivalTime } from "@/lib/flightTicke
 import { getGeminiApiKey, setGeminiApiKey } from "@/lib/geminiVision";
 import { useDialog } from "@/lib/dialog-context";
 import { FileDropArea } from "@/components/ui/FileDropArea";
-import { getWhatsAppUrl, getTelUrl, normalizePhone } from "@/lib/phoneUtils";
+import { getWhatsAppUrl, getTelUrl, normalizePhone, validateHostPhone, validateTravelerPhone } from "@/lib/phoneUtils";
 
 export default function RequestDetailPage({
   requestId: propRequestId,
@@ -389,6 +389,19 @@ export default function RequestDetailPage({
       setError("يرجى كتابة اسم المسافر.");
       return;
     }
+
+    let formattedPhone: string | undefined = undefined;
+    if (phoneNumber !== undefined && phoneNumber.trim()) {
+      const pVal = validateTravelerPhone(phoneNumber);
+      if (!pVal.isValid) {
+        setError(pVal.error || "رقم المسافر غير صحيح");
+        return;
+      }
+      formattedPhone = pVal.formatted;
+    } else if (phoneNumber !== undefined) {
+      formattedPhone = undefined;
+    }
+
     try {
       setActionLoading(true);
       setError(null);
@@ -396,7 +409,7 @@ export default function RequestDetailPage({
       await api.travelers.update(travelerId, {
         fullName: fullName.trim(),
         passportNumber: passportNumber?.trim() || current?.passportNumber,
-        phoneNumber: phoneNumber !== undefined ? (phoneNumber.trim() || undefined) : current?.phoneNumber,
+        phoneNumber: phoneNumber !== undefined ? formattedPhone : current?.phoneNumber,
         nationality: nationality?.trim() || current?.nationality,
         dateOfBirth: dateOfBirth?.trim() || current?.dateOfBirth,
         notes: current?.notes,
@@ -415,6 +428,17 @@ export default function RequestDetailPage({
   const handleSaveHostInfo = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!request) return;
+
+    let formattedHostPhone: string | undefined = undefined;
+    if (editHostPhone.trim()) {
+      const hVal = validateHostPhone(editHostPhone);
+      if (!hVal.isValid) {
+        setError(hVal.error || "رقم المستضيف غير صحيح");
+        return;
+      }
+      formattedHostPhone = hVal.formatted;
+    }
+
     try {
       setActionLoading(true);
       setError(null);
@@ -423,7 +447,7 @@ export default function RequestDetailPage({
         hostName: editHostName.trim(),
         hostBirthDate: editHostBirthDate.trim() || undefined,
         hostNationality: editHostNationality.trim() || undefined,
-        hostPhone: editHostPhone.trim() || undefined,
+        hostPhone: formattedHostPhone,
         hostNationalId: editHostNationalId.trim() || undefined,
       });
       setSuccess("تم تحديث بيانات المستضيف بنجاح.");
@@ -2751,7 +2775,7 @@ export default function RequestDetailPage({
                       dir="ltr"
                       value={editTravelerPhone}
                       onChange={(e) => setEditTravelerPhone(e.target.value)}
-                      placeholder="رقم الهاتف (اختياري)"
+                      placeholder="010xxxxxxxx"
                       className="text-xs px-2.5 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono bg-white w-36 text-right"
                     />
 
