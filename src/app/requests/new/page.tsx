@@ -300,6 +300,7 @@ export default function UnifiedNewRequestPage() {
         prev.map((t) => {
           if (t.id !== travelerId) return t;
           if (result && result.fullNameArabic) {
+            setHostName((current) => current || result.fullNameArabic);
             return {
               ...t,
               fullName: result.fullNameArabic,
@@ -609,577 +610,351 @@ export default function UnifiedNewRequestPage() {
         </div>
       )}
 
-      {/* السطر العلوي: تذكرة الطيران المشتركة + هوية المستضيف + رقم هاتف المستضيف */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-              <Plane className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-sm font-bold text-gray-900">
-                بيانات الرحلة والاستضافة المشتركة
-              </h2>
-              <p className="text-xs text-gray-500">
-                ارفع تذكرة الطيران وهوية المستضيف ورقم هاتفه (يستخرج الذكاء الاصطناعي كافة التفاصيل تلقائياً)
-              </p>
-            </div>
+      {/* استمارة المعاملة والمسافرين - مطابقة للمخطط المطلوب */}
+      <div className="bg-white rounded-3xl shadow-sm border border-gray-200 p-4 sm:p-6 space-y-4">
+        {/* الصف 1: مربع التذكرة على اليمين | مربع هوية المستضيف على الشمال */}
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 items-stretch">
+          {/* 1. المربع الأول فوق على اليمين: أيكون للتذكرة فقط (بدون نصوص إضافية معقدة) */}
+          <FileDropArea
+            onFileDrop={(file) => handleTicketFileChange(file)}
+            accept=".pdf,.jpg,.jpeg,.png"
+            maxSizeMb={15}
+            activeBorderColor="sky"
+            overlayText="أفلت التذكرة هنا"
+            onError={(msg) => alert({ title: "تنبيه", message: msg, variant: "warning" })}
+            className="rounded-2xl h-full"
+          >
+            {flightTicketFile ? (
+              <div className="relative h-28 sm:h-32 p-2.5 bg-sky-50/70 border-2 border-sky-400 rounded-2xl flex flex-col items-center justify-center text-center">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleTicketFileChange(null);
+                  }}
+                  className="absolute top-1.5 left-1.5 p-1 bg-red-100 hover:bg-red-200 text-red-600 rounded-full cursor-pointer transition-colors shadow-2xs"
+                  title="إزالة واستبدال التذكرة"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+                <div className="w-10 h-10 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center mb-1">
+                  {isScanningTicket ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <Ticket className="w-5 h-5" />
+                  )}
+                </div>
+                <span className="text-xs font-bold text-gray-900 truncate max-w-[90%]" title={flightTicketFile.name}>
+                  {flightTicketFile.name}
+                </span>
+                <span className="text-[10px] text-emerald-700 font-bold mt-0.5">
+                  {isScanningTicket ? "جاري الاستخراج (AI)..." : "تم رفع التذكرة ✓"}
+                </span>
+              </div>
+            ) : (
+              <label
+                htmlFor="topFlightTicketFile"
+                className="h-28 sm:h-32 flex flex-col items-center justify-center border-2 border-dashed border-sky-300 hover:border-sky-500 bg-sky-50/30 hover:bg-sky-50/60 rounded-2xl cursor-pointer transition-all p-2 text-center group"
+              >
+                <input
+                  type="file"
+                  id="topFlightTicketFile"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={(e) => handleTicketFileChange(e.target.files?.[0] || null)}
+                  className="hidden"
+                />
+                <div className="w-12 h-12 rounded-2xl bg-sky-100 text-sky-700 flex items-center justify-center group-hover:scale-110 transition-transform mb-1.5 shadow-2xs">
+                  <Ticket className="w-6 h-6" />
+                </div>
+                <span className="text-xs font-bold text-sky-950">تذكرة الطيران</span>
+              </label>
+            )}
+          </FileDropArea>
+
+          {/* 2. المربع الثاني فوق على الشمال: أيكون لهوية المستضيف */}
+          <FileDropArea
+            onFileDrop={(file) => handleHostIdFileChange(file)}
+            accept=".pdf,.jpg,.jpeg,.png"
+            maxSizeMb={10}
+            activeBorderColor="amber"
+            overlayText="أفلت الهوية هنا"
+            onError={(msg) => alert({ title: "تنبيه", message: msg, variant: "warning" })}
+            className="rounded-2xl h-full"
+          >
+            {hostIdFile ? (
+              <div className="relative h-28 sm:h-32 p-2.5 bg-amber-50/70 border-2 border-amber-400 rounded-2xl flex flex-col items-center justify-center text-center">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setHostIdFile(null);
+                    setHostScanSuccess(false);
+                    setHostScanMessage("");
+                  }}
+                  className="absolute top-1.5 left-1.5 p-1 bg-red-100 hover:bg-red-200 text-red-600 rounded-full cursor-pointer transition-colors shadow-2xs"
+                  title="إزالة واستبدال الهوية"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+                <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center mb-1 font-bold text-sm">
+                  {isScanningHostId ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <Home className="w-5 h-5" />
+                  )}
+                </div>
+                <span className="text-xs font-bold text-gray-900 truncate max-w-[90%]" title={hostIdFile.name}>
+                  {hostIdFile.name}
+                </span>
+                <span className="text-[10px] text-emerald-700 font-bold mt-0.5">
+                  {isScanningHostId ? "جاري الفحص (OCR)..." : "تم رفع الهوية ✓"}
+                </span>
+              </div>
+            ) : (
+              <label
+                htmlFor="topHostIdFile"
+                className="h-28 sm:h-32 flex flex-col items-center justify-center border-2 border-dashed border-amber-300 hover:border-amber-500 bg-amber-50/30 hover:bg-amber-50/60 rounded-2xl cursor-pointer transition-all p-2 text-center group"
+              >
+                <input
+                  type="file"
+                  id="topHostIdFile"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={(e) => handleHostIdFileChange(e.target.files?.[0] || null)}
+                  className="hidden"
+                />
+                <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center group-hover:scale-110 transition-transform mb-1.5 shadow-2xs">
+                  <Home className="w-6 h-6" />
+                </div>
+                <span className="text-xs font-bold text-amber-950">هوية المستضيف</span>
+              </label>
+            )}
+          </FileDropArea>
+        </div>
+
+        {/* الصف 2: مستطيل عريض لرقم المستضيف */}
+        <div className="space-y-1">
+          <label className="block text-xs font-bold text-gray-700">
+            رقم المستضيف
+          </label>
+          <div className="relative">
+            <input
+              type="tel"
+              value={hostPhone}
+              onChange={(e) => setHostPhone(e.target.value)}
+              placeholder="اكتب رقم المستضيف (مثال: 05xxxxxxxx)"
+              dir="ltr"
+              className="w-full text-sm py-2.5 px-3.5 bg-gray-50/70 hover:bg-white focus:bg-white border border-gray-300 focus:border-amber-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 text-right font-mono font-bold transition-all"
+            />
+            <Phone className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
-          <div className="flex items-center gap-2">
-            {isScanningTicket && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-sky-50 text-sky-700 border border-sky-200 animate-pulse">
-                <Loader2 className="w-3 h-3 animate-spin" />
-                جاري استخراج بيانات التذكرة (AI)...
+        </div>
+
+        {/* الصف 3: المستطيل لاسم المستضيف (يُستخرج من الهوية / الجواز تلقائياً) */}
+        <div className="space-y-1 sm:max-w-md">
+          <label className="block text-xs font-bold text-gray-700 flex items-center justify-between">
+            <span>اسم المستضيف</span>
+            {(hostScanSuccess || hostName) && (
+              <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" /> تم الاستخراج
               </span>
             )}
-            {isScanningHostId && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 animate-pulse">
-                <Loader2 className="w-3 h-3 animate-spin" />
-                جاري فحص هوية المستضيف (OCR)...
-              </span>
-            )}
-          </div>
+          </label>
+          <input
+            type="text"
+            value={hostName}
+            onChange={(e) => setHostName(e.target.value)}
+            placeholder="اسم المستضيف (يُستخرج تلقائياً)"
+            className="w-full text-xs py-2.5 px-3 bg-gray-50/70 hover:bg-white focus:bg-white border border-gray-300 focus:border-amber-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 font-bold text-gray-900 transition-all"
+          />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
-          {/* 1. تذكرة الطيران المشتركة */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-gray-800 flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <Ticket className="w-4 h-4 text-sky-600" />
-                <span>تذكرة الطيران</span>
-              </span>
-              {ticketScanSuccess && (
-                <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3" /> تم الاستخراج
-                </span>
-              )}
-            </label>
+        {/* خط فاصل أنيق بين الاستضافة والمسافرين */}
+        <div className="border-t border-gray-200/80 pt-2"></div>
 
-            <FileDropArea
-              onFileDrop={(file) => handleTicketFileChange(file)}
-              accept=".pdf,.jpg,.jpeg,.png"
-              maxSizeMb={15}
-              activeBorderColor="sky"
-              overlayText="أفلت تذكرة الطيران هنا"
-              overlaySubtext="استخراج تلقائي فوري بالذكاء الاصطناعي"
-              onError={(msg) => alert({ title: "تنبيه", message: msg, variant: "warning" })}
-              className="rounded-xl"
-            >
-              {flightTicketFile ? (
-                <div className="p-3 bg-sky-50/50 border border-sky-200 rounded-xl relative flex items-center justify-between gap-2 min-h-[92px]">
-                  <div className="flex items-center gap-2.5 overflow-hidden">
-                    <div className="w-10 h-10 bg-sky-100 text-sky-700 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 border border-sky-200">
-                      <Ticket className="w-5 h-5" />
-                    </div>
-                    <div className="overflow-hidden">
-                      <p className="text-xs font-bold text-gray-800 truncate" title={flightTicketFile.name}>
-                        {flightTicketFile.name}
-                      </p>
-                      <p className="text-[10px] text-gray-500">
-                        {formatFileSize(flightTicketFile.size)}
-                      </p>
-                      {ticketScanSuccess && airline && (
-                        <p className="text-[10px] text-emerald-700 font-semibold truncate mt-0.5">
-                          {airline} {flightNumber ? `(${flightNumber})` : ""}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      type="button"
-                      disabled={isScanningTicket}
-                      onClick={() => runTicketScan(flightTicketFile)}
-                      className="p-1.5 bg-sky-100 hover:bg-sky-200 text-sky-700 rounded-lg text-xs transition-colors disabled:opacity-50 cursor-pointer"
-                      title="إعادة الفحص بالذكاء الاصطناعي"
-                    >
-                      <RotateCcw className={`w-3.5 h-3.5 ${isScanningTicket ? "animate-spin" : ""}`} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleTicketFileChange(null)}
-                      className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs transition-colors cursor-pointer"
-                      title="إزالة واستبدال"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <input
-                    type="file"
-                    id="topFlightTicketFile"
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    onChange={(e) => handleTicketFileChange(e.target.files?.[0] || null)}
-                    className="hidden"
-                  />
-                  <label
-                    htmlFor="topFlightTicketFile"
-                    className="w-full flex flex-col items-center justify-center py-4 px-3 border-2 border-dashed border-sky-300 hover:border-sky-500 rounded-xl cursor-pointer bg-sky-50/20 hover:bg-sky-50/60 transition-all text-center min-h-[92px]"
-                  >
-                    <Upload className="w-5 h-5 text-sky-600 mb-1" />
-                    <span className="text-xs font-bold text-sky-700">
-                      رفع أو سحب التذكرة
-                    </span>
-                    <span className="text-[10px] text-gray-400 mt-0.5">
-                      PDF, JPG, PNG (AI تلقائي)
-                    </span>
-                  </label>
-                </div>
-              )}
-            </FileDropArea>
-          </div>
-
-          {/* 2. هوية المستضيف */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-gray-800 flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <Home className="w-4 h-4 text-amber-600" />
-                <span>هوية المستضيف</span>
-              </span>
-              {hostScanSuccess && (
-                <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3" /> تم الاستخراج
-                </span>
-              )}
-            </label>
-
-            <FileDropArea
-              onFileDrop={(file) => handleHostIdFileChange(file)}
-              accept=".pdf,.jpg,.jpeg,.png"
-              maxSizeMb={10}
-              activeBorderColor="amber"
-              overlayText="أفلت هوية المستضيف هنا"
-              overlaySubtext="فحص واستخراج تلقائي بالـ OCR"
-              onError={(msg) => alert({ title: "تنبيه", message: msg, variant: "warning" })}
-              className="rounded-xl"
-            >
-              {hostIdFile ? (
-                <div className="p-3 bg-amber-50/50 border border-amber-200 rounded-xl relative flex items-center justify-between gap-2 min-h-[92px]">
-                  <div className="flex items-center gap-2.5 overflow-hidden">
-                    <div className="w-10 h-10 bg-amber-100 text-amber-700 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 border border-amber-200">
-                      ID
-                    </div>
-                    <div className="overflow-hidden">
-                      <p className="text-xs font-bold text-gray-800 truncate" title={hostIdFile.name}>
-                        {hostIdFile.name}
-                      </p>
-                      <p className="text-[10px] text-gray-500">
-                        {formatFileSize(hostIdFile.size)}
-                      </p>
-                      {hostScanSuccess && hostName && (
-                        <p className="text-[10px] text-emerald-700 font-semibold truncate mt-0.5">
-                          {hostName}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-1 shrink-0">
-                    {hostIdFile.type.startsWith("image/") && (
-                      <button
-                        type="button"
-                        disabled={isScanningHostId}
-                        onClick={() => runHostIdScan(hostIdFile)}
-                        className="p-1.5 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-lg text-xs transition-colors disabled:opacity-50 cursor-pointer"
-                        title="إعادة فحص الهوية بالـ OCR"
-                      >
-                        <RotateCcw className={`w-3.5 h-3.5 ${isScanningHostId ? "animate-spin" : ""}`} />
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setHostIdFile(null);
-                        setHostScanSuccess(false);
-                        setHostScanMessage("");
-                      }}
-                      className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs transition-colors cursor-pointer"
-                      title="إزالة واستبدال"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <input
-                    type="file"
-                    id="topHostIdFile"
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    onChange={(e) => handleHostIdFileChange(e.target.files?.[0] || null)}
-                    className="hidden"
-                  />
-                  <label
-                    htmlFor="topHostIdFile"
-                    className="w-full flex flex-col items-center justify-center py-4 px-3 border-2 border-dashed border-amber-300 hover:border-amber-500 rounded-xl cursor-pointer bg-amber-50/20 hover:bg-amber-50/60 transition-all text-center min-h-[92px]"
-                  >
-                    <Upload className="w-5 h-5 text-amber-600 mb-1" />
-                    <span className="text-xs font-bold text-amber-700">
-                      رفع أو سحب الهوية
-                    </span>
-                    <span className="text-[10px] text-gray-400 mt-0.5">
-                      PDF, JPG, PNG (OCR تلقائي)
-                    </span>
-                  </label>
-                </div>
-              )}
-            </FileDropArea>
-          </div>
-
-          {/* 3. رقم هاتف المستضيف */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-gray-800 flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <Phone className="w-4 h-4 text-emerald-600" />
-                <span>رقم هاتف المستضيف</span>
-              </span>
-              <span className="text-[10px] text-gray-400 font-normal">
-                داخل المملكة
-              </span>
-            </label>
-            <div className="min-h-[92px] p-3 bg-gray-50/60 rounded-xl border border-gray-200 flex flex-col justify-center">
-              <input
-                type="tel"
-                value={hostPhone}
-                onChange={(e) => setHostPhone(e.target.value)}
-                placeholder="05XXXXXXXX"
-                dir="ltr"
-                className="w-full text-sm px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 text-right font-mono font-medium"
-              />
-              <span className="text-[10px] text-gray-500 mt-1.5 block">
-                مطلوب في حال إرفاق مستند هوية المستضيف
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* سطر المسافرين: جواز السفر + الاسم ورقم الجواز + الصورة الشخصية + رقم الموبايل */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
-            <Users className="w-5 h-5 text-blue-600" />
-            <span>بيانات ومستندات المسافرين ({travelers.length})</span>
-          </h2>
-        </div>
-
+        {/* قائمة المسافرين */}
         <div className="space-y-4">
           {travelers.map((traveler, index) => (
             <div
               key={traveler.id}
-              className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 space-y-4 relative"
+              className="bg-gray-50/50 border border-gray-200/90 rounded-2xl p-3.5 sm:p-4 space-y-3 relative"
             >
-              {/* ترويسة بطاقة المسافر */}
-              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                <div className="flex items-center gap-2.5 flex-wrap">
-                  <span className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold">
+              {/* شريط رأس المسافر (يظهر عند وجود أكثر من مسافر) */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-800 flex items-center justify-center text-xs font-bold">
                     {index + 1}
                   </span>
-                  <h3 className="text-sm font-bold text-gray-900">
-                    {traveler.fullName?.trim() ? (
-                      <span className="text-blue-900 font-extrabold">{traveler.fullName}</span>
-                    ) : (
-                      <span>المسافر #{index + 1}</span>
-                    )}
-                  </h3>
-                  {traveler.isScanning ? (
-                    <span className="inline-flex items-center gap-1.5 text-xs text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full animate-pulse">
-                      <Loader2 className="w-3 h-3 animate-spin text-blue-600" />
-                      <span>جاري قراءة الجواز (MRZ)...</span>
+                  <span className="text-xs font-bold text-gray-800">
+                    {traveler.fullName?.trim() ? traveler.fullName : `المسافر #${index + 1}`}
+                  </span>
+                  {traveler.passportNumber && (
+                    <span className="text-[10px] text-gray-500 font-mono">
+                      ({traveler.passportNumber})
                     </span>
-                  ) : traveler.scanSuccess ? (
-                    <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-bold">
-                      <Sparkles className="w-3 h-3 text-emerald-600" />
-                      <span>تم استخراج الاسم والجواز ✓</span>
-                    </span>
-                  ) : null}
+                  )}
                 </div>
 
                 {travelers.length > 1 && (
                   <button
                     type="button"
                     onClick={() => removeTraveler(traveler.id)}
-                    className="text-xs text-red-600 hover:text-red-800 flex items-center gap-1 py-1 px-2.5 rounded-lg hover:bg-red-50 transition-colors font-medium cursor-pointer"
+                    className="text-xs text-red-600 hover:text-red-800 flex items-center gap-1 p-1 rounded-lg hover:bg-red-50 transition-colors font-medium cursor-pointer"
+                    title="حذف المسافر"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                    <span>حذف المسافر</span>
+                    <span>حذف</span>
                   </button>
                 )}
               </div>
 
-              {/* شبكة مدخلات ومستندات المسافر */}
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
-                {/* 1. جواز السفر (رفع أو سحب) - 4 أعمدة */}
-                <div className="md:col-span-4 space-y-1.5">
-                  <label className="block text-xs font-bold text-gray-800 flex items-center justify-between">
-                    <span className="flex items-center gap-1.5">
-                      <FileText className="w-4 h-4 text-blue-600" />
-                      <span>جواز السفر</span>
-                    </span>
-                    {traveler.passportFile && (
-                      <span className="text-[10px] text-green-700 bg-green-100 px-1.5 py-0.5 rounded font-bold">
-                        مرفوع ✓
+              {/* الصف 4: على اليمين جواز السفر، وعلى الشمال الصورة الشخصية */}
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 items-stretch">
+                {/* 1. جواز السفر (على اليمين) */}
+                <FileDropArea
+                  onFileDrop={(file) => handleFileChange(traveler.id, "passport", file)}
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  maxSizeMb={10}
+                  activeBorderColor="blue"
+                  overlayText="أفلت جواز السفر هنا"
+                  onError={(msg) => alert({ title: "تنبيه", message: msg, variant: "warning" })}
+                  className="rounded-2xl h-full"
+                >
+                  {traveler.passportFile ? (
+                    <div className="relative h-28 sm:h-32 p-2.5 bg-blue-50/70 border-2 border-blue-400 rounded-2xl flex flex-col items-center justify-center text-center">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleFileChange(traveler.id, "passport", null);
+                        }}
+                        className="absolute top-1.5 left-1.5 p-1 bg-red-100 hover:bg-red-200 text-red-600 rounded-full cursor-pointer transition-colors shadow-2xs"
+                        title="إزالة واستبدال الجواز"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                      <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center mb-1 overflow-hidden">
+                        {traveler.isScanning ? (
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : traveler.passportPreview ? (
+                          <img src={traveler.passportPreview} alt="جواز السفر" className="w-full h-full object-cover" />
+                        ) : (
+                          <FileText className="w-5 h-5" />
+                        )}
+                      </div>
+                      <span className="text-xs font-bold text-gray-900 truncate max-w-[90%]" title={traveler.passportFile.name}>
+                        {traveler.passportFile.name}
                       </span>
-                    )}
-                  </label>
-
-                  <FileDropArea
-                    onFileDrop={(file) => handleFileChange(traveler.id, "passport", file)}
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    maxSizeMb={10}
-                    activeBorderColor="blue"
-                    overlayText="أفلت جواز السفر هنا"
-                    overlaySubtext="فحص واستخراج شريط MRZ تلقائياً"
-                    onError={(msg) => alert({ title: "تنبيه", message: msg, variant: "warning" })}
-                    className="rounded-xl"
-                  >
-                    {traveler.passportFile ? (
-                      <div className="p-3 bg-blue-50/40 border border-blue-200 rounded-xl flex items-center justify-between gap-2 min-h-[92px]">
-                        <div className="flex items-center gap-2.5 overflow-hidden">
-                          {traveler.passportPreview ? (
-                            <img
-                              src={traveler.passportPreview}
-                              alt="جواز السفر"
-                              className="w-12 h-12 object-cover rounded-lg border border-blue-300 shrink-0"
-                            />
-                          ) : (
-                            <div className="w-12 h-12 bg-red-100 text-red-600 rounded-lg flex items-center justify-center font-bold text-xs shrink-0">
-                              PDF
-                            </div>
-                          )}
-                          <div className="overflow-hidden">
-                            <p className="text-xs font-bold text-gray-800 truncate" title={traveler.passportFile.name}>
-                              {traveler.passportFile.name}
-                            </p>
-                            <p className="text-[10px] text-gray-500">
-                              {formatFileSize(traveler.passportFile.size)}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-1 shrink-0">
-                          {traveler.passportFile.type.startsWith("image/") && (
-                            <button
-                              type="button"
-                              disabled={traveler.isScanning}
-                              onClick={() => runMrzScanForTraveler(traveler.id, traveler.passportFile!)}
-                              className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg text-xs transition-colors disabled:opacity-50 cursor-pointer"
-                              title="إعادة فحص الجواز"
-                            >
-                              <RotateCcw className={`w-3.5 h-3.5 ${traveler.isScanning ? "animate-spin" : ""}`} />
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => handleFileChange(traveler.id, "passport", null)}
-                            className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs transition-colors cursor-pointer"
-                            title="إزالة واستبدال"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div>
-                        <input
-                          type="file"
-                          id={`passport-${traveler.id}`}
-                          accept=".pdf,.jpg,.jpeg,.png"
-                          onChange={(e) => handleFileChange(traveler.id, "passport", e.target.files?.[0] || null)}
-                          className="hidden"
-                        />
-                        <label
-                          htmlFor={`passport-${traveler.id}`}
-                          className="w-full flex flex-col items-center justify-center py-4 px-3 border-2 border-dashed border-blue-300 hover:border-blue-500 rounded-xl cursor-pointer bg-blue-50/20 hover:bg-blue-50/60 transition-all text-center min-h-[92px]"
-                        >
-                          <Upload className="w-5 h-5 text-blue-600 mb-1" />
-                          <span className="text-xs font-bold text-blue-700">
-                            رفع أو سحب الجواز
-                          </span>
-                          <span className="text-[10px] text-gray-400 mt-0.5">
-                            PDF, JPG, PNG (MRZ تلقائي)
-                          </span>
-                        </label>
-                      </div>
-                    )}
-                  </FileDropArea>
-                </div>
-
-                {/* 2. اسم المسافر ورقم الجواز (ظاهرين في الصفحة) - 4 أعمدة */}
-                <div className="md:col-span-4 space-y-2.5">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1 flex items-center justify-between">
-                      <span>اسم المسافر</span>
-                      {traveler.scanSuccess && traveler.fullName && (
-                        <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-0.5">
-                          <CheckCircle2 className="w-3 h-3" /> مستخرج تلقائياً
-                        </span>
-                      )}
-                    </label>
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        type="text"
-                        value={traveler.fullName || ""}
-                        onChange={(e) => updateTravelerField(traveler.id, "fullName", e.target.value)}
-                        placeholder="اسم المسافر (يُستخرج من الجواز)"
-                        className="w-full text-xs px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
-                      />
-                      {traveler.fullName && /[A-Za-z]/.test(traveler.fullName) && (
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            const tr = await translateEnglishNameToArabic(traveler.fullName!);
-                            if (tr) updateTravelerField(traveler.id, "fullName", tr);
-                          }}
-                          className="shrink-0 px-2 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold rounded-lg border border-blue-200 flex items-center gap-1 transition-colors cursor-pointer"
-                          title="ترجمة إلى العربية"
-                        >
-                          <Languages className="w-3.5 h-3.5" />
-                          <span>ترجمة</span>
-                        </button>
-                      )}
+                      <span className="text-[10px] text-emerald-700 font-bold mt-0.5">
+                        {traveler.isScanning ? "جاري فحص MRZ..." : "تم رفع الجواز ✓"}
+                      </span>
                     </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1 flex items-center justify-between">
-                      <span>رقم جواز السفر</span>
-                      {traveler.nationality && (
-                        <span className="text-[10px] text-gray-500">
-                          {traveler.nationality}
-                        </span>
-                      )}
+                  ) : (
+                    <label
+                      htmlFor={`passport-${traveler.id}`}
+                      className="h-28 sm:h-32 flex flex-col items-center justify-center border-2 border-dashed border-blue-300 hover:border-blue-500 bg-blue-50/30 hover:bg-blue-50/60 rounded-2xl cursor-pointer transition-all p-2 text-center group"
+                    >
+                      <input
+                        type="file"
+                        id={`passport-${traveler.id}`}
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(e) => handleFileChange(traveler.id, "passport", e.target.files?.[0] || null)}
+                        className="hidden"
+                      />
+                      <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center group-hover:scale-110 transition-transform mb-1.5 shadow-2xs">
+                        <FileText className="w-6 h-6" />
+                      </div>
+                      <span className="text-xs font-bold text-blue-950">جواز السفر</span>
                     </label>
-                    <input
-                      type="text"
-                      value={traveler.passportNumber || ""}
-                      onChange={(e) => updateTravelerField(traveler.id, "passportNumber", e.target.value.toUpperCase())}
-                      placeholder="رقم الجواز (يُستخرج من الجواز)"
-                      className="w-full text-xs px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono font-bold"
-                    />
-                  </div>
-                </div>
+                  )}
+                </FileDropArea>
 
-                {/* 3. الصورة الشخصية - عمودين */}
-                <div className="md:col-span-2 space-y-1.5">
-                  <label className="block text-xs font-bold text-gray-800 flex items-center justify-between">
-                    <span className="flex items-center gap-1.5">
-                      <ImageIcon className="w-4 h-4 text-purple-600" />
-                      <span>الصورة الشخصية</span>
-                    </span>
-                    {traveler.photoFile && (
-                      <span className="text-[10px] text-green-700 bg-green-100 px-1.5 py-0.5 rounded font-bold">
-                        مرفوعة ✓
+                {/* 2. الصورة الشخصية (على الشمال) */}
+                <FileDropArea
+                  onFileDrop={(file) => handleFileChange(traveler.id, "photo", file)}
+                  accept=".jpg,.jpeg,.png"
+                  maxSizeMb={10}
+                  activeBorderColor="purple"
+                  overlayText="أفلت الصورة هنا"
+                  onError={(msg) => alert({ title: "تنبيه", message: msg, variant: "warning" })}
+                  className="rounded-2xl h-full"
+                >
+                  {traveler.photoFile ? (
+                    <div className="relative h-28 sm:h-32 p-2.5 bg-purple-50/70 border-2 border-purple-400 rounded-2xl flex flex-col items-center justify-center text-center">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleFileChange(traveler.id, "photo", null);
+                        }}
+                        className="absolute top-1.5 left-1.5 p-1 bg-red-100 hover:bg-red-200 text-red-600 rounded-full cursor-pointer transition-colors shadow-2xs"
+                        title="إزالة واستبدال الصورة"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                      <div className="w-10 h-10 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center mb-1 overflow-hidden border border-purple-300">
+                        {traveler.photoPreview ? (
+                          <img src={traveler.photoPreview} alt="الصورة الشخصية" className="w-full h-full object-cover" />
+                        ) : (
+                          <ImageIcon className="w-5 h-5" />
+                        )}
+                      </div>
+                      <span className="text-xs font-bold text-gray-900 truncate max-w-[90%]" title={traveler.photoFile.name}>
+                        {traveler.photoFile.name}
                       </span>
-                    )}
-                  </label>
-
-                  <FileDropArea
-                    onFileDrop={(file) => handleFileChange(traveler.id, "photo", file)}
-                    accept=".jpg,.jpeg,.png"
-                    maxSizeMb={10}
-                    activeBorderColor="purple"
-                    overlayText="أفلت الصورة هنا"
-                    overlaySubtext="خلفية بيضاء (JPG, PNG)"
-                    onError={(msg) => alert({ title: "تنبيه", message: msg, variant: "warning" })}
-                    className="rounded-xl"
-                  >
-                    {traveler.photoFile ? (
-                      <div className="p-2.5 bg-purple-50/40 border border-purple-200 rounded-xl flex items-center justify-between gap-2 min-h-[92px]">
-                        <div className="flex items-center gap-2 overflow-hidden">
-                          {traveler.photoPreview && (
-                            <img
-                              src={traveler.photoPreview}
-                              alt="الصورة"
-                              className="w-10 h-10 object-cover rounded-full border border-purple-300 shrink-0"
-                            />
-                          )}
-                          <div className="overflow-hidden">
-                            <p className="text-[11px] font-bold text-gray-800 truncate" title={traveler.photoFile.name}>
-                              {traveler.photoFile.name}
-                            </p>
-                            <p className="text-[9px] text-gray-500">
-                              {formatFileSize(traveler.photoFile.size)}
-                            </p>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleFileChange(traveler.id, "photo", null)}
-                          className="p-1 text-red-600 hover:text-red-800 shrink-0 cursor-pointer"
-                          title="إزالة واستبدال"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
+                      <span className="text-[10px] text-emerald-700 font-bold mt-0.5">
+                        تم رفع الصورة ✓
+                      </span>
+                    </div>
+                  ) : (
+                    <label
+                      htmlFor={`photo-${traveler.id}`}
+                      className="h-28 sm:h-32 flex flex-col items-center justify-center border-2 border-dashed border-purple-300 hover:border-purple-500 bg-purple-50/30 hover:bg-purple-50/60 rounded-2xl cursor-pointer transition-all p-2 text-center group"
+                    >
+                      <input
+                        type="file"
+                        id={`photo-${traveler.id}`}
+                        accept=".jpg,.jpeg,.png"
+                        onChange={(e) => handleFileChange(traveler.id, "photo", e.target.files?.[0] || null)}
+                        className="hidden"
+                      />
+                      <div className="w-12 h-12 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center group-hover:scale-110 transition-transform mb-1.5 shadow-2xs">
+                        <ImageIcon className="w-6 h-6" />
                       </div>
-                    ) : (
-                      <div>
-                        <input
-                          type="file"
-                          id={`photo-${traveler.id}`}
-                          accept=".jpg,.jpeg,.png"
-                          onChange={(e) => handleFileChange(traveler.id, "photo", e.target.files?.[0] || null)}
-                          className="hidden"
-                        />
-                        <label
-                          htmlFor={`photo-${traveler.id}`}
-                          className="w-full flex flex-col items-center justify-center py-4 px-2 border-2 border-dashed border-purple-300 hover:border-purple-500 rounded-xl cursor-pointer bg-purple-50/20 hover:bg-purple-50/60 transition-all text-center min-h-[92px]"
-                        >
-                          <Upload className="w-4 h-4 text-purple-600 mb-1" />
-                          <span className="text-xs font-bold text-purple-700">
-                            رفع الصورة
-                          </span>
-                          <span className="text-[9px] text-gray-400 mt-0.5">
-                            خلفية بيضاء
-                          </span>
-                        </label>
-                      </div>
-                    )}
-                  </FileDropArea>
-                </div>
+                      <span className="text-xs font-bold text-purple-950">الصورة الشخصية</span>
+                    </label>
+                  )}
+                </FileDropArea>
+              </div>
 
-                {/* 4. رقم موبايل المسافر - عمودين */}
-                <div className="md:col-span-2 space-y-1.5">
-                  <label className="block text-xs font-bold text-gray-800 flex items-center justify-between">
-                    <span className="flex items-center gap-1.5">
-                      <Phone className="w-4 h-4 text-emerald-600" />
-                      <span>رقم الموبايل</span>
-                    </span>
-                    <span className="text-[10px] text-gray-400 font-normal">
-                      اختياري
-                    </span>
-                  </label>
-                  <div className="min-h-[92px] p-2.5 bg-gray-50/60 rounded-xl border border-gray-200 flex flex-col justify-center">
-                    <input
-                      type="tel"
-                      dir="ltr"
-                      value={traveler.phoneNumber || ""}
-                      onChange={(e) => updateTravelerField(traveler.id, "phoneNumber", e.target.value)}
-                      placeholder="+966..."
-                      className="w-full text-xs px-2.5 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-right"
-                    />
-                    <span className="text-[10px] text-gray-400 mt-1 block">
-                      للتواصل والمتابعة
-                    </span>
-                  </div>
+              {/* الصف 5: رقم التليفون للمسافر */}
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-gray-700">
+                  رقم تليفون المسافر
+                </label>
+                <div className="relative">
+                  <input
+                    type="tel"
+                    dir="ltr"
+                    value={traveler.phoneNumber || ""}
+                    onChange={(e) => updateTravelerField(traveler.id, "phoneNumber", e.target.value)}
+                    placeholder="+966..."
+                    className="w-full text-sm py-2.5 px-3.5 bg-white border border-gray-300 focus:border-blue-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-mono font-bold text-right transition-all"
+                  />
+                  <Phone className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
               </div>
             </div>
           ))}
         </div>
 
-        {/* زر مسافر جديد */}
+        {/* الصف 6 (آخر حاجة تحت خالص): زر إضافة مسافر جديد */}
         <button
           type="button"
           onClick={addTraveler}
-          className="w-full py-3.5 border-2 border-dashed border-blue-300 hover:border-blue-500 rounded-2xl text-blue-600 hover:text-blue-700 bg-blue-50/40 hover:bg-blue-50 flex items-center justify-center gap-2 text-sm font-bold transition-all shadow-xs cursor-pointer"
+          className="w-full py-3.5 border-2 border-dashed border-blue-300 hover:border-blue-500 rounded-2xl text-blue-600 hover:text-blue-700 bg-blue-50/30 hover:bg-blue-50/60 flex items-center justify-center gap-2 text-sm font-bold transition-all shadow-xs cursor-pointer"
         >
           <Plus className="w-4 h-4" />
-          <span>+ مسافر جديد</span>
+          <span>+ إضافة مسافر جديد</span>
         </button>
       </div>
 
