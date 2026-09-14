@@ -749,25 +749,6 @@ export default function UnifiedNewRequestPage() {
           </div>
         </div>
 
-        {/* الصف 3: المستطيل لاسم المستضيف (يُستخرج من الهوية / الجواز تلقائياً) */}
-        <div className="space-y-1 sm:max-w-md">
-          <label className="block text-xs font-bold text-gray-700 flex items-center justify-between">
-            <span>اسم المستضيف</span>
-            {(hostScanSuccess || hostName) && (
-              <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3" /> تم الاستخراج
-              </span>
-            )}
-          </label>
-          <input
-            type="text"
-            value={hostName}
-            onChange={(e) => setHostName(e.target.value)}
-            placeholder="اسم المستضيف (يُستخرج تلقائياً)"
-            className="w-full text-xs py-2.5 px-3 bg-gray-50/70 hover:bg-white focus:bg-white border border-gray-300 focus:border-amber-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 font-bold text-gray-900 transition-all"
-          />
-        </div>
-
         {/* خط فاصل أنيق بين الاستضافة والمسافرين */}
         <div className="border-t border-gray-200/80 pt-2"></div>
 
