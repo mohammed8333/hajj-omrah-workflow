@@ -143,6 +143,13 @@ export interface Transfer {
   status: string;
 }
 
+export interface TravelerSummaryItem {
+  id: string;
+  fullName: string;
+  passportNumber?: string;
+  photoUrl?: string;
+}
+
 export interface GroupRequestSummary {
   id: string;
   requestNumber: string;
@@ -166,6 +173,7 @@ export interface GroupRequestSummary {
   flightNumber?: string;
   destination?: string;
   travelersCount: number;
+  travelersList?: TravelerSummaryItem[];
   documentsCount: number;
   pendingCorrectionsCount: number;
   createdAt: string;

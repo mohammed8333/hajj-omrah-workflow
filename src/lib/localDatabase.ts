@@ -911,6 +911,20 @@ class LocalDatabaseEngine {
         (c) => c.status === "Pending"
       ).length;
 
+      const reqTravelers = (r.travelers || []).map((t) => {
+        const photoDoc =
+          t.documents?.find((d) => d.documentType === "PersonalPhoto") ||
+          r.groupDocuments?.find(
+            (d) => d.travelerId === t.id && d.documentType === "PersonalPhoto"
+          );
+        return {
+          id: t.id,
+          fullName: t.fullName || "مسافر",
+          passportNumber: t.passportNumber,
+          photoUrl: (photoDoc as any)?.storageUrl || (photoDoc as any)?.fileDataUrl,
+        };
+      });
+
       const summary: GroupRequestSummary = {
         id: r.id,
         requestNumber: r.requestNumber,
@@ -934,6 +948,7 @@ class LocalDatabaseEngine {
         flightNumber: r.flightNumber,
         destination: r.destination,
         travelersCount: r.travelers.length,
+        travelersList: reqTravelers,
         documentsCount: docCount,
         pendingCorrectionsCount: pendingCorrections,
         createdAt: r.createdAt,

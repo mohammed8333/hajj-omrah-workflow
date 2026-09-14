@@ -347,16 +347,17 @@ export const supabaseService = {
 
       const requestIds = requests.map((r) => r.id);
 
-      // Fetch traveler counts
+      // Fetch traveler counts & details
       const { data: travelers } = await client
         .from("travelers")
-        .select("id, group_request_id")
-        .in("group_request_id", requestIds);
+        .select("id, group_request_id, full_name, passport_number, created_at")
+        .in("group_request_id", requestIds)
+        .order("created_at", { ascending: true });
 
-      // Fetch document counts
+      // Fetch document counts & traveler photos
       const { data: docs } = await client
         .from("documents")
-        .select("id, group_request_id")
+        .select("id, group_request_id, traveler_id, document_type, storage_url, storage_path")
         .in("group_request_id", requestIds);
 
       // Fetch pending corrections count
@@ -367,9 +368,29 @@ export const supabaseService = {
         .in("group_request_id", requestIds);
 
       return requests.map((r) => {
-        const tCount = travelers?.filter((t) => t.group_request_id === r.id).length || 0;
+        const matchingTravelers = travelers?.filter((t) => t.group_request_id === r.id) || [];
+        const tCount = matchingTravelers.length;
         const dCount = docs?.filter((d) => d.group_request_id === r.id).length || 0;
         const cCount = corrections?.filter((c) => c.group_request_id === r.id).length || 0;
+
+        const reqTravelers = matchingTravelers.map((t) => {
+          const photoDoc = docs?.find(
+            (d) => d.traveler_id === t.id && d.document_type === "PersonalPhoto"
+          );
+          let photoUrl = photoDoc?.storage_url;
+          if (!photoUrl && photoDoc?.storage_path) {
+            const { data: pubData } = client.storage
+              .from(BUCKET_NAME)
+              .getPublicUrl(photoDoc.storage_path);
+            photoUrl = pubData?.publicUrl;
+          }
+          return {
+            id: t.id,
+            fullName: t.full_name || "مسافر",
+            passportNumber: t.passport_number || undefined,
+            photoUrl: photoUrl || undefined,
+          };
+        });
 
         return {
           id: r.id,
@@ -394,6 +415,7 @@ export const supabaseService = {
           flightNumber: r.flight_number || undefined,
           destination: r.destination || undefined,
           travelersCount: tCount,
+          travelersList: reqTravelers,
           documentsCount: dCount,
           pendingCorrectionsCount: cCount,
           createdAt: r.created_at,

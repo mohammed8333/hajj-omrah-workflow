@@ -20,6 +20,9 @@ import {
   X,
   Archive,
   Trash2,
+  Plane,
+  Calendar,
+  User,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -305,275 +308,363 @@ export default function RequestsListPage() {
         <>
           {/* Mobile Cards View (phones) */}
           <div className="block md:hidden space-y-3">
-            {filtered.map((r) => (
-              <div
-                key={r.id}
-                className="bg-white rounded-2xl border border-gray-200 p-4 shadow-xs space-y-3"
-              >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <span className="text-xs font-mono font-bold bg-gray-100 text-gray-800 px-2 py-0.5 rounded-md">
-                      {r.requestNumber}
-                    </span>
-                    <h3 className="text-sm font-bold text-gray-900 mt-1.5">{r.groupName}</h3>
-                  </div>
-                  <RequestStatusBadge status={r.status} />
-                </div>
+            {filtered.map((r) => {
+              const travelers =
+                r.travelersList && r.travelersList.length > 0
+                  ? r.travelersList
+                  : [{ id: `fb-${r.id}`, fullName: r.groupName || "بدون اسم", passportNumber: undefined, photoUrl: undefined }];
 
-                {/* Prominent Nusuk Bar on Phone */}
-                <div className="flex items-center justify-between bg-gray-50 p-2.5 rounded-xl border border-gray-100 text-xs">
-                  <span className="text-gray-500 font-medium flex items-center gap-1">
-                    <Hash className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>رقم مجموعة نسك:</span>
-                  </span>
-                  {r.nusukGroupNumber ? (
+              return (
+                <div
+                  key={r.id}
+                  className="bg-white rounded-2xl border border-gray-200 p-4 shadow-xs space-y-3"
+                >
+                  <div className="flex justify-between items-start gap-2">
+                    {/* رقم مجموعة نسك */}
                     <div className="flex items-center gap-1.5">
-                      <span className="font-mono font-bold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-md text-xs">
-                        {r.nusukGroupNumber}
-                      </span>
-                      <button
-                        onClick={(e) => copyToClipboard(r.nusukGroupNumber!, e)}
-                        className="text-gray-400 hover:text-emerald-700 p-1"
-                        title="نسخ رقم نسك"
-                      >
-                        {copiedNusuk === r.nusukGroupNumber ? (
-                          <Check className="w-3.5 h-3.5 text-emerald-600" />
-                        ) : (
-                          <Copy className="w-3.5 h-3.5" />
-                        )}
-                      </button>
-                    </div>
-                  ) : (
-                    <span className="text-gray-400 text-[11px]">غير مسجل بعد</span>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 text-[11px] text-gray-500 pt-1">
-                  <div>
-                    <span>المسافرين: </span>
-                    <span className="font-bold text-gray-800">{r.travelersCount}</span>
-                  </div>
-                  <div dir="ltr" className="text-right">
-                    <span>{r.contactPhone}</span>
-                  </div>
-                  <div>
-                    <span>الاستضافة: </span>
-                    <span className={r.hasHosting ? "text-amber-700 font-bold" : "text-gray-400"}>
-                      {r.hasHosting ? "مشتركة" : "بدون"}
-                    </span>
-                  </div>
-                  <div className="text-left text-gray-400">
-                    {new Date(r.createdAt).toLocaleDateString("ar-SA")}
-                  </div>
-                </div>
-
-                {/* Lifecycle Timer on Mobile */}
-                <div className="pt-2 border-t border-gray-100 flex items-center justify-between gap-2">
-                  <RequestLifecycleTimer
-                    createdAt={r.createdAt}
-                    travelDate={r.travelDate}
-                    departureDate={r.departureDate}
-                    flightDepartureTime={r.flightDepartureTime}
-                    status={r.status}
-                    mode="compact"
-                  />
-                  <span className="text-[11px] text-gray-400">
-                    {new Date(r.createdAt).toLocaleDateString("ar-SA")}
-                  </span>
-                </div>
-
-                {/* Action Buttons on Card */}
-                <div className="pt-2 border-t border-gray-100 flex items-center justify-between gap-2 flex-wrap">
-                  <Link
-                    href={`/requests/${r.id}`}
-                    className="inline-flex items-center justify-center gap-1.5 text-xs font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 px-3 py-1.5 rounded-xl transition-colors cursor-pointer"
-                  >
-                    <span>عرض التفاصيل</span>
-                    <ArrowRight className="w-3.5 h-3.5 rotate-180" />
-                  </Link>
-
-                  {role === "Admin" && (
-                    <div className="flex items-center gap-1.5">
-                      {r.status === "Archived" ? (
-                        <button
-                          type="button"
-                          onClick={(e) => handleAdminUnarchive(r.id, e)}
-                          className="inline-flex items-center gap-1 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2.5 py-1.5 rounded-xl transition-colors cursor-pointer"
-                          title="إلغاء الأرشفة"
-                        >
-                          <Archive className="w-3.5 h-3.5" />
-                          <span>إلغاء الأرشفة</span>
-                        </button>
+                      <span className="text-xs text-gray-500 font-medium">نسك:</span>
+                      {r.nusukGroupNumber ? (
+                        <div className="flex items-center gap-1">
+                          <span className="font-mono font-bold text-emerald-800 bg-emerald-50 border border-emerald-300 px-2 py-0.5 rounded-md text-xs">
+                            {r.nusukGroupNumber}
+                          </span>
+                          <button
+                            onClick={(e) => copyToClipboard(r.nusukGroupNumber!, e)}
+                            className="text-gray-400 hover:text-emerald-700 p-0.5 cursor-pointer"
+                            title="نسخ رقم نسك"
+                          >
+                            {copiedNusuk === r.nusukGroupNumber ? (
+                              <Check className="w-3.5 h-3.5 text-emerald-600" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        </div>
                       ) : (
+                        <span className="text-gray-400 text-xs italic">قيد التسجيل</span>
+                      )}
+                    </div>
+                    <RequestStatusBadge status={r.status} />
+                  </div>
+
+                  {/* بيانات الرحلة وتاريخ السفر */}
+                  <div className="flex items-center justify-between text-xs bg-gray-50/80 p-2.5 rounded-xl border border-gray-100">
+                    <div className="flex items-center gap-1.5">
+                      <Plane className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                      <span className="font-bold text-gray-800 font-mono">
+                        {r.flightNumber || r.airline || "تذكرة مشتركة"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 text-gray-600">
+                      <Calendar className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                      <span>
+                        {r.departureDate || r.travelDate
+                          ? new Date(r.departureDate || r.travelDate!).toLocaleDateString("ar-SA")
+                          : "لم يُحدد"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* قائمة المعتمرين مع الصور */}
+                  <div className="space-y-1.5 pt-1">
+                    <span className="text-[11px] font-bold text-gray-500 block">
+                      المعتمرون ({travelers.length}):
+                    </span>
+                    <div className="space-y-1.5">
+                      {travelers.map((t, idx) => (
+                        <div
+                          key={t.id || idx}
+                          className="flex items-center gap-2.5 bg-gray-50/60 p-2 rounded-xl border border-gray-100"
+                        >
+                          {t.photoUrl ? (
+                            <img
+                              src={t.photoUrl}
+                              alt={t.fullName}
+                              className="w-8 h-8 rounded-full object-cover border border-purple-300 shrink-0 shadow-2xs"
+                            />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-purple-50 text-purple-700 border border-purple-200 flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
+                              {t.fullName && t.fullName.trim() ? (
+                                t.fullName.trim().charAt(0)
+                              ) : (
+                                <User className="w-4 h-4 text-purple-600" />
+                              )}
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <span className="text-xs font-bold text-gray-900 truncate block">
+                              {t.fullName}
+                            </span>
+                            {t.passportNumber && (
+                              <span className="text-[10px] text-gray-400 font-mono block">
+                                جواز: {t.passportNumber}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Actions on Mobile */}
+                  <div className="pt-2 border-t border-gray-100 flex items-center justify-between gap-2">
+                    <Link
+                      href={`/requests/${r.id}`}
+                      className="inline-flex items-center justify-center gap-1.5 text-xs font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-3 py-1.5 rounded-xl transition-colors cursor-pointer"
+                    >
+                      <span>عرض التفاصيل</span>
+                      <ArrowRight className="w-3.5 h-3.5 rotate-180" />
+                    </Link>
+
+                    {role === "Admin" && (
+                      <div className="flex items-center gap-1.5">
+                        {r.status === "Archived" ? (
+                          <button
+                            type="button"
+                            onClick={(e) => handleAdminUnarchive(r.id, e)}
+                            className="p-1.5 text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-xl transition-colors cursor-pointer"
+                            title="إلغاء الأرشفة"
+                          >
+                            <Archive className="w-3.5 h-3.5" />
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => handleAdminArchive(r.id, e)}
+                            className="p-1.5 text-purple-800 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-xl transition-colors cursor-pointer"
+                            title="أرشفة"
+                          >
+                            <Archive className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                         <button
                           type="button"
-                          onClick={(e) => handleAdminArchive(r.id, e)}
-                          className="inline-flex items-center gap-1 text-xs font-bold text-purple-800 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-2.5 py-1.5 rounded-xl transition-colors cursor-pointer"
-                          title="أرشفة المعاملة"
+                          onClick={(e) => handleAdminDelete(r.id, r.requestNumber, e)}
+                          className="p-1.5 text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-xl transition-colors cursor-pointer"
+                          title="مسح المعاملة"
                         >
-                          <Archive className="w-3.5 h-3.5" />
-                          <span>أرشفة</span>
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={(e) => handleAdminDelete(r.id, r.requestNumber, e)}
-                        className="inline-flex items-center gap-1 text-xs font-bold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-2.5 py-1.5 rounded-xl transition-colors cursor-pointer"
-                        title="مسح المعاملة"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>مسح</span>
-                      </button>
-                    </div>
-                  )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
-          {/* Desktop Table View */}
+          {/* Desktop Table View with Merged Rows for Travelers */}
           <div className="hidden md:block bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-right text-xs">
-                <thead className="bg-gray-50/80 border-b border-gray-200 text-gray-600 font-semibold">
+              <table className="w-full text-right text-xs border-collapse">
+                <thead className="bg-gray-50/90 border-b border-gray-200 text-gray-700 font-bold">
                   <tr>
-                    <th className="py-3.5 px-4">رقم المعاملة</th>
-                    <th className="py-3.5 px-4">اسم المجموعة / العميل</th>
-                    <th className="py-3.5 px-4">الحالة</th>
                     <th className="py-3.5 px-4">رقم مجموعة نسك</th>
-                    <th className="py-3.5 px-4">المسافرين</th>
-                    <th className="py-3.5 px-4">الاستضافة</th>
-                    <th className="py-3.5 px-4">دورة المعاملة</th>
-                    <th className="py-3.5 px-4">تاريخ الإنشاء</th>
+                    <th className="py-3.5 px-4 text-center">الحالة</th>
+                    <th className="py-3.5 px-4">بيانات الرحلة والتاريخ</th>
+                    <th className="py-3.5 px-4">اسم المعتمر</th>
+                    <th className="py-3.5 px-4 text-center">صورة المعتمر</th>
                     <th className="py-3.5 px-4 text-center">الإجراء</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {filtered.map((r) => {
-                    const isNusukMatch =
-                      search.trim() &&
-                      r.nusukGroupNumber &&
-                      r.nusukGroupNumber.toLowerCase().includes(search.trim().toLowerCase());
+                {filtered.map((r, rIdx) => {
+                  const isNusukMatch =
+                    Boolean(search.trim()) &&
+                    Boolean(r.nusukGroupNumber) &&
+                    r.nusukGroupNumber!.toLowerCase().includes(search.trim().toLowerCase());
 
-                    return (
-                      <tr key={r.id} className="hover:bg-gray-50/60 transition-colors">
-                        <td className="py-3.5 px-4 font-mono font-bold text-gray-900">
-                          {r.requestNumber}
-                        </td>
-                        <td className="py-3.5 px-4 font-semibold text-gray-900">
-                          <div>{r.groupName}</div>
-                          <div className="text-[11px] text-gray-400 font-normal font-mono" dir="ltr">
-                            {r.contactPhone}
-                          </div>
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <RequestStatusBadge status={r.status} />
-                        </td>
-                        {/* Nusuk Group Number Column */}
-                        <td className="py-3.5 px-4 font-mono">
-                          {r.nusukGroupNumber ? (
-                            <div className="inline-flex items-center gap-1.5">
-                              <span
-                                className={`px-2.5 py-1 rounded-md text-xs font-bold font-mono transition-all ${
-                                  isNusukMatch
-                                    ? "bg-emerald-600 text-white ring-2 ring-emerald-300"
-                                    : "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                                }`}
-                              >
-                                {r.nusukGroupNumber}
-                              </span>
-                              <button
-                                onClick={(e) => copyToClipboard(r.nusukGroupNumber!, e)}
-                                className="text-gray-400 hover:text-emerald-700 p-1 cursor-pointer transition-colors"
-                                title="نسخ رقم نسك"
-                              >
-                                {copiedNusuk === r.nusukGroupNumber ? (
-                                  <Check className="w-3.5 h-3.5 text-emerald-600" />
-                                ) : (
-                                  <Copy className="w-3.5 h-3.5" />
-                                )}
-                              </button>
-                            </div>
-                          ) : (
-                            <span className="text-gray-300 text-[11px]">-</span>
-                          )}
-                        </td>
-                        <td className="py-3.5 px-4 text-gray-700">
-                          <span className="font-bold">{r.travelersCount}</span> مسافر
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <span
-                            className={`px-2 py-0.5 rounded-full text-[11px] ${
-                              r.hasHosting
-                                ? "bg-amber-50 text-amber-800 font-medium"
-                                : "text-gray-400"
-                            }`}
-                          >
-                            {r.hasHosting ? "مشتركة" : "بدون"}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <RequestLifecycleTimer
-                            createdAt={r.createdAt}
-                            travelDate={r.travelDate}
-                            departureDate={r.departureDate}
-                            flightDepartureTime={r.flightDepartureTime}
-                            status={r.status}
-                            mode="compact"
-                          />
-                        </td>
-                        <td className="py-3.5 px-4 text-gray-500 whitespace-nowrap">
-                          {new Date(r.createdAt).toLocaleDateString("ar-SA")}
-                        </td>
-                        <td className="py-3.5 px-4 text-center">
-                          <div className="inline-flex items-center gap-1.5 justify-center">
-                            <Link
-                              href={`/requests/${r.id}`}
-                              className="inline-flex items-center gap-1 text-sky-600 hover:text-sky-800 font-bold bg-sky-50 px-2.5 py-1.5 rounded-lg transition-colors"
-                              title="فتح المعاملة"
-                            >
-                              <span>فتح</span>
-                              <ArrowRight className="w-3.5 h-3.5 rotate-180" />
-                            </Link>
+                  const travelers =
+                    r.travelersList && r.travelersList.length > 0
+                      ? r.travelersList
+                      : [{ id: `fb-${r.id}`, fullName: r.groupName || "بدون اسم", passportNumber: undefined, photoUrl: undefined }];
 
-                            {role === "Admin" && (
-                              <div className="flex items-center gap-1 border-r border-gray-200 pr-1.5 mr-0.5">
-                                {r.status === "Archived" ? (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => handleAdminUnarchive(r.id, e)}
-                                    className="p-1.5 text-amber-700 hover:bg-amber-100 rounded-lg cursor-pointer transition-colors"
-                                    title="إلغاء الأرشفة"
-                                  >
-                                    <Archive className="w-3.5 h-3.5" />
-                                  </button>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => handleAdminArchive(r.id, e)}
-                                    className="p-1.5 text-purple-700 hover:bg-purple-100 rounded-lg cursor-pointer transition-colors"
-                                    title="أرشفة المعاملة"
-                                  >
-                                    <Archive className="w-3.5 h-3.5" />
-                                  </button>
-                                )}
+                  const rowCount = travelers.length;
 
-                                <button
-                                  type="button"
-                                  onClick={(e) => handleAdminDelete(r.id, r.requestNumber, e)}
-                                  className="p-1.5 text-red-600 hover:bg-red-100 rounded-lg cursor-pointer transition-colors"
-                                  title="مسح المعاملة نهائياً"
+                  return (
+                    <tbody
+                      key={r.id}
+                      className={`divide-y divide-gray-100 border-b-2 border-gray-200/90 transition-colors ${
+                        rIdx % 2 === 0 ? "bg-white" : "bg-slate-50/40"
+                      } hover:bg-sky-50/30`}
+                    >
+                      {travelers.map((t, tIdx) => {
+                        return (
+                          <tr key={`${r.id}-${t.id || tIdx}`} className="transition-colors">
+                            {/* Merged Columns (Rendered on first row only with rowSpan) */}
+                            {tIdx === 0 && (
+                              <>
+                                {/* 1. رقم مجموعة نسك */}
+                                <td
+                                  rowSpan={rowCount}
+                                  className="py-3.5 px-4 align-middle border-l border-gray-100 font-mono"
                                 >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
+                                  {r.nusukGroupNumber ? (
+                                    <div className="inline-flex items-center gap-1.5">
+                                      <span
+                                        className={`px-2.5 py-1 rounded-md text-xs font-bold font-mono transition-all ${
+                                          isNusukMatch
+                                            ? "bg-emerald-600 text-white ring-2 ring-emerald-300"
+                                            : "bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-2xs"
+                                        }`}
+                                      >
+                                        {r.nusukGroupNumber}
+                                      </span>
+                                      <button
+                                        onClick={(e) => copyToClipboard(r.nusukGroupNumber!, e)}
+                                        className="text-gray-400 hover:text-emerald-700 p-1 cursor-pointer transition-colors"
+                                        title="نسخ رقم نسك"
+                                      >
+                                        {copiedNusuk === r.nusukGroupNumber ? (
+                                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                        ) : (
+                                          <Copy className="w-3.5 h-3.5" />
+                                        )}
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <span className="text-gray-400 text-xs italic">قيد التسجيل</span>
+                                  )}
+                                </td>
+
+                                {/* 2. الحالة */}
+                                <td
+                                  rowSpan={rowCount}
+                                  className="py-3.5 px-4 align-middle text-center border-l border-gray-100"
+                                >
+                                  <RequestStatusBadge status={r.status} />
+                                </td>
+
+                                {/* 3. بيانات الرحلة: رقم الرحلة فوق وتحتيها التاريخ */}
+                                <td
+                                  rowSpan={rowCount}
+                                  className="py-3.5 px-4 align-middle border-l border-gray-100"
+                                >
+                                  <div className="space-y-1">
+                                    <div className="font-bold text-gray-900 flex items-center gap-1.5 text-xs">
+                                      <Plane className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                                      <span className="font-mono uppercase">
+                                        {r.flightNumber || r.airline || "تذكرة مشتركة"}
+                                      </span>
+                                    </div>
+                                    <div className="text-[11px] text-gray-600 flex items-center gap-1.5">
+                                      <Calendar className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                                      <span>
+                                        {r.departureDate || r.travelDate
+                                          ? new Date(r.departureDate || r.travelDate!).toLocaleDateString("ar-SA")
+                                          : "لم يُحدد"}
+                                      </span>
+                                    </div>
+                                    {(r.departureDate || r.travelDate) && (
+                                      <div className="pt-0.5">
+                                        <RequestLifecycleTimer
+                                          createdAt={r.createdAt}
+                                          travelDate={r.travelDate}
+                                          departureDate={r.departureDate}
+                                          flightDepartureTime={r.flightDepartureTime}
+                                          status={r.status}
+                                          mode="compact"
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                              </>
                             )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
+
+                            {/* 4. اسم المعتمر */}
+                            <td className="py-3 px-4 align-middle border-l border-gray-100">
+                              <div className="font-bold text-gray-900 text-xs">
+                                {t.fullName}
+                              </div>
+                              {t.passportNumber && (
+                                <div className="text-[10px] text-gray-500 font-mono mt-0.5">
+                                  جواز: {t.passportNumber}
+                                </div>
+                              )}
+                            </td>
+
+                            {/* 5. صورة المعتمر مصغرة زي بروفايل */}
+                            <td className="py-3 px-4 align-middle text-center border-l border-gray-100">
+                              <div className="flex items-center justify-center">
+                                {t.photoUrl ? (
+                                  <img
+                                    src={t.photoUrl}
+                                    alt={t.fullName}
+                                    className="w-9 h-9 rounded-full object-cover border border-purple-300 shadow-2xs hover:scale-110 transition-transform cursor-pointer"
+                                    title={`صورة المعتمر: ${t.fullName}`}
+                                  />
+                                ) : (
+                                  <div
+                                    className="w-9 h-9 rounded-full bg-purple-50 text-purple-700 border border-purple-200 flex items-center justify-center font-bold text-xs shadow-2xs"
+                                    title="لا توجد صورة شخصية"
+                                  >
+                                    {t.fullName && t.fullName.trim() ? (
+                                      t.fullName.trim().charAt(0)
+                                    ) : (
+                                      <User className="w-4 h-4 text-purple-600" />
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* 6. الإجراء (Merged for the whole group) */}
+                            {tIdx === 0 && (
+                              <td
+                                rowSpan={rowCount}
+                                className="py-3.5 px-4 align-middle text-center"
+                              >
+                                <div className="inline-flex items-center gap-1.5 justify-center">
+                                  <Link
+                                    href={`/requests/${r.id}`}
+                                    className="inline-flex items-center gap-1 text-xs font-bold text-sky-700 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-3 py-1.5 rounded-xl transition-colors shadow-2xs cursor-pointer"
+                                    title="فتح المعاملة"
+                                  >
+                                    <span>فتح</span>
+                                    <ArrowRight className="w-3.5 h-3.5 rotate-180" />
+                                  </Link>
+
+                                  {role === "Admin" && (
+                                    <div className="flex items-center gap-1 border-r border-gray-200 pr-1.5 mr-0.5">
+                                      {r.status === "Archived" ? (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => handleAdminUnarchive(r.id, e)}
+                                          className="p-1.5 text-amber-700 hover:bg-amber-100 rounded-lg cursor-pointer transition-colors"
+                                          title="إلغاء الأرشفة"
+                                        >
+                                          <Archive className="w-3.5 h-3.5" />
+                                        </button>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => handleAdminArchive(r.id, e)}
+                                          className="p-1.5 text-purple-700 hover:bg-purple-100 rounded-lg cursor-pointer transition-colors"
+                                          title="أرشفة المعاملة"
+                                        >
+                                          <Archive className="w-3.5 h-3.5" />
+                                        </button>
+                                      )}
+
+                                      <button
+                                        type="button"
+                                        onClick={(e) => handleAdminDelete(r.id, r.requestNumber, e)}
+                                        className="p-1.5 text-red-600 hover:bg-red-100 rounded-lg cursor-pointer transition-colors"
+                                        title="مسح المعاملة نهائياً"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                            )}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  );
+                })}
               </table>
             </div>
           </div>
