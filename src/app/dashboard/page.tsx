@@ -24,11 +24,128 @@ import {
   X,
   Archive,
   Trash2,
+  Plane,
+  Calendar,
+  User,
+  MessageSquare,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { RequestLifecycleTimer } from "@/components/ui/RequestLifecycleTimer";
 import { useDialog } from "@/lib/dialog-context";
+import { getWhatsAppUrl } from "@/lib/phoneUtils";
+
+// اقتطاع الاسم الثلاثي فقط (3 مقاطع كحد أقصى)
+function getThreePartName(fullName?: string): string {
+  if (!fullName) return "بدون اسم";
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length <= 3) return parts.join(" ");
+  return parts.slice(0, 3).join(" ");
+}
+
+// تنسيق التاريخ يوم وشهر فقط بخط واضح
+function formatDayMonth(dateStr?: string): string {
+  if (!dateStr) return "لم يُحدد";
+  try {
+    const dateOnly = dateStr.split("T")[0];
+    const [y, m, d] = dateOnly.split("-").map(Number);
+    if (y && m && d) {
+      const dateObj = new Date(y, m - 1, d);
+      return dateObj.toLocaleDateString("ar-EG-u-nu-latn", {
+        day: "numeric",
+        month: "long",
+      });
+    }
+    const fallback = new Date(dateStr);
+    return fallback.toLocaleDateString("ar-EG-u-nu-latn", {
+      day: "numeric",
+      month: "long",
+    });
+  } catch {
+    return dateStr;
+  }
+}
+
+// حساب المدة المتبقية على موعد السفر (السفر خلال قد ايه)
+function getTravelCountdown(
+  departureDate?: string,
+  travelDate?: string,
+  flightDepartureTime?: string
+): { text: string; colorClass: string } | null {
+  const effectiveDate = departureDate || travelDate;
+  if (!effectiveDate) return null;
+
+  try {
+    const now = Date.now();
+    let travelEpoch: number | null = null;
+    const dateOnly = effectiveDate.split("T")[0];
+    const [y, m, d] = dateOnly.split("-").map(Number);
+
+    if (y && m && d) {
+      if (
+        flightDepartureTime &&
+        /^\d{1,2}:\d{2}$/.test(flightDepartureTime.trim())
+      ) {
+        const [hh, mm] = flightDepartureTime.trim().split(":").map(Number);
+        const dt = new Date(y, m - 1, d, hh, mm, 0);
+        if (!isNaN(dt.getTime())) travelEpoch = dt.getTime();
+      }
+      if (travelEpoch === null) {
+        const dt = new Date(y, m - 1, d, 23, 59, 59);
+        if (!isNaN(dt.getTime())) travelEpoch = dt.getTime();
+      }
+    }
+
+    if (travelEpoch === null) {
+      const dt = new Date(effectiveDate);
+      if (!isNaN(dt.getTime())) travelEpoch = dt.getTime();
+    }
+
+    if (!travelEpoch) return null;
+
+    const diffMs = travelEpoch - now;
+    if (diffMs <= 0) {
+      return {
+        text: "انتهى موعد السفر",
+        colorClass: "bg-gray-100 text-gray-700 border-gray-200",
+      };
+    }
+
+    const days = Math.floor(diffMs / (24 * 3600 * 1000));
+    const hours = Math.floor((diffMs % (24 * 3600 * 1000)) / (3600 * 1000));
+
+    if (days === 0) {
+      if (hours === 0) {
+        const minutes = Math.max(1, Math.floor((diffMs % (3600 * 1000)) / (60 * 1000)));
+        return {
+          text: `السفر خلال ${minutes} دقيقة`,
+          colorClass: "bg-rose-50 text-rose-800 border-rose-200",
+        };
+      }
+      return {
+        text: `السفر خلال ${hours} ساعة`,
+        colorClass: "bg-rose-50 text-rose-800 border-rose-200",
+      };
+    } else if (days === 1) {
+      return {
+        text: `السفر غداً (${hours} س)`,
+        colorClass: "bg-amber-50 text-amber-800 border-amber-200",
+      };
+    } else if (days <= 3) {
+      return {
+        text: `السفر خلال ${days} أيام`,
+        colorClass: "bg-amber-50 text-amber-800 border-amber-200",
+      };
+    } else {
+      return {
+        text: `السفر خلال ${days} يوم`,
+        colorClass: "bg-sky-50 text-sky-800 border-sky-200",
+      };
+    }
+  } catch {
+    return null;
+  }
+}
 
 export default function DashboardPage() {
   const { user, role, loading: authLoading } = useAuth();
@@ -47,6 +164,48 @@ export default function DashboardPage() {
     navigator.clipboard.writeText(nusuk);
     setCopiedNusuk(nusuk);
     setTimeout(() => setCopiedNusuk(null), 2000);
+  };
+
+  // فتح محادثة واتساب مع المستضيف برسالة الاستضافة المعتمدة
+  const handleOpenHostWhatsApp = (
+    r: GroupRequestSummary,
+    e: React.MouseEvent
+  ) => {
+    e.stopPropagation();
+    const phone = (r.hostPhone || (r.hasHosting ? r.contactPhone : "") || "").trim();
+    if (!phone) return;
+
+    const hostFirstName = r.hostName?.trim().split(/\s+/)[0] || "";
+    const salutation = hostFirstName
+      ? `السلام عليكم يا أستاذ ${hostFirstName}`
+      : "السلام عليكم يا أستاذ";
+
+    const currentUserName = user?.fullName?.trim() || user?.username || "ممثل شركة إيواء";
+
+    const travelers =
+      r.travelersList && r.travelersList.length > 0
+        ? r.travelersList
+        : [{ fullName: r.groupName || "المعتمر", passportNumber: "" }];
+
+    const travelersLines = travelers
+      .map(
+        (t) =>
+          `السيد ${t.fullName?.trim() || "المعتمر"}\nرقم جواز ${t.passportNumber?.trim() || ""}`.trim()
+      )
+      .join("\n");
+
+    const message = `${salutation}
+مع حضرتك ${currentUserName}
+من شركة إيواء للعمرة 
+ارجو قبول استضافة 
+${travelersLines}
+علما بان المعتمر المذكور تحت مسئولية حضرتك حتى خروجه من المملكة .
+وشكرا`;
+
+    const whatsappUrl = getWhatsAppUrl(phone, message);
+    if (whatsappUrl) {
+      window.open(whatsappUrl, "_blank");
+    }
   };
 
   const handleAdminArchive = async (id: string, e: React.MouseEvent) => {
@@ -524,6 +683,348 @@ export default function DashboardPage() {
             </Link>
           )}
         </div>
+      ) : role === "Sender" ? (
+        <>
+          {/* Mobile Cards View (phones) - للمرسل على التليفون */}
+          <div className="block md:hidden space-y-3">
+            {filteredRequests.map((r) => {
+              const travelers =
+                r.travelersList && r.travelersList.length > 0
+                  ? r.travelersList
+                  : [{ id: `fb-${r.id}`, fullName: r.groupName || "بدون اسم", passportNumber: undefined, photoUrl: undefined }];
+
+              const travelCountdown = getTravelCountdown(
+                r.departureDate,
+                r.travelDate,
+                r.flightDepartureTime
+              );
+
+              return (
+                <div
+                  key={r.id}
+                  onClick={() => router.push(`/requests/${r.id}`)}
+                  className="bg-white rounded-2xl border border-gray-200 p-3.5 shadow-xs hover:border-sky-300 hover:shadow-md transition-all cursor-pointer active:scale-[0.99] space-y-2.5"
+                >
+                  {/* الشريط العلوي: يمين = رقم مجموعة نسك مع النسخ، شمال = حالة المجموعة */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 px-2.5 py-1 rounded-xl">
+                      <span className="text-[11px] text-gray-500 font-bold">نسك:</span>
+                      {r.nusukGroupNumber ? (
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono font-bold text-emerald-800 text-xs">
+                            {r.nusukGroupNumber}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              copyToClipboard(r.nusukGroupNumber!, e);
+                            }}
+                            className="text-gray-400 hover:text-emerald-700 p-0.5 cursor-pointer"
+                            title="نسخ رقم نسك"
+                          >
+                            {copiedNusuk === r.nusukGroupNumber ? (
+                              <Check className="w-3.5 h-3.5 text-emerald-600" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 text-xs italic">قيد التسجيل</span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <RequestStatusBadge status={r.status} />
+                    </div>
+                  </div>
+
+                  {/* الجزء السفلي: شبكة من عمودين مطابقة لقائمة المعاملات */}
+                  <div className="grid grid-cols-2 gap-2.5 items-stretch">
+                    {/* المربع الأيمن: بيانات الرحلة ومؤشر موعد السفر */}
+                    <div className="flex flex-col gap-1.5">
+                      <div className="bg-sky-50/60 border border-sky-100 rounded-xl p-2.5 flex-1 flex flex-col justify-center gap-1">
+                        <div className="flex items-center gap-1.5">
+                          <Plane className="w-4 h-4 text-sky-600 shrink-0" />
+                          <span className="font-mono font-bold text-gray-900 text-sm tracking-wide truncate">
+                            {r.flightNumber || r.airline || "تذكرة مشتركة"}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-gray-800">
+                          <Calendar className="w-4 h-4 text-sky-600 shrink-0" />
+                          <span className="font-bold text-sm">
+                            {formatDayMonth(r.departureDate || r.travelDate)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {travelCountdown ? (
+                        <div
+                          className={`border rounded-xl px-2 py-1 text-center flex items-center justify-center gap-1 text-[11px] font-bold shadow-2xs ${travelCountdown.colorClass}`}
+                        >
+                          <Clock className="w-3.5 h-3.5 shrink-0" />
+                          <span className="truncate">{travelCountdown.text}</span>
+                        </div>
+                      ) : (
+                        <div className="border border-gray-200 bg-gray-50 rounded-xl px-2 py-1 text-center text-[10px] text-gray-400 font-medium">
+                          موعد السفر غير محدد
+                        </div>
+                      )}
+                    </div>
+
+                    {/* المستطيل الأيسر: أسماء المسافرين (ثلاثية) مع الصور */}
+                    <div className="bg-gray-50/70 border border-gray-200 rounded-xl p-2.5 flex flex-col justify-center min-h-[105px]">
+                      <div className="space-y-2 max-h-36 overflow-y-auto pr-0.5">
+                        {travelers.map((t, idx) => (
+                          <div key={t.id || idx} className="flex items-center gap-2 min-w-0">
+                            {t.photoUrl ? (
+                              <img
+                                src={t.photoUrl}
+                                alt={t.fullName}
+                                className="w-8 h-8 rounded-full object-cover border border-purple-300 shrink-0 shadow-2xs"
+                              />
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-700 border border-purple-200 flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
+                                {t.fullName && t.fullName.trim() ? (
+                                  t.fullName.trim().charAt(0)
+                                ) : (
+                                  <User className="w-4 h-4 text-purple-600" />
+                                )}
+                              </div>
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <span
+                                className="text-xs font-bold text-gray-900 block truncate leading-tight"
+                                title={t.fullName}
+                              >
+                                {getThreePartName(t.fullName)}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* زر واتساب المستضيف */}
+                  {(r.hostPhone || (r.hasHosting && r.contactPhone)) && (
+                    <button
+                      type="button"
+                      onClick={(e) => handleOpenHostWhatsApp(r, e)}
+                      className="w-full mt-2.5 py-2 px-3 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl flex items-center justify-center gap-2 text-xs font-bold transition-all shadow-xs cursor-pointer"
+                      title="مراسلة المستضيف عبر واتساب"
+                    >
+                      <MessageSquare className="w-4 h-4 fill-white" />
+                      <span>واتساب المستضيف</span>
+                      <span className="text-[11px] font-mono opacity-90 dir-ltr">
+                        ({r.hostPhone || r.contactPhone})
+                      </span>
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Desktop Table View (صفحات الكمبيوتر) - صفوف بدمج خلايا المعتمرين كما في قائمة المعاملات */}
+          <div className="hidden md:block bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-right text-xs border-collapse">
+                <thead className="bg-gray-50/90 border-b border-gray-200 text-gray-700 font-bold">
+                  <tr>
+                    <th className="py-3.5 px-4">رقم مجموعة نسك</th>
+                    <th className="py-3.5 px-4 text-center">الحالة</th>
+                    <th className="py-3.5 px-4">بيانات الرحلة والتاريخ</th>
+                    <th className="py-3.5 px-4">اسم المعتمر</th>
+                    <th className="py-3.5 px-4 text-center">صورة المعتمر</th>
+                    <th className="py-3.5 px-4 text-center">الإجراء</th>
+                  </tr>
+                </thead>
+                {filteredRequests.map((r, rIdx) => {
+                  const isNusukMatch =
+                    Boolean(searchTerm.trim()) &&
+                    Boolean(r.nusukGroupNumber) &&
+                    r.nusukGroupNumber!.toLowerCase().includes(searchTerm.trim().toLowerCase());
+
+                  const travelers =
+                    r.travelersList && r.travelersList.length > 0
+                      ? r.travelersList
+                      : [{ id: `fb-${r.id}`, fullName: r.groupName || "بدون اسم", passportNumber: undefined, photoUrl: undefined }];
+
+                  const rowCount = travelers.length;
+                  const travelCountdown = getTravelCountdown(
+                    r.departureDate,
+                    r.travelDate,
+                    r.flightDepartureTime
+                  );
+
+                  return (
+                    <tbody
+                      key={r.id}
+                      className={`divide-y divide-gray-100 border-b-2 border-gray-200/90 transition-colors ${
+                        rIdx % 2 === 0 ? "bg-white" : "bg-slate-50/40"
+                      } hover:bg-sky-50/30`}
+                    >
+                      {travelers.map((t, tIdx) => {
+                        return (
+                          <tr key={`${r.id}-${t.id || tIdx}`} className="transition-colors">
+                            {/* Merged Columns */}
+                            {tIdx === 0 && (
+                              <>
+                                {/* 1. رقم مجموعة نسك */}
+                                <td
+                                  rowSpan={rowCount}
+                                  className="py-3.5 px-4 align-middle border-l border-gray-100 font-mono"
+                                >
+                                  {r.nusukGroupNumber ? (
+                                    <div className="inline-flex items-center gap-1.5">
+                                      <span
+                                        className={`px-2.5 py-1 rounded-md text-xs font-bold font-mono transition-all ${
+                                          isNusukMatch
+                                            ? "bg-emerald-600 text-white ring-2 ring-emerald-300"
+                                            : "bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-2xs"
+                                        }`}
+                                      >
+                                        {r.nusukGroupNumber}
+                                      </span>
+                                      <button
+                                        onClick={(e) => copyToClipboard(r.nusukGroupNumber!, e)}
+                                        className="text-gray-400 hover:text-emerald-700 p-1 cursor-pointer transition-colors"
+                                        title="نسخ رقم نسك"
+                                      >
+                                        {copiedNusuk === r.nusukGroupNumber ? (
+                                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                        ) : (
+                                          <Copy className="w-3.5 h-3.5" />
+                                        )}
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <span className="text-gray-400 text-xs italic">قيد التسجيل</span>
+                                  )}
+                                </td>
+
+                                {/* 2. الحالة */}
+                                <td
+                                  rowSpan={rowCount}
+                                  className="py-3.5 px-4 align-middle text-center border-l border-gray-100"
+                                >
+                                  <RequestStatusBadge status={r.status} />
+                                </td>
+
+                                {/* 3. بيانات الرحلة والتاريخ ومؤشر السفر */}
+                                <td
+                                  rowSpan={rowCount}
+                                  className="py-3.5 px-4 align-middle border-l border-gray-100"
+                                >
+                                  <div className="space-y-1">
+                                    <div className="font-bold text-gray-900 flex items-center gap-1.5 text-xs">
+                                      <Plane className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                                      <span className="font-mono uppercase">
+                                        {r.flightNumber || r.airline || "تذكرة مشتركة"}
+                                      </span>
+                                    </div>
+                                    <div className="text-[11px] text-gray-600 flex items-center gap-1.5">
+                                      <Calendar className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                                      <span>
+                                        {r.departureDate || r.travelDate
+                                          ? new Date(r.departureDate || r.travelDate!).toLocaleDateString("ar-SA")
+                                          : "لم يُحدد"}
+                                      </span>
+                                    </div>
+                                    {travelCountdown && (
+                                      <div className="pt-0.5">
+                                        <span
+                                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border ${travelCountdown.colorClass}`}
+                                        >
+                                          <Clock className="w-3.5 h-3.5 shrink-0" />
+                                          <span>{travelCountdown.text}</span>
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                              </>
+                            )}
+
+                            {/* 4. اسم المعتمر */}
+                            <td className="py-3 px-4 align-middle border-l border-gray-100">
+                              <div className="font-bold text-gray-900 text-xs">
+                                {t.fullName}
+                              </div>
+                              {t.passportNumber && (
+                                <div className="text-[10px] text-gray-500 font-mono mt-0.5">
+                                  جواز: {t.passportNumber}
+                                </div>
+                              )}
+                            </td>
+
+                            {/* 5. صورة المعتمر */}
+                            <td className="py-3 px-4 align-middle text-center border-l border-gray-100">
+                              <div className="flex items-center justify-center">
+                                {t.photoUrl ? (
+                                  <img
+                                    src={t.photoUrl}
+                                    alt={t.fullName}
+                                    className="w-9 h-9 rounded-full object-cover border border-purple-300 shadow-2xs hover:scale-110 transition-transform cursor-pointer"
+                                    title={`صورة المعتمر: ${t.fullName}`}
+                                  />
+                                ) : (
+                                  <div
+                                    className="w-9 h-9 rounded-full bg-purple-50 text-purple-700 border border-purple-200 flex items-center justify-center font-bold text-xs shadow-2xs"
+                                    title="لا توجد صورة شخصية"
+                                  >
+                                    {t.fullName && t.fullName.trim() ? (
+                                      t.fullName.trim().charAt(0)
+                                    ) : (
+                                      <User className="w-4 h-4 text-purple-600" />
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* 6. الإجراء */}
+                            {tIdx === 0 && (
+                              <td
+                                rowSpan={rowCount}
+                                className="py-3.5 px-4 align-middle text-center"
+                              >
+                                <div className="inline-flex items-center gap-1.5 justify-center">
+                                  <Link
+                                    href={`/requests/${r.id}`}
+                                    className="inline-flex items-center gap-1 text-xs font-bold text-sky-700 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-3 py-1.5 rounded-xl transition-colors shadow-2xs cursor-pointer"
+                                    title="فتح المعاملة"
+                                  >
+                                    <span>فتح</span>
+                                    <ArrowRight className="w-3.5 h-3.5 rotate-180" />
+                                  </Link>
+
+                                  {(r.hostPhone || (r.hasHosting && r.contactPhone)) && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => handleOpenHostWhatsApp(r, e)}
+                                      className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-2.5 py-1.5 rounded-xl transition-colors shadow-2xs cursor-pointer"
+                                      title="واتساب المستضيف"
+                                    >
+                                      <MessageSquare className="w-3.5 h-3.5 fill-emerald-600 text-emerald-600" />
+                                      <span>واتساب</span>
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            )}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  );
+                })}
+              </table>
+            </div>
+          </div>
+        </>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredRequests.map((req) => (
