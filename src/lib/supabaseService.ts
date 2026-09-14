@@ -540,15 +540,6 @@ export const supabaseService = {
         });
       }
 
-      // Initial traveler
-      await client.from("travelers").insert({
-        id: `trv-${Date.now()}-1`,
-        group_request_id: requestId,
-        full_name: "المسافر الرئيسي",
-        status: "Pending",
-        created_at: now,
-      });
-
       // Initial history
       await client.from("status_histories").insert({
         id: `sh-${Date.now()}`,
@@ -808,6 +799,59 @@ export const supabaseService = {
   },
 
   travelers: {
+    add: async (
+      requestId: string,
+      data: {
+        fullName: string;
+        passportNumber?: string;
+        phoneNumber?: string;
+        nationality?: string;
+        dateOfBirth?: string;
+        notes?: string;
+      }
+    ): Promise<Traveler> => {
+      const client = getClient();
+      const travelerId = `trv-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+      const now = new Date().toISOString();
+      const row = {
+        id: travelerId,
+        group_request_id: requestId,
+        full_name: data.fullName.trim(),
+        passport_number: data.passportNumber?.trim() || null,
+        phone_number: data.phoneNumber?.trim() || null,
+        nationality: data.nationality?.trim() || "مصري",
+        date_of_birth: data.dateOfBirth?.trim() || null,
+        status: "Pending",
+        notes: data.notes?.trim() || null,
+        created_at: now,
+      };
+
+      const { data: inserted, error } = await client
+        .from("travelers")
+        .insert(row)
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Error inserting traveler to Supabase:", error);
+        throw new Error(`فشل إضافة المسافر: ${error.message}`);
+      }
+
+      return {
+        id: inserted?.id || travelerId,
+        groupRequestId: inserted?.group_request_id || requestId,
+        fullName: inserted?.full_name || row.full_name,
+        passportNumber: inserted?.passport_number || data.passportNumber,
+        phoneNumber: inserted?.phone_number || data.phoneNumber,
+        nationality: inserted?.nationality || data.nationality || "مصري",
+        dateOfBirth: inserted?.date_of_birth || data.dateOfBirth,
+        status: inserted?.status || "Pending",
+        notes: inserted?.notes || data.notes,
+        createdAt: inserted?.created_at || now,
+        documents: [],
+      };
+    },
+
     update: async (
       id: string,
       data: {

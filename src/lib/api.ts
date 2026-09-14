@@ -379,6 +379,25 @@ export const api = {
   },
 
   travelers: {
+    add: async (
+      requestId: string,
+      data: {
+        fullName: string;
+        passportNumber?: string;
+        phoneNumber?: string;
+        nationality?: string;
+        dateOfBirth?: string;
+        notes?: string;
+      }
+    ): Promise<Traveler> => {
+      if (isSupabaseConfigured()) {
+        return await supabaseService.travelers.add(requestId, data);
+      }
+      await delay();
+      const current = await api.auth.getMe();
+      return localDB.addTraveler(requestId, data, current);
+    },
+
     update: async (
       travelerId: string,
       data: {
