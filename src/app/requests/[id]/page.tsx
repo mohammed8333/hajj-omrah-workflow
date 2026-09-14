@@ -60,6 +60,7 @@ import { scanHostId } from "@/lib/hostIdScanner";
 import { scanFlightTicket, calculateAirportArrivalTime } from "@/lib/flightTicketScanner";
 import { getGeminiApiKey, setGeminiApiKey } from "@/lib/geminiVision";
 import { useDialog } from "@/lib/dialog-context";
+import { FileDropArea } from "@/components/ui/FileDropArea";
 
 export default function RequestDetailPage({
   requestId: propRequestId,
@@ -2132,178 +2133,192 @@ export default function RequestDetailPage({
                 request.hostingInfo?.hostIdDocument ||
                 request.groupDocuments?.find((d) => d.documentType === "HostId");
 
-              return hostDoc ? (
-                <div className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs">
-                  <div className="flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-sky-600" />
-                    <div>
-                      <div className="font-semibold text-gray-800">
-                        {hostDoc.originalFileName}
+              return (
+                <FileDropArea
+                  disabled={!canEditAnyData}
+                  onFileDrop={(file) => handleFileUpload(file, "HostId")}
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  maxSizeMb={10}
+                  activeBorderColor="amber"
+                  overlayText="أفلت هوية المستضيف هنا للرفع"
+                  overlaySubtext="سيتم رفع الوثيقة وتحديث المعاملة مباشرة"
+                  onError={(msg) => alert({ title: "تنبيه", message: msg, variant: "warning" })}
+                  className="rounded-xl"
+                >
+                  {hostDoc ? (
+                    <div className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-5 h-5 text-sky-600" />
+                        <div>
+                          <div className="font-semibold text-gray-800">
+                            {hostDoc.originalFileName}
+                          </div>
+                          <div className="text-[10px] text-gray-400">
+                            {(hostDoc.fileSize / 1024).toFixed(1)} KB
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-[10px] text-gray-400">
-                        {(hostDoc.fileSize / 1024).toFixed(1)} KB
+
+                      <div className="flex items-center gap-2">
+                        <DocumentStatusBadge
+                          status={hostDoc.reviewStatus}
+                        />
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setPreviewDoc(hostDoc);
+                          }}
+                          className="p-1.5 text-gray-600 hover:text-sky-600 hover:bg-gray-200 rounded-lg cursor-pointer"
+                          title="معاينة المستند"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleDownloadDoc(hostDoc);
+                          }}
+                          className="p-1.5 text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                          title="تنزيل هوية المستضيف"
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
+
+                        {canEditAnyData && (
+                          <label
+                            className="p-1.5 text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors cursor-pointer shadow-2xs"
+                            title="استبدال / رفع هوية المستضيف مجدداً (أو اسحب الملف هنا)"
+                          >
+                            <UploadCloud className="w-4 h-4" />
+                            <input
+                              type="file"
+                              accept=".pdf,.jpg,.jpeg,.png"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleFileUpload(file, "HostId");
+                              }}
+                            />
+                          </label>
+                        )}
+
+                        <button
+                          type="button"
+                          disabled={isScanningHostIdDoc}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleScanExistingHostId(hostDoc);
+                          }}
+                          className="p-1.5 text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition-colors cursor-pointer disabled:opacity-50 shadow-2xs"
+                          title="فحص واستخراج بيانات هوية المستضيف تلقائياً (مسح ذكي OCR)"
+                        >
+                          {isScanningHostIdDoc ? (
+                            <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
+                          ) : (
+                            <ScanText className="w-4 h-4" />
+                          )}
+                        </button>
+
+                        {/* Quick Review Buttons when Pending */}
+                        {(isSafaReviewer || isAgent) && hostDoc.reviewStatus === "Pending" && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handleQuickReview(hostDoc.id, "Accepted");
+                              }}
+                              disabled={actionLoading}
+                              className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors cursor-pointer shadow-2xs"
+                              title="قبول هوية المستضيف (صح)"
+                            >
+                              <Check className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handleQuickReview(hostDoc.id, "NeedsCorrection");
+                              }}
+                              disabled={actionLoading}
+                              className="p-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors cursor-pointer shadow-2xs"
+                              title="طلب تصحيح هوية المستضيف (مثلث الخطر)"
+                            >
+                              <AlertTriangle className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handleQuickReview(hostDoc.id, "Rejected");
+                              }}
+                              disabled={actionLoading}
+                              className="p-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition-colors cursor-pointer shadow-2xs"
+                              title="رفض هوية المستضيف (إكس)"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Agent Return/Reset Action: only Agent can return reviewed documents */}
+                        {isAgent && hostDoc.reviewStatus !== "Pending" && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              handleQuickReview(hostDoc.id, "Pending", "تمت إعادة المستند للمراجعة من قبل الوكيل");
+                            }}
+                            disabled={actionLoading}
+                            className="p-1.5 bg-amber-50 hover:bg-amber-500 text-amber-800 hover:text-white border border-amber-300 rounded-lg transition-colors cursor-pointer shadow-2xs"
+                            title="إعادة فتح تدقيق المستند لموظف الصفا (إعادة التدقيق)"
+                          >
+                            <Undo2 className="w-4 h-4" />
+                          </button>
+                        )}
+
+                        {canEditAnyData && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              handleDeleteDocument(hostDoc.id);
+                            }}
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                            title="حذف المستند"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <DocumentStatusBadge
-                      status={hostDoc.reviewStatus}
-                    />
-
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setPreviewDoc(hostDoc);
-                      }}
-                      className="p-1.5 text-gray-600 hover:text-sky-600 hover:bg-gray-200 rounded-lg cursor-pointer"
-                      title="معاينة المستند"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleDownloadDoc(hostDoc);
-                      }}
-                      className="p-1.5 text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
-                      title="تنزيل هوية المستضيف"
-                    >
-                      <Download className="w-4 h-4" />
-                    </button>
-
-                    {canEditAnyData && (
-                      <label
-                        className="p-1.5 text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors cursor-pointer shadow-2xs"
-                        title="استبدال / رفع هوية المستضيف مجدداً"
-                      >
-                        <UploadCloud className="w-4 h-4" />
-                        <input
-                          type="file"
-                          accept=".pdf,.jpg,.jpeg,.png"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) handleFileUpload(file, "HostId");
-                          }}
-                        />
-                      </label>
-                    )}
-
-                    <button
-                      type="button"
-                      disabled={isScanningHostIdDoc}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleScanExistingHostId(hostDoc);
-                      }}
-                      className="p-1.5 text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition-colors cursor-pointer disabled:opacity-50 shadow-2xs"
-                      title="فحص واستخراج بيانات هوية المستضيف تلقائياً (مسح ذكي OCR)"
-                    >
-                      {isScanningHostIdDoc ? (
-                        <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
-                      ) : (
-                        <ScanText className="w-4 h-4" />
+                  ) : (
+                    <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center">
+                      <p className="text-xs text-gray-500 mb-2">
+                        لم يتم رفع وثيقة هوية المستضيف بعد. (يمكنك سحب وإفلات الملف هنا)
+                      </p>
+                      {canEditAnyData && (
+                        <label className="inline-flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer">
+                          <UploadCloud className="w-4 h-4" />
+                          <span>رفع هوية المستضيف</span>
+                          <input
+                            type="file"
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleFileUpload(file, "HostId");
+                            }}
+                          />
+                        </label>
                       )}
-                    </button>
-
-                    {/* Quick Review Buttons when Pending */}
-                    {(isSafaReviewer || isAgent) && hostDoc.reviewStatus === "Pending" && (
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handleQuickReview(hostDoc.id, "Accepted");
-                          }}
-                          disabled={actionLoading}
-                          className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors cursor-pointer shadow-2xs"
-                          title="قبول هوية المستضيف (صح)"
-                        >
-                          <Check className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handleQuickReview(hostDoc.id, "NeedsCorrection");
-                          }}
-                          disabled={actionLoading}
-                          className="p-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors cursor-pointer shadow-2xs"
-                          title="طلب تصحيح هوية المستضيف (مثلث الخطر)"
-                        >
-                          <AlertTriangle className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handleQuickReview(hostDoc.id, "Rejected");
-                          }}
-                          disabled={actionLoading}
-                          className="p-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition-colors cursor-pointer shadow-2xs"
-                          title="رفض هوية المستضيف (إكس)"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Agent Return/Reset Action: only Agent can return reviewed documents */}
-                    {isAgent && hostDoc.reviewStatus !== "Pending" && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handleQuickReview(hostDoc.id, "Pending", "تمت إعادة المستند للمراجعة من قبل الوكيل");
-                        }}
-                        disabled={actionLoading}
-                        className="p-1.5 bg-amber-50 hover:bg-amber-500 text-amber-800 hover:text-white border border-amber-300 rounded-lg transition-colors cursor-pointer shadow-2xs"
-                        title="إعادة فتح تدقيق المستند لموظف الصفا (إعادة التدقيق)"
-                      >
-                        <Undo2 className="w-4 h-4" />
-                      </button>
-                    )}
-
-                    {canEditAnyData && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handleDeleteDocument(hostDoc.id);
-                        }}
-                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
-                        title="حذف المستند"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center">
-                  <p className="text-xs text-gray-500 mb-2">
-                    لم يتم رفع وثيقة هوية المستضيف بعد.
-                  </p>
-                  {canEditAnyData && (
-                    <label className="inline-flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer">
-                      <UploadCloud className="w-4 h-4" />
-                      <span>رفع هوية المستضيف</span>
-                      <input
-                        type="file"
-                        accept=".pdf,.jpg,.jpeg,.png"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleFileUpload(file, "HostId");
-                        }}
-                      />
-                    </label>
+                    </div>
                   )}
-                </div>
+                </FileDropArea>
               );
             })()}
           </div>
@@ -2437,178 +2452,192 @@ export default function RequestDetailPage({
               request.flightTicketDocument ||
               request.groupDocuments?.find((d) => d.documentType === "FlightTicket");
 
-            return ticketDoc ? (
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs gap-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center shrink-0">
-                    <Ticket className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="font-semibold text-gray-800">
-                      {ticketDoc.originalFileName}
+            return (
+              <FileDropArea
+                disabled={!canEditAnyData}
+                onFileDrop={(file) => handleFileUpload(file, "FlightTicket")}
+                accept=".pdf,.jpg,.jpeg,.png"
+                maxSizeMb={15}
+                activeBorderColor="sky"
+                overlayText="أفلت تذكرة الطيران هنا للرفع"
+                overlaySubtext="سيتم رفع التذكرة وتحديث المعاملة مباشرة"
+                onError={(msg) => alert({ title: "تنبيه", message: msg, variant: "warning" })}
+                className="rounded-xl"
+              >
+                {ticketDoc ? (
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs gap-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center shrink-0">
+                        <Ticket className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="font-semibold text-gray-800">
+                          {ticketDoc.originalFileName}
+                        </div>
+                        <div className="text-[10px] text-gray-400">
+                          {(ticketDoc.fileSize / 1024).toFixed(1)} KB
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-[10px] text-gray-400">
-                      {(ticketDoc.fileSize / 1024).toFixed(1)} KB
-                    </div>
-                  </div>
-                </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <DocumentStatusBadge status={ticketDoc.reviewStatus} />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <DocumentStatusBadge status={ticketDoc.reviewStatus} />
 
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setPreviewDoc(ticketDoc);
-                    }}
-                    className="p-1.5 text-gray-600 hover:text-sky-600 hover:bg-gray-200 rounded-lg cursor-pointer"
-                    title="معاينة المستند"
-                  >
-                    <Eye className="w-4 h-4" />
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handleDownloadDoc(ticketDoc);
-                    }}
-                    className="p-1.5 text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
-                    title="تنزيل تذكرة الطيران"
-                  >
-                    <Download className="w-4 h-4" />
-                  </button>
-
-                  {canEditAnyData && (
-                    <label
-                      className="p-1.5 text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors cursor-pointer shadow-2xs"
-                      title="استبدال / رفع تذكرة الطيران مجدداً"
-                    >
-                      <UploadCloud className="w-4 h-4" />
-                      <input
-                        type="file"
-                        accept=".pdf,.jpg,.jpeg,.png"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleFileUpload(file, "FlightTicket");
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setPreviewDoc(ticketDoc);
                         }}
-                      />
-                    </label>
-                  )}
+                        className="p-1.5 text-gray-600 hover:text-sky-600 hover:bg-gray-200 rounded-lg cursor-pointer"
+                        title="معاينة المستند"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
 
-                  <button
-                    type="button"
-                    disabled={isScanningFlightTicketDoc}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handleScanExistingFlightTicket(ticketDoc);
-                    }}
-                    className="p-1.5 text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition-colors cursor-pointer disabled:opacity-50 shadow-2xs"
-                    title="فحص واستخراج بيانات تذكرة الطيران بالذكاء الاصطناعي (Google Gemini)"
-                  >
-                    {isScanningFlightTicketDoc ? (
-                      <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
-                    ) : (
-                      <Sparkles className="w-4 h-4 text-indigo-600" />
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handleDownloadDoc(ticketDoc);
+                        }}
+                        className="p-1.5 text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                        title="تنزيل تذكرة الطيران"
+                      >
+                        <Download className="w-4 h-4" />
+                      </button>
+
+                      {canEditAnyData && (
+                        <label
+                          className="p-1.5 text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors cursor-pointer shadow-2xs"
+                          title="استبدال / رفع تذكرة الطيران مجدداً (أو اسحب الملف هنا)"
+                        >
+                          <UploadCloud className="w-4 h-4" />
+                          <input
+                            type="file"
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleFileUpload(file, "FlightTicket");
+                            }}
+                          />
+                        </label>
+                      )}
+
+                      <button
+                        type="button"
+                        disabled={isScanningFlightTicketDoc}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handleScanExistingFlightTicket(ticketDoc);
+                        }}
+                        className="p-1.5 text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition-colors cursor-pointer disabled:opacity-50 shadow-2xs"
+                        title="فحص واستخراج بيانات تذكرة الطيران بالذكاء الاصطناعي (Google Gemini)"
+                      >
+                        {isScanningFlightTicketDoc ? (
+                          <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
+                        ) : (
+                          <Sparkles className="w-4 h-4 text-indigo-600" />
+                        )}
+                      </button>
+
+                      {/* Quick Review Buttons when Pending */}
+                      {(isSafaReviewer || isAgent) && ticketDoc.reviewStatus === "Pending" && (
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              handleQuickReview(ticketDoc.id, "Accepted");
+                            }}
+                            disabled={actionLoading}
+                            className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors cursor-pointer shadow-2xs"
+                            title="قبول تذكرة الطيران (صح)"
+                          >
+                            <Check className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              handleQuickReview(ticketDoc.id, "NeedsCorrection");
+                            }}
+                            disabled={actionLoading}
+                            className="p-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors cursor-pointer shadow-2xs"
+                            title="طلب تصحيح تذكرة الطيران (مثلث الخطر)"
+                          >
+                            <AlertTriangle className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              handleQuickReview(ticketDoc.id, "Rejected");
+                            }}
+                            disabled={actionLoading}
+                            className="p-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition-colors cursor-pointer shadow-2xs"
+                            title="رفض تذكرة الطيران (إكس)"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Agent Return/Reset Action */}
+                      {isAgent && ticketDoc.reviewStatus !== "Pending" && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleQuickReview(ticketDoc.id, "Pending", "تمت إعادة المستند للمراجعة من قبل الوكيل");
+                          }}
+                          disabled={actionLoading}
+                          className="p-1.5 bg-amber-50 hover:bg-amber-500 text-amber-800 hover:text-white border border-amber-300 rounded-lg transition-colors cursor-pointer shadow-2xs"
+                          title="إعادة فتح تدقيق تذكرة الطيران لموظف الصفا (إعادة التدقيق)"
+                        >
+                          <Undo2 className="w-4 h-4" />
+                        </button>
+                      )}
+
+                      {canEditAnyData && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleDeleteDocument(ticketDoc.id);
+                          }}
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                          title="حذف المستند"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center">
+                    <p className="text-xs text-gray-500 mb-2">
+                      لم يتم رفع وثيقة تذكرة الطيران المشتركة بعد. (يمكنك سحب وإفلات الملف هنا)
+                    </p>
+                    {canEditAnyData && (
+                      <label className="inline-flex items-center gap-1.5 bg-sky-50 hover:bg-sky-100 text-sky-800 text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer border border-sky-200">
+                        <UploadCloud className="w-4 h-4" />
+                        <span>رفع تذكرة الطيران (فحص واستخراج ذكي بالذكاء الاصطناعي)</span>
+                        <input
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleFileUpload(file, "FlightTicket");
+                          }}
+                        />
+                      </label>
                     )}
-                  </button>
-
-                  {/* Quick Review Buttons when Pending */}
-                  {(isSafaReviewer || isAgent) && ticketDoc.reviewStatus === "Pending" && (
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handleQuickReview(ticketDoc.id, "Accepted");
-                        }}
-                        disabled={actionLoading}
-                        className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors cursor-pointer shadow-2xs"
-                        title="قبول تذكرة الطيران (صح)"
-                      >
-                        <Check className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handleQuickReview(ticketDoc.id, "NeedsCorrection");
-                        }}
-                        disabled={actionLoading}
-                        className="p-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors cursor-pointer shadow-2xs"
-                        title="طلب تصحيح تذكرة الطيران (مثلث الخطر)"
-                      >
-                        <AlertTriangle className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handleQuickReview(ticketDoc.id, "Rejected");
-                        }}
-                        disabled={actionLoading}
-                        className="p-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition-colors cursor-pointer shadow-2xs"
-                        title="رفض تذكرة الطيران (إكس)"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Agent Return/Reset Action */}
-                  {isAgent && ticketDoc.reviewStatus !== "Pending" && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleQuickReview(ticketDoc.id, "Pending", "تمت إعادة المستند للمراجعة من قبل الوكيل");
-                      }}
-                      disabled={actionLoading}
-                      className="p-1.5 bg-amber-50 hover:bg-amber-500 text-amber-800 hover:text-white border border-amber-300 rounded-lg transition-colors cursor-pointer shadow-2xs"
-                      title="إعادة فتح تدقيق تذكرة الطيران لموظف الصفا (إعادة التدقيق)"
-                    >
-                      <Undo2 className="w-4 h-4" />
-                    </button>
-                  )}
-
-                  {canEditAnyData && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleDeleteDocument(ticketDoc.id);
-                      }}
-                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
-                      title="حذف المستند"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center">
-                <p className="text-xs text-gray-500 mb-2">
-                  لم يتم رفع وثيقة تذكرة الطيران المشتركة بعد.
-                </p>
-                {canEditAnyData && (
-                  <label className="inline-flex items-center gap-1.5 bg-sky-50 hover:bg-sky-100 text-sky-800 text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer border border-sky-200">
-                    <UploadCloud className="w-4 h-4" />
-                    <span>رفع تذكرة الطيران (فحص واستخراج ذكي بالذكاء الاصطناعي)</span>
-                    <input
-                      type="file"
-                      accept=".pdf,.jpg,.jpeg,.png"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleFileUpload(file, "FlightTicket");
-                      }}
-                    />
-                  </label>
+                  </div>
                 )}
-              </div>
+              </FileDropArea>
             );
           })()}
         </div>
@@ -2866,70 +2895,172 @@ export default function RequestDetailPage({
                   );
 
                   return (
-                    <div
+                    <FileDropArea
                       key={docType}
-                      className="border border-gray-200 rounded-xl p-3.5 bg-gray-50/60 flex flex-col justify-between"
+                      disabled={!canEditAnyData}
+                      onFileDrop={(file) => handleFileUpload(file, docType, traveler.id)}
+                      accept={docType === "Passport" ? ".pdf,.jpg,.jpeg,.png" : ".jpg,.jpeg,.png"}
+                      maxSizeMb={10}
+                      activeBorderColor={docType === "Passport" ? "blue" : "purple"}
+                      overlayText={`أفلت ${DOCUMENT_TYPE_LABELS[docType]} هنا للرفع`}
+                      overlaySubtext="سيتم رفع وتحديث المستند للمسافر مباشرة"
+                      onError={(msg) => alert({ title: "تنبيه", message: msg, variant: "warning" })}
+                      className="rounded-xl flex flex-col justify-between"
                     >
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-bold text-gray-700">
-                          {DOCUMENT_TYPE_LABELS[docType]}
-                          {docType === "Passport" || docType === "PersonalPhoto" ? (
-                            <span className="text-red-500 mr-0.5">*</span>
-                          ) : null}
-                        </span>
+                      <div
+                        className="border border-gray-200 rounded-xl p-3.5 bg-gray-50/60 flex flex-col justify-between h-full"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-bold text-gray-700">
+                            {DOCUMENT_TYPE_LABELS[docType]}
+                            {docType === "Passport" || docType === "PersonalPhoto" ? (
+                              <span className="text-red-500 mr-0.5">*</span>
+                            ) : null}
+                          </span>
+
+                          {doc ? (
+                            <DocumentStatusBadge status={doc.reviewStatus} />
+                          ) : (
+                            <span className="text-[10px] bg-gray-200 text-gray-600 px-2 py-0.5 rounded font-medium">
+                              غير مرفوع
+                            </span>
+                          )}
+                        </div>
 
                         {doc ? (
-                          <DocumentStatusBadge status={doc.reviewStatus} />
-                        ) : (
-                          <span className="text-[10px] bg-gray-200 text-gray-600 px-2 py-0.5 rounded font-medium">
-                            غير مرفوع
-                          </span>
-                        )}
-                      </div>
-
-                      {doc ? (
-                        <div className="space-y-2 mt-2">
-                          <div className="text-[11px] text-gray-600 truncate">
-                            {doc.originalFileName}
-                          </div>
-
-                          {doc.reviewNote && (
-                            <div className="text-[11px] text-amber-800 bg-amber-50 p-1.5 rounded">
-                              ملاحظة: {doc.reviewNote}
+                          <div className="space-y-2 mt-2">
+                            <div className="text-[11px] text-gray-600 truncate">
+                              {doc.originalFileName}
                             </div>
-                          )}
 
-                          <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-gray-200/60">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                setPreviewDoc(doc);
-                              }}
-                              className="p-1.5 text-sky-600 hover:text-sky-800 hover:bg-sky-50 rounded-lg transition-colors cursor-pointer"
-                              title="معاينة المستند"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
+                            {doc.reviewNote && (
+                              <div className="text-[11px] text-amber-800 bg-amber-50 p-1.5 rounded">
+                                ملاحظة: {doc.reviewNote}
+                              </div>
+                            )}
 
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                handleDownloadDoc(doc);
-                              }}
-                              className="p-1.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
-                              title="تنزيل المستند"
-                            >
-                              <Download className="w-4 h-4" />
-                            </button>
-
-                            {canEditAnyData && (
-                              <label
-                                className="p-1.5 text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors cursor-pointer shadow-2xs"
-                                title="استبدال / رفع مستند مصحح"
+                            <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-gray-200/60">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setPreviewDoc(doc);
+                                }}
+                                className="p-1.5 text-sky-600 hover:text-sky-800 hover:bg-sky-50 rounded-lg transition-colors cursor-pointer"
+                                title="معاينة المستند"
                               >
+                                <Eye className="w-4 h-4" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  handleDownloadDoc(doc);
+                                }}
+                                className="p-1.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                                title="تنزيل المستند"
+                              >
+                                <Download className="w-4 h-4" />
+                              </button>
+
+                              {canEditAnyData && (
+                                <label
+                                  className="p-1.5 text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors cursor-pointer shadow-2xs"
+                                  title="استبدال / رفع مستند مصحح (أو اسحب الملف هنا)"
+                                >
+                                  <UploadCloud className="w-4 h-4" />
+                                  <input
+                                    type="file"
+                                    accept=".pdf,.jpg,.jpeg,.png"
+                                    className="hidden"
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) handleFileUpload(file, docType, traveler.id);
+                                    }}
+                                  />
+                                </label>
+                              )}
+
+                              {/* Quick Review Buttons when Pending */}
+                              {(isSafaReviewer || isAgent) && doc.reviewStatus === "Pending" && (
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      handleQuickReview(doc.id, "Accepted");
+                                    }}
+                                    disabled={actionLoading}
+                                    className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors cursor-pointer shadow-2xs"
+                                    title="قبول المستند (صح)"
+                                  >
+                                    <Check className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      handleQuickReview(doc.id, "NeedsCorrection");
+                                    }}
+                                    disabled={actionLoading}
+                                    className="p-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors cursor-pointer shadow-2xs"
+                                    title="طلب تصحيح للمستند (مثلث الخطر)"
+                                  >
+                                    <AlertTriangle className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      handleQuickReview(doc.id, "Rejected");
+                                    }}
+                                    disabled={actionLoading}
+                                    className="p-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition-colors cursor-pointer shadow-2xs"
+                                    title="رفض المستند (إكس)"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              )}
+
+                              {/* Agent Return/Reset Action: only Agent can return reviewed documents */}
+                              {isAgent && doc.reviewStatus !== "Pending" && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    handleQuickReview(doc.id, "Pending", "تمت إعادة المستند للمراجعة من قبل الوكيل");
+                                  }}
+                                  disabled={actionLoading}
+                                  className="p-1.5 bg-amber-50 hover:bg-amber-500 text-amber-800 hover:text-white border border-amber-300 rounded-lg transition-colors cursor-pointer shadow-2xs"
+                                  title="إعادة فتح تدقيق المستند لموظف الصفا (إعادة التدقيق)"
+                                >
+                                  <Undo2 className="w-4 h-4" />
+                                </button>
+                              )}
+
+                              {canEditAnyData && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    handleDeleteDocument(doc.id);
+                                  }}
+                                  className="p-1 text-gray-400 hover:text-red-600 rounded cursor-pointer"
+                                  title="حذف"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="mt-4 flex flex-col items-center justify-center p-3 border border-dashed border-gray-300 rounded-lg bg-white text-center">
+                            {canEditAnyData ? (
+                              <label className="text-xs font-semibold text-sky-600 hover:text-sky-800 flex items-center gap-1 cursor-pointer">
                                 <UploadCloud className="w-4 h-4" />
+                                <span>رفع المستند (أو اسحبه هنا)</span>
                                 <input
                                   type="file"
                                   accept=".pdf,.jpg,.jpeg,.png"
@@ -2940,103 +3071,13 @@ export default function RequestDetailPage({
                                   }}
                                 />
                               </label>
-                            )}
-
-                            {/* Quick Review Buttons when Pending */}
-                            {(isSafaReviewer || isAgent) && doc.reviewStatus === "Pending" && (
-                              <div className="flex items-center gap-1">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    handleQuickReview(doc.id, "Accepted");
-                                  }}
-                                  disabled={actionLoading}
-                                  className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors cursor-pointer shadow-2xs"
-                                  title="قبول المستند (صح)"
-                                >
-                                  <Check className="w-4 h-4" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    handleQuickReview(doc.id, "NeedsCorrection");
-                                  }}
-                                  disabled={actionLoading}
-                                  className="p-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors cursor-pointer shadow-2xs"
-                                  title="طلب تصحيح للمستند (مثلث الخطر)"
-                                >
-                                  <AlertTriangle className="w-4 h-4" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    handleQuickReview(doc.id, "Rejected");
-                                  }}
-                                  disabled={actionLoading}
-                                  className="p-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition-colors cursor-pointer shadow-2xs"
-                                  title="رفض المستند (إكس)"
-                                >
-                                  <X className="w-4 h-4" />
-                                </button>
-                              </div>
-                            )}
-
-                            {/* Agent Return/Reset Action: only Agent can return reviewed documents */}
-                            {isAgent && doc.reviewStatus !== "Pending" && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  handleQuickReview(doc.id, "Pending", "تمت إعادة المستند للمراجعة من قبل الوكيل");
-                                }}
-                                disabled={actionLoading}
-                                className="p-1.5 bg-amber-50 hover:bg-amber-500 text-amber-800 hover:text-white border border-amber-300 rounded-lg transition-colors cursor-pointer shadow-2xs"
-                                title="إعادة فتح تدقيق المستند لموظف الصفا (إعادة التدقيق)"
-                              >
-                                <Undo2 className="w-4 h-4" />
-                              </button>
-                            )}
-
-                            {canEditAnyData && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  handleDeleteDocument(doc.id);
-                                }}
-                                className="p-1 text-gray-400 hover:text-red-600 rounded cursor-pointer"
-                                title="حذف"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                            ) : (
+                              <span className="text-[11px] text-gray-400">لم يُرفع</span>
                             )}
                           </div>
-                        </div>
-                      ) : (
-                        <div className="mt-4 flex flex-col items-center justify-center p-3 border border-dashed border-gray-300 rounded-lg bg-white text-center">
-                          {canEditAnyData ? (
-                            <label className="text-xs font-semibold text-sky-600 hover:text-sky-800 flex items-center gap-1 cursor-pointer">
-                              <UploadCloud className="w-4 h-4" />
-                              <span>رفع المستند</span>
-                              <input
-                                type="file"
-                                accept=".pdf,.jpg,.jpeg,.png"
-                                className="hidden"
-                                onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) handleFileUpload(file, docType, traveler.id);
-                                }}
-                              />
-                            </label>
-                          ) : (
-                            <span className="text-[11px] text-gray-400">لم يُرفع</span>
-                          )}
-                        </div>
-                      )}
-                    </div>
+                        )}
+                      </div>
+                    </FileDropArea>
                   );
                 }
               )}

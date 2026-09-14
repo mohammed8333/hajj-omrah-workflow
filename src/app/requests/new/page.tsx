@@ -34,6 +34,7 @@ import { scanPassportMRZ, translateEnglishNameToArabic } from "@/lib/mrzScanner"
 import { scanHostId } from "@/lib/hostIdScanner";
 import { scanFlightTicket, calculateAirportArrivalTime } from "@/lib/flightTicketScanner";
 import { useDialog } from "@/lib/dialog-context";
+import { FileDropArea } from "@/components/ui/FileDropArea";
 
 interface TravelerDraft {
   id: string;
@@ -770,63 +771,74 @@ export default function UnifiedNewRequestPage() {
                 )}
               </div>
 
-              <div className="relative">
-                <input
-                  type="file"
-                  id="host-id-file"
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  onChange={(e) => handleHostIdFileChange(e.target.files?.[0] || null)}
-                  className="hidden"
-                />
-                <label
-                  htmlFor="host-id-file"
-                  className={`w-full flex items-center justify-between p-4 text-sm rounded-xl border-2 border-dashed cursor-pointer transition-colors ${
-                    hostIdFile
-                      ? "bg-green-50/60 border-green-400 text-green-900"
-                      : "bg-gray-50/50 border-gray-300 hover:border-amber-400 hover:bg-amber-50/30 text-gray-700"
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-xs shrink-0">
-                      ID
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold">
-                        {hostIdFile ? hostIdFile.name : "اضغط لاختيار أو سحب ملف هوية المستضيف"}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        {hostIdFile
-                          ? `${formatFileSize(hostIdFile.size)} - جاهز للرفع (يتم الفحص التلقائي)`
-                          : "الصيغ المسموحة: PDF, JPG, PNG (حد أقصى 10MB) - يتم استخراج الاسم والميلاد تلقائياً"}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {hostIdFile ? (
-                      <span className="text-xs font-bold text-green-700 bg-green-100 px-2.5 py-1 rounded-full flex items-center gap-1">
-                        <CheckCircle2 className="w-3.5 h-3.5" /> تم التحديد
-                      </span>
-                    ) : (
-                      <Upload className="w-5 h-5 text-gray-400" />
-                    )}
-                  </div>
-                </label>
-
-                {hostIdFile && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setHostIdFile(null);
-                      setHostScanSuccess(false);
-                      setHostScanMessage("");
-                    }}
-                    className="absolute top-2 left-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 shadow-sm cursor-pointer"
-                    title="إزالة واستبدال"
+              <FileDropArea
+                onFileDrop={(file) => handleHostIdFileChange(file)}
+                accept=".pdf,.jpg,.jpeg,.png"
+                maxSizeMb={10}
+                activeBorderColor="amber"
+                overlayText="أفلت ملف هوية المستضيف هنا"
+                overlaySubtext="سيتم فحص الهوية واستخراج البيانات تلقائياً (OCR)"
+                onError={(msg) => alert({ title: "تنبيه", message: msg, variant: "warning" })}
+                className="rounded-xl"
+              >
+                <div className="relative">
+                  <input
+                    type="file"
+                    id="host-id-file"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    onChange={(e) => handleHostIdFileChange(e.target.files?.[0] || null)}
+                    className="hidden"
+                  />
+                  <label
+                    htmlFor="host-id-file"
+                    className={`w-full flex items-center justify-between p-4 text-sm rounded-xl border-2 border-dashed cursor-pointer transition-colors ${
+                      hostIdFile
+                        ? "bg-green-50/60 border-green-400 text-green-900"
+                        : "bg-gray-50/50 border-gray-300 hover:border-amber-400 hover:bg-amber-50/30 text-gray-700"
+                    }`}
                   >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-xs shrink-0">
+                        ID
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold">
+                          {hostIdFile ? hostIdFile.name : "اضغط لاختيار أو اسحب ملف هوية المستضيف هنا"}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {hostIdFile
+                            ? `${formatFileSize(hostIdFile.size)} - جاهز للرفع (يتم الفحص التلقائي)`
+                            : "الصيغ المسموحة: PDF, JPG, PNG (حد أقصى 10MB) - يتم استخراج الاسم والميلاد تلقائياً"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {hostIdFile ? (
+                        <span className="text-xs font-bold text-green-700 bg-green-100 px-2.5 py-1 rounded-full flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> تم التحديد
+                        </span>
+                      ) : (
+                        <Upload className="w-5 h-5 text-gray-400" />
+                      )}
+                    </div>
+                  </label>
+
+                  {hostIdFile && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setHostIdFile(null);
+                        setHostScanSuccess(false);
+                        setHostScanMessage("");
+                      }}
+                      className="absolute top-2 left-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 shadow-sm cursor-pointer z-10"
+                      title="إزالة واستبدال"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </FileDropArea>
             </div>
           </div>
         )}
@@ -890,65 +902,76 @@ export default function UnifiedNewRequestPage() {
             )}
           </label>
 
-          {flightTicketFile ? (
-            <div className="p-4 bg-sky-50/50 border border-sky-200 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3">
-              <div className="flex items-center gap-3 overflow-hidden w-full sm:w-auto">
-                <div className="w-12 h-12 bg-sky-100 text-sky-700 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 border border-sky-200">
-                  <Ticket className="w-6 h-6" />
+          <FileDropArea
+            onFileDrop={(file) => handleTicketFileChange(file)}
+            accept=".pdf,.jpg,.jpeg,.png"
+            maxSizeMb={15}
+            activeBorderColor="sky"
+            overlayText="أفلت تذكرة الطيران هنا"
+            overlaySubtext="يقوم الذكاء الاصطناعي باستخراج تفاصيل ومواعيد الرحلة تلقائياً"
+            onError={(msg) => alert({ title: "تنبيه", message: msg, variant: "warning" })}
+            className="rounded-xl"
+          >
+            {flightTicketFile ? (
+              <div className="p-4 bg-sky-50/50 border border-sky-200 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="flex items-center gap-3 overflow-hidden w-full sm:w-auto">
+                  <div className="w-12 h-12 bg-sky-100 text-sky-700 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 border border-sky-200">
+                    <Ticket className="w-6 h-6" />
+                  </div>
+                  <div className="overflow-hidden flex-1">
+                    <p className="text-sm font-bold text-gray-800 truncate">{flightTicketFile.name}</p>
+                    <p className="text-xs text-gray-500">{(flightTicketFile.size / 1024).toFixed(1)} KB</p>
+                  </div>
                 </div>
-                <div className="overflow-hidden flex-1">
-                  <p className="text-sm font-bold text-gray-800 truncate">{flightTicketFile.name}</p>
-                  <p className="text-xs text-gray-500">{(flightTicketFile.size / 1024).toFixed(1)} KB</p>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                  <button
+                    type="button"
+                    disabled={isScanningTicket}
+                    onClick={() => runTicketScan(flightTicketFile)}
+                    className="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer shadow-2xs"
+                    title="إعادة فحص التذكرة بالذكاء الاصطناعي"
+                  >
+                    <RotateCcw className={`w-3.5 h-3.5 ${isScanningTicket ? "animate-spin" : ""}`} />
+                    <span>إعادة الفحص بالذكاء الاصطناعي</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleTicketFileChange(null)}
+                    className="px-3 py-1.5 bg-white hover:bg-red-50 text-red-600 border border-red-200 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    <span>إزالة الملف</span>
+                  </button>
                 </div>
               </div>
-
-              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                <button
-                  type="button"
-                  disabled={isScanningTicket}
-                  onClick={() => runTicketScan(flightTicketFile)}
-                  className="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer shadow-2xs"
-                  title="إعادة فحص التذكرة بالذكاء الاصطناعي"
+            ) : (
+              <div>
+                <input
+                  type="file"
+                  id="sharedFlightTicketFile"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={(e) => handleTicketFileChange(e.target.files?.[0] || null)}
+                  className="hidden"
+                />
+                <label
+                  htmlFor="sharedFlightTicketFile"
+                  className="w-full flex flex-col items-center justify-center py-6 px-4 border-2 border-dashed border-sky-300 hover:border-sky-500 rounded-xl cursor-pointer bg-sky-50/30 hover:bg-sky-50/70 transition-all text-center group"
                 >
-                  <RotateCcw className={`w-3.5 h-3.5 ${isScanningTicket ? "animate-spin" : ""}`} />
-                  <span>إعادة الفحص بالذكاء الاصطناعي</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleTicketFileChange(null)}
-                  className="px-3 py-1.5 bg-white hover:bg-red-50 text-red-600 border border-red-200 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
-                >
-                  <X className="w-3.5 h-3.5" />
-                  <span>إزالة الملف</span>
-                </button>
+                  <div className="w-12 h-12 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                    <Upload className="w-6 h-6" />
+                  </div>
+                  <span className="text-sm font-bold text-sky-700">
+                    اضغط هنا أو اسحب تذكرة الطيران المشتركة (صورة أو PDF)
+                  </span>
+                  <span className="text-xs text-gray-500 mt-1">
+                    يقوم الذكاء الاصطناعي بقراءة وتعبئة جميع الحقول أدناه تلقائياً بدقة تامة
+                  </span>
+                </label>
               </div>
-            </div>
-          ) : (
-            <div>
-              <input
-                type="file"
-                id="sharedFlightTicketFile"
-                accept=".pdf,.jpg,.jpeg,.png"
-                onChange={(e) => handleTicketFileChange(e.target.files?.[0] || null)}
-                className="hidden"
-              />
-              <label
-                htmlFor="sharedFlightTicketFile"
-                className="w-full flex flex-col items-center justify-center py-6 px-4 border-2 border-dashed border-sky-300 hover:border-sky-500 rounded-xl cursor-pointer bg-sky-50/30 hover:bg-sky-50/70 transition-all text-center group"
-              >
-                <div className="w-12 h-12 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                  <Upload className="w-6 h-6" />
-                </div>
-                <span className="text-sm font-bold text-sky-700">
-                  اضغط هنا لرفع تذكرة الطيران المشتركة (صورة أو PDF)
-                </span>
-                <span className="text-xs text-gray-500 mt-1">
-                  يقوم الذكاء الاصطناعي بقراءة وتعبئة جميع الحقول أدناه تلقائياً بدقة تامة
-                </span>
-              </label>
-            </div>
-          )}
+            )}
+          </FileDropArea>
         </div>
 
         {/* 6 Form Fields Extracted by AI */}
@@ -1260,184 +1283,206 @@ export default function UnifiedNewRequestPage() {
               {/* Direct Document Upload Cards (Passport & Photo) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* 1. Passport Upload */}
-                <div
-                  className={`rounded-xl border-2 border-dashed p-3.5 transition-colors ${
-                    traveler.passportFile
-                      ? "border-green-400 bg-green-50/50"
-                      : "border-gray-300 hover:border-blue-400 bg-gray-50/40"
-                  }`}
+                <FileDropArea
+                  onFileDrop={(file) => handleFileChange(traveler.id, "passport", file)}
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  maxSizeMb={10}
+                  activeBorderColor="blue"
+                  overlayText="أفلت جواز السفر هنا"
+                  overlaySubtext="سيتم فحص وقراءة شريط MRZ تلقائياً"
+                  onError={(msg) => alert({ title: "تنبيه", message: msg, variant: "warning" })}
+                  className="rounded-xl"
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-gray-800">
-                      <FileText className="w-4 h-4 text-blue-600" />
-                      <span>صورة جواز السفر</span>
+                  <div
+                    className={`rounded-xl border-2 border-dashed p-3.5 transition-colors ${
+                      traveler.passportFile
+                        ? "border-green-400 bg-green-50/50"
+                        : "border-gray-300 hover:border-blue-400 bg-gray-50/40"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-gray-800">
+                        <FileText className="w-4 h-4 text-blue-600" />
+                        <span>صورة جواز السفر</span>
+                      </div>
+                      {traveler.passportFile && (
+                        <span className="text-[10px] text-green-700 bg-green-100 px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5">
+                          <CheckCircle2 className="w-3 h-3" /> تم التحديد
+                        </span>
+                      )}
                     </div>
-                    {traveler.passportFile && (
-                      <span className="text-[10px] text-green-700 bg-green-100 px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5">
-                        <CheckCircle2 className="w-3 h-3" /> تم التحديد
-                      </span>
-                    )}
-                  </div>
 
-                  {traveler.passportFile ? (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        {traveler.passportPreview ? (
-                          <img
-                            src={traveler.passportPreview}
-                            alt="معاينة الجواز"
-                            className="w-12 h-12 object-cover rounded-lg border border-green-300 shrink-0"
-                          />
-                        ) : (
-                          <div className="w-12 h-12 bg-red-100 text-red-600 rounded-lg flex items-center justify-center font-bold text-xs shrink-0">
-                            PDF
+                    {traveler.passportFile ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          {traveler.passportPreview ? (
+                            <img
+                              src={traveler.passportPreview}
+                              alt="معاينة الجواز"
+                              className="w-12 h-12 object-cover rounded-lg border border-green-300 shrink-0"
+                            />
+                          ) : (
+                            <div className="w-12 h-12 bg-red-100 text-red-600 rounded-lg flex items-center justify-center font-bold text-xs shrink-0">
+                              PDF
+                            </div>
+                          )}
+                          <div className="overflow-hidden flex-1">
+                            <p className="text-xs font-bold text-gray-800 truncate">
+                              {traveler.passportFile.name}
+                            </p>
+                            <p className="text-[10px] text-gray-500">
+                              {formatFileSize(traveler.passportFile.size)}
+                            </p>
                           </div>
-                        )}
-                        <div className="overflow-hidden flex-1">
-                          <p className="text-xs font-bold text-gray-800 truncate">
-                            {traveler.passportFile.name}
-                          </p>
-                          <p className="text-[10px] text-gray-500">
-                            {formatFileSize(traveler.passportFile.size)}
-                          </p>
+                        </div>
+                        <div className="flex items-center gap-3 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => handleFileChange(traveler.id, "passport", null)}
+                            className="text-[11px] text-red-600 hover:text-red-800 font-medium flex items-center gap-1"
+                          >
+                            <X className="w-3 h-3" /> إزالة واستبدال
+                          </button>
+                          {traveler.passportFile.type.startsWith("image/") && (
+                            <button
+                              type="button"
+                              disabled={traveler.isScanning}
+                              onClick={() =>
+                                runMrzScanForTraveler(traveler.id, traveler.passportFile!)
+                              }
+                              className="text-[11px] text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1 disabled:opacity-50"
+                              title="إعادة فحص وقراءة شريط MRZ"
+                            >
+                              <RotateCcw
+                                className={`w-3 h-3 ${
+                                  traveler.isScanning ? "animate-spin" : ""
+                                }`}
+                              />
+                              إعادة فحص الجواز
+                            </button>
+                          )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-3 pt-1">
+                    ) : (
+                      <div>
+                        <input
+                          type="file"
+                          id={`passport-${traveler.id}`}
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          onChange={(e) =>
+                            handleFileChange(
+                              traveler.id,
+                              "passport",
+                              e.target.files?.[0] || null
+                            )
+                          }
+                          className="hidden"
+                        />
+                        <label
+                          htmlFor={`passport-${traveler.id}`}
+                          className="w-full flex flex-col items-center justify-center py-4 px-2 border border-gray-200 rounded-lg cursor-pointer hover:bg-white hover:border-blue-300 transition-colors"
+                        >
+                          <Upload className="w-5 h-5 text-gray-400 mb-1" />
+                          <span className="text-xs font-bold text-blue-600">
+                            اضغط لاختيار أو اسحب الجواز هنا
+                          </span>
+                          <span className="text-[10px] text-gray-400 mt-0.5">
+                            PDF, JPG, PNG (أقصى 10MB)
+                          </span>
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                </FileDropArea>
+
+                {/* 2. Photo Upload */}
+                <FileDropArea
+                  onFileDrop={(file) => handleFileChange(traveler.id, "photo", file)}
+                  accept=".jpg,.jpeg,.png"
+                  maxSizeMb={10}
+                  activeBorderColor="purple"
+                  overlayText="أفلت الصورة الشخصية هنا"
+                  overlaySubtext="خلفية بيضاء وواضحة (JPG, PNG)"
+                  onError={(msg) => alert({ title: "تنبيه", message: msg, variant: "warning" })}
+                  className="rounded-xl"
+                >
+                  <div
+                    className={`rounded-xl border-2 border-dashed p-3.5 transition-colors ${
+                      traveler.photoFile
+                        ? "border-green-400 bg-green-50/50"
+                        : "border-gray-300 hover:border-purple-400 bg-gray-50/40"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-gray-800">
+                        <ImageIcon className="w-4 h-4 text-purple-600" />
+                        <span>الصورة الشخصية</span>
+                      </div>
+                      {traveler.photoFile && (
+                        <span className="text-[10px] text-green-700 bg-green-100 px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5">
+                          <CheckCircle2 className="w-3 h-3" /> تم التحديد
+                        </span>
+                      )}
+                    </div>
+
+                    {traveler.photoFile ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          {traveler.photoPreview && (
+                            <img
+                              src={traveler.photoPreview}
+                              alt="معاينة الصورة"
+                              className="w-12 h-12 object-cover rounded-full border border-purple-300 shrink-0"
+                            />
+                          )}
+                          <div className="overflow-hidden flex-1">
+                            <p className="text-xs font-bold text-gray-800 truncate">
+                              {traveler.photoFile.name}
+                            </p>
+                            <p className="text-[10px] text-gray-500">
+                              {formatFileSize(traveler.photoFile.size)}
+                            </p>
+                          </div>
+                        </div>
                         <button
                           type="button"
-                          onClick={() => handleFileChange(traveler.id, "passport", null)}
+                          onClick={() => handleFileChange(traveler.id, "photo", null)}
                           className="text-[11px] text-red-600 hover:text-red-800 font-medium flex items-center gap-1"
                         >
                           <X className="w-3 h-3" /> إزالة واستبدال
                         </button>
-                        {traveler.passportFile.type.startsWith("image/") && (
-                          <button
-                            type="button"
-                            disabled={traveler.isScanning}
-                            onClick={() =>
-                              runMrzScanForTraveler(traveler.id, traveler.passportFile!)
-                            }
-                            className="text-[11px] text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1 disabled:opacity-50"
-                            title="إعادة فحص وقراءة شريط MRZ"
-                          >
-                            <RotateCcw
-                              className={`w-3 h-3 ${
-                                traveler.isScanning ? "animate-spin" : ""
-                              }`}
-                            />
-                            إعادة فحص الجواز
-                          </button>
-                        )}
                       </div>
-                    </div>
-                  ) : (
-                    <div>
-                      <input
-                        type="file"
-                        id={`passport-${traveler.id}`}
-                        accept=".pdf,.jpg,.jpeg,.png"
-                        onChange={(e) =>
-                          handleFileChange(
-                            traveler.id,
-                            "passport",
-                            e.target.files?.[0] || null
-                          )
-                        }
-                        className="hidden"
-                      />
-                      <label
-                        htmlFor={`passport-${traveler.id}`}
-                        className="w-full flex flex-col items-center justify-center py-4 px-2 border border-gray-200 rounded-lg cursor-pointer hover:bg-white hover:border-blue-300 transition-colors"
-                      >
-                        <Upload className="w-5 h-5 text-gray-400 mb-1" />
-                        <span className="text-xs font-bold text-blue-600">
-                          اضغط لاختيار الجواز
-                        </span>
-                        <span className="text-[10px] text-gray-400 mt-0.5">
-                          PDF, JPG, PNG (أقصى 10MB)
-                        </span>
-                      </label>
-                    </div>
-                  )}
-                </div>
-
-                {/* 2. Photo Upload */}
-                <div
-                  className={`rounded-xl border-2 border-dashed p-3.5 transition-colors ${
-                    traveler.photoFile
-                      ? "border-green-400 bg-green-50/50"
-                      : "border-gray-300 hover:border-purple-400 bg-gray-50/40"
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-gray-800">
-                      <ImageIcon className="w-4 h-4 text-purple-600" />
-                      <span>الصورة الشخصية</span>
-                    </div>
-                    {traveler.photoFile && (
-                      <span className="text-[10px] text-green-700 bg-green-100 px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5">
-                        <CheckCircle2 className="w-3 h-3" /> تم التحديد
-                      </span>
+                    ) : (
+                      <div>
+                        <input
+                          type="file"
+                          id={`photo-${traveler.id}`}
+                          accept=".jpg,.jpeg,.png"
+                          onChange={(e) =>
+                            handleFileChange(
+                              traveler.id,
+                              "photo",
+                              e.target.files?.[0] || null
+                            )
+                          }
+                          className="hidden"
+                        />
+                        <label
+                          htmlFor={`photo-${traveler.id}`}
+                          className="w-full flex flex-col items-center justify-center py-4 px-2 border border-gray-200 rounded-lg cursor-pointer hover:bg-white hover:border-purple-300 transition-colors"
+                        >
+                          <Upload className="w-5 h-5 text-gray-400 mb-1" />
+                          <span className="text-xs font-bold text-purple-600">
+                            اضغط لاختيار أو اسحب الصورة هنا
+                          </span>
+                          <span className="text-[10px] text-gray-400 mt-0.5">
+                            خلفية بيضاء (JPG, PNG)
+                          </span>
+                        </label>
+                      </div>
                     )}
                   </div>
-
-                  {traveler.photoFile ? (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        {traveler.photoPreview && (
-                          <img
-                            src={traveler.photoPreview}
-                            alt="معاينة الصورة"
-                            className="w-12 h-12 object-cover rounded-full border border-purple-300 shrink-0"
-                          />
-                        )}
-                        <div className="overflow-hidden flex-1">
-                          <p className="text-xs font-bold text-gray-800 truncate">
-                            {traveler.photoFile.name}
-                          </p>
-                          <p className="text-[10px] text-gray-500">
-                            {formatFileSize(traveler.photoFile.size)}
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleFileChange(traveler.id, "photo", null)}
-                        className="text-[11px] text-red-600 hover:text-red-800 font-medium flex items-center gap-1"
-                      >
-                        <X className="w-3 h-3" /> إزالة واستبدال
-                      </button>
-                    </div>
-                  ) : (
-                    <div>
-                      <input
-                        type="file"
-                        id={`photo-${traveler.id}`}
-                        accept=".jpg,.jpeg,.png"
-                        onChange={(e) =>
-                          handleFileChange(
-                            traveler.id,
-                            "photo",
-                            e.target.files?.[0] || null
-                          )
-                        }
-                        className="hidden"
-                      />
-                      <label
-                        htmlFor={`photo-${traveler.id}`}
-                        className="w-full flex flex-col items-center justify-center py-4 px-2 border border-gray-200 rounded-lg cursor-pointer hover:bg-white hover:border-purple-300 transition-colors"
-                      >
-                        <Upload className="w-5 h-5 text-gray-400 mb-1" />
-                        <span className="text-xs font-bold text-purple-600">
-                          اضغط لاختيار الصورة
-                        </span>
-                        <span className="text-[10px] text-gray-400 mt-0.5">
-                          خلفية بيضاء (JPG, PNG)
-                        </span>
-                      </label>
-                    </div>
-                  )}
-                </div>
+                </FileDropArea>
               </div>
             </div>
           ))}
