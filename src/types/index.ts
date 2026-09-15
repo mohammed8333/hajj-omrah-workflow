@@ -165,6 +165,13 @@ export interface GroupRequestSummary {
   hasHosting: boolean;
   hostName?: string;
   hostPhone?: string;
+  hostNationalId?: string;
+  hostBirthDate?: string;
+  hostIdDocumentId?: string;
+  hostIdDocumentUrl?: string;
+  flightTicketDocumentId?: string;
+  flightTicketDocumentUrl?: string;
+  returnFlightNumber?: string;
   contactPhone: string;
   travelDate?: string;
   departureDate?: string;
@@ -203,6 +210,7 @@ export interface GroupRequestDetail {
   airportArrivalTime?: string;
   airline?: string;
   flightNumber?: string;
+  returnFlightNumber?: string;
   flightTicketDocumentId?: string;
   flightTicketDocument?: DocumentItem;
   destination?: string;

@@ -24,6 +24,11 @@ import {
   User,
   Clock,
   MessageSquare,
+  IdCard,
+  Download,
+  Eye,
+  ExternalLink,
+  CheckCircle2,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -153,6 +158,20 @@ export default function RequestsListPage() {
   const [nusukFilter, setNusukFilter] = useState<"ALL" | "WITH_NUSUK" | "WITHOUT_NUSUK">("ALL");
   const [activeTab, setActiveTab] = useState<string>("ALL");
   const [copiedNusuk, setCopiedNusuk] = useState<string | null>(null);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [docPreviewModal, setDocPreviewModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    url: string | null;
+    loading: boolean;
+    docId?: string;
+    downloadName?: string;
+  }>({
+    isOpen: false,
+    title: "",
+    url: null,
+    loading: false,
+  });
 
   useEffect(() => {
     if (role === "SaudiAgent" && activeTab === "ALL") {
@@ -194,6 +213,92 @@ export default function RequestsListPage() {
     navigator.clipboard.writeText(nusuk);
     setCopiedNusuk(nusuk);
     setTimeout(() => setCopiedNusuk(null), 2000);
+  };
+
+  const copyText = (text: string, key: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    navigator.clipboard.writeText(text);
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(null), 2000);
+  };
+
+  const handleViewDoc = async (
+    docId?: string,
+    docUrl?: string,
+    title?: string,
+    e?: React.MouseEvent
+  ) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    if (!docId && !docUrl) {
+      await alert({
+        title: "تنبيه",
+        message: "هذا المستند غير مرفوع في المعاملة حتى الآن.",
+        variant: "warning",
+      });
+      return;
+    }
+    setDocPreviewModal({
+      isOpen: true,
+      title: title || "معاينة المستند",
+      url: docUrl || null,
+      loading: !docUrl,
+      docId,
+      downloadName: (title || "document").replace(/\s+/g, "_") + ".pdf",
+    });
+    if (!docUrl && docId) {
+      try {
+        const url = await api.documents.getStreamUrl(docId);
+        setDocPreviewModal((prev) => ({ ...prev, url, loading: false }));
+      } catch (err) {
+        console.error("Failed to get doc stream URL:", err);
+        setDocPreviewModal((prev) => ({ ...prev, loading: false }));
+        await alert({
+          title: "خطأ",
+          message: "تعذر تحميل معاينة المستند، يرجى المحاولة مرة أخرى.",
+          variant: "danger",
+        });
+      }
+    }
+  };
+
+  const handleDownloadDoc = async (
+    docId?: string,
+    docUrl?: string,
+    fileName?: string,
+    e?: React.MouseEvent
+  ) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    if (!docId && !docUrl) {
+      await alert({
+        title: "تنبيه",
+        message: "هذا المستند غير مرفوع في المعاملة حتى الآن.",
+        variant: "warning",
+      });
+      return;
+    }
+    try {
+      const url = docUrl || (await api.documents.getStreamUrl(docId!));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName || "document.pdf";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error("Failed to download document:", err);
+      await alert({
+        title: "خطأ",
+        message: "تعذر تنزيل المستند، يرجى المحاولة لاحقاً.",
+        variant: "danger",
+      });
+    }
   };
 
   const handleAdminArchive = async (id: string, e: React.MouseEvent) => {
@@ -896,9 +1001,274 @@ ${travelersLines}
         </div>
       ) : (
         <>
-          {/* Mobile Cards View (phones) - بناءً على الرسم التخطيطي المطلوب */}
+          {/* Mobile Cards View (phones) */}
           <div className="block md:hidden space-y-3">
             {filtered.map((r) => {
+              if (role === "SaudiAgent") {
+                const isCompleted = r.status === "Completed" || r.status === "Archived";
+                return (
+                  <div
+                    key={r.id}
+                    onClick={() => router.push(`/requests/${r.id}`)}
+                    className="bg-white rounded-2xl border border-gray-200 p-3.5 shadow-xs hover:border-sky-300 hover:shadow-md transition-all cursor-pointer active:scale-[0.99] space-y-3"
+                  >
+                    {/* الشريط العلوي: يمين = رقم مجموعة نسك مع النسخ، شمال = حالة المعاملة */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 px-2.5 py-1 rounded-xl">
+                        <span className="text-[11px] text-gray-500 font-bold">نسك:</span>
+                        {r.nusukGroupNumber ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono font-bold text-emerald-800 text-xs">
+                              {r.nusukGroupNumber}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                copyToClipboard(r.nusukGroupNumber!, e);
+                              }}
+                              className="text-gray-400 hover:text-emerald-700 p-0.5 cursor-pointer"
+                              title="نسخ رقم نسك"
+                            >
+                              {copiedNusuk === r.nusukGroupNumber ? (
+                                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                              ) : (
+                                <Copy className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 text-xs italic">قيد التسجيل</span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        {isCompleted ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-300 shadow-2xs">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>اكتملت المعاملة</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-sky-50 text-sky-700 border border-sky-300 shadow-2xs">
+                            <Check className="w-3.5 h-3.5 text-sky-600" />
+                            <span>تم الاستلام</span>
+                          </span>
+                        )}
+
+                        {r.status === "Completed" && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAgentArchive(r.id, r.requestNumber, e);
+                            }}
+                            className="px-2 py-1 text-[11px] font-bold text-emerald-800 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 rounded-lg cursor-pointer transition-colors flex items-center gap-1 shadow-2xs"
+                            title="إيداع في الأرشيف (تم)"
+                          >
+                            <Check className="w-3 h-3 text-emerald-700" />
+                            <span>تم (أرشفة)</span>
+                          </button>
+                        )}
+                        {r.status === "Archived" && (
+                          <span className="px-2 py-0.5 text-[10px] font-bold text-purple-700 bg-purple-50 border border-purple-200 rounded-lg flex items-center gap-1">
+                            <Archive className="w-3 h-3 text-purple-600" />
+                            <span>مؤرشفة</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* عمودين: الجزء الأيمن مربعين تحت بعض للرحلة، الجزء الأيسر بيانات المستضيف الـ 4 مع النسخ */}
+                    <div className="grid grid-cols-2 gap-2.5 items-stretch">
+                      {/* الجزء الأيمن: مربعين تحت بعض لبيانات الرحلة */}
+                      <div className="flex flex-col gap-2 justify-between">
+                        {/* المربع الأول: رحلة الذهاب */}
+                        <div className="bg-sky-50/70 border border-sky-200 rounded-xl p-2.5 flex flex-col justify-center gap-1 flex-1">
+                          <div className="text-[10px] text-sky-700 font-bold flex items-center gap-1">
+                            <Plane className="w-3 h-3 text-sky-600" />
+                            <span>رحلة الذهاب:</span>
+                          </div>
+                          <div className="font-mono font-bold text-gray-900 text-xs truncate">
+                            {r.flightNumber || r.airline || "تذكرة مشتركة"}
+                          </div>
+                          <div className="text-[11px] font-bold text-gray-800 flex items-center gap-1 mt-0.5">
+                            <Calendar className="w-3 h-3 text-sky-600" />
+                            <span>{formatDayMonth(r.departureDate || r.travelDate)}</span>
+                          </div>
+                        </div>
+
+                        {/* المربع الثاني: رحلة العودة */}
+                        <div className="bg-indigo-50/60 border border-indigo-200 rounded-xl p-2.5 flex flex-col justify-center gap-1 flex-1">
+                          <div className="text-[10px] text-indigo-700 font-bold flex items-center gap-1">
+                            <Plane className="w-3 h-3 text-indigo-600 -scale-x-100" />
+                            <span>رحلة العودة:</span>
+                          </div>
+                          <div className="font-mono font-bold text-gray-900 text-xs truncate">
+                            {r.returnFlightNumber || r.flightNumber || "رحلة العودة"}
+                          </div>
+                          <div className="text-[11px] font-bold text-gray-800 flex items-center gap-1 mt-0.5">
+                            <Calendar className="w-3 h-3 text-indigo-600" />
+                            <span>{r.returnDate ? formatDayMonth(r.returnDate) : "لم يُحدد"}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* الجزء الأيسر: بيانات المستضيف الأربعة تحت بعض مع علامة نسخ لكل سطر */}
+                      <div className="bg-amber-50/30 border border-amber-200/80 rounded-xl p-2.5 flex flex-col justify-between text-xs space-y-1.5">
+                        {/* 1. رقم الهوية + نسخ */}
+                        <div className="flex items-center justify-between gap-1 border-b border-amber-100 pb-1">
+                          <div className="min-w-0 flex-1">
+                            <span className="text-[10px] text-gray-500 block leading-tight">رقم الهوية:</span>
+                            <span className="font-mono font-bold text-gray-900 text-[11px] truncate block" dir="ltr">
+                              {r.hostNationalId || "-"}
+                            </span>
+                          </div>
+                          {r.hostNationalId && (
+                            <button
+                              type="button"
+                              onClick={(e) => copyText(r.hostNationalId!, `m-hostId-${r.id}`, e)}
+                              className="text-gray-400 hover:text-amber-700 p-1 cursor-pointer shrink-0"
+                              title="نسخ رقم الهوية"
+                            >
+                              {copiedKey === `m-hostId-${r.id}` ? (
+                                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                              ) : (
+                                <Copy className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          )}
+                        </div>
+
+                        {/* 2. تاريخ ميلاد المستضيف + نسخ */}
+                        <div className="flex items-center justify-between gap-1 border-b border-amber-100 pb-1">
+                          <div className="min-w-0 flex-1">
+                            <span className="text-[10px] text-gray-500 block leading-tight">تاريخ الميلاد:</span>
+                            <span className="font-mono font-bold text-gray-900 text-[11px] truncate block" dir="ltr">
+                              {r.hostBirthDate || "-"}
+                            </span>
+                          </div>
+                          {r.hostBirthDate && (
+                            <button
+                              type="button"
+                              onClick={(e) => copyText(r.hostBirthDate!, `m-hostBirth-${r.id}`, e)}
+                              className="text-gray-400 hover:text-amber-700 p-1 cursor-pointer shrink-0"
+                              title="نسخ تاريخ الميلاد"
+                            >
+                              {copiedKey === `m-hostBirth-${r.id}` ? (
+                                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                              ) : (
+                                <Copy className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          )}
+                        </div>
+
+                        {/* 3. تليفون المستضيف + نسخ */}
+                        <div className="flex items-center justify-between gap-1 border-b border-amber-100 pb-1">
+                          <div className="min-w-0 flex-1">
+                            <span className="text-[10px] text-gray-500 block leading-tight">هاتف المستضيف:</span>
+                            <span className="font-mono font-bold text-gray-900 text-[11px] truncate block" dir="ltr">
+                              {r.hostPhone || (r.hasHosting ? r.contactPhone : "-")}
+                            </span>
+                          </div>
+                          {(r.hostPhone || (r.hasHosting && r.contactPhone)) && (
+                            <button
+                              type="button"
+                              onClick={(e) => copyText(r.hostPhone || r.contactPhone, `m-hostPhone-${r.id}`, e)}
+                              className="text-gray-400 hover:text-amber-700 p-1 cursor-pointer shrink-0"
+                              title="نسخ رقم الهاتف"
+                            >
+                              {copiedKey === `m-hostPhone-${r.id}` ? (
+                                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                              ) : (
+                                <Copy className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          )}
+                        </div>
+
+                        {/* 4. اسم المستضيف + نسخ */}
+                        <div className="flex items-center justify-between gap-1">
+                          <div className="min-w-0 flex-1">
+                            <span className="text-[10px] text-gray-500 block leading-tight">اسم المستضيف:</span>
+                            <span className="font-bold text-gray-900 text-[11px] truncate block">
+                              {r.hostName || "-"}
+                            </span>
+                          </div>
+                          {r.hostName && (
+                            <button
+                              type="button"
+                              onClick={(e) => copyText(r.hostName!, `m-hostName-${r.id}`, e)}
+                              className="text-gray-400 hover:text-amber-700 p-1 cursor-pointer shrink-0"
+                              title="نسخ اسم المستضيف"
+                            >
+                              {copiedKey === `m-hostName-${r.id}` ? (
+                                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                              ) : (
+                                <Copy className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* الشريط السفلي: أزرار التذكرة والهوية (معاينة وتحميل) */}
+                    <div className="pt-2 border-t border-gray-100 flex items-center justify-between gap-2">
+                      {/* يمين: أزرار التذكرة */}
+                      <div className="flex items-center gap-1 bg-sky-50/80 border border-sky-200 px-2 py-1 rounded-xl">
+                        <button
+                          type="button"
+                          onClick={(e) => handleViewDoc(r.flightTicketDocumentId, r.flightTicketDocumentUrl, `تذكرة طيران - ${r.groupName}`, e)}
+                          className={`p-1.5 rounded-lg text-sky-700 hover:bg-sky-100 transition-colors cursor-pointer flex items-center gap-1 ${
+                            !r.flightTicketDocumentId && !r.flightTicketDocumentUrl ? "opacity-40" : ""
+                          }`}
+                          title="معاينة تذكرة الطيران"
+                        >
+                          <Plane className="w-4 h-4 text-sky-600" />
+                          <span className="text-[11px] font-bold">التذكرة</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => handleDownloadDoc(r.flightTicketDocumentId, r.flightTicketDocumentUrl, `ticket-${r.requestNumber}.pdf`, e)}
+                          className={`p-1.5 rounded-lg text-sky-700 hover:bg-sky-100 transition-colors cursor-pointer ${
+                            !r.flightTicketDocumentId && !r.flightTicketDocumentUrl ? "opacity-40" : ""
+                          }`}
+                          title="تحميل تذكرة الطيران"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      {/* يسار: أزرار الهوية */}
+                      <div className="flex items-center gap-1 bg-amber-50/80 border border-amber-200 px-2 py-1 rounded-xl">
+                        <button
+                          type="button"
+                          onClick={(e) => handleViewDoc(r.hostIdDocumentId, r.hostIdDocumentUrl, `هوية المستضيف - ${r.hostName || r.groupName}`, e)}
+                          className={`p-1.5 rounded-lg text-amber-800 hover:bg-amber-100 transition-colors cursor-pointer flex items-center gap-1 ${
+                            !r.hostIdDocumentId && !r.hostIdDocumentUrl ? "opacity-40" : ""
+                          }`}
+                          title="معاينة هوية المستضيف"
+                        >
+                          <IdCard className="w-4 h-4 text-amber-700" />
+                          <span className="text-[11px] font-bold">الهوية</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => handleDownloadDoc(r.hostIdDocumentId, r.hostIdDocumentUrl, `host-id-${r.requestNumber}.jpg`, e)}
+                          className={`p-1.5 rounded-lg text-amber-800 hover:bg-amber-100 transition-colors cursor-pointer ${
+                            !r.hostIdDocumentId && !r.hostIdDocumentUrl ? "opacity-40" : ""
+                          }`}
+                          title="تحميل هوية المستضيف"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
               const travelers =
                 r.travelersList && r.travelersList.length > 0
                   ? r.travelersList
@@ -949,11 +1319,6 @@ ${travelersLines}
 
                     {/* المستطيل فوق على الشمال: حالة المجموعة + أزرار الأدمن والوكيل إن وجدت */}
                     <div className="flex items-center gap-1.5">
-                      {role === "SaudiAgent" && r.status === "ReadyForSaudiAgent" && (
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-amber-500 text-white shadow-2xs">
-                          جديد من صفا
-                        </span>
-                      )}
                       <RequestStatusBadge status={r.status} />
                       {role === "SaudiAgent" && (
                         <div className="flex items-center gap-1">
@@ -1111,11 +1476,309 @@ ${travelersLines}
             })}
           </div>
 
-          {/* Desktop Table View with Merged Rows for Travelers */}
+          {/* Desktop Table View */}
           <div className="hidden md:block bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-right text-xs border-collapse">
-                <thead className="bg-gray-50/90 border-b border-gray-200 text-gray-700 font-bold">
+              {role === "SaudiAgent" ? (
+                <table className="w-full text-right text-xs border-collapse">
+                  <thead className="bg-gray-50/90 border-b border-gray-200 text-gray-700 font-bold">
+                    <tr>
+                      <th className="py-3.5 px-4">رقم مجموعة نسك</th>
+                      <th className="py-3.5 px-4 text-center">الحالة</th>
+                      <th className="py-3.5 px-4">رحلة الذهاب</th>
+                      <th className="py-3.5 px-4">رحلة العودة</th>
+                      <th className="py-3.5 px-4">بيانات المستضيف</th>
+                      <th className="py-3.5 px-4 text-center">المستندات</th>
+                      <th className="py-3.5 px-4 text-center">الإجراء</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {filtered.map((r, rIdx) => {
+                      const isCompleted = r.status === "Completed" || r.status === "Archived";
+                      const isNusukMatch =
+                        Boolean(search.trim()) &&
+                        Boolean(r.nusukGroupNumber) &&
+                        r.nusukGroupNumber!.toLowerCase().includes(search.trim().toLowerCase());
+
+                      return (
+                        <tr
+                          key={r.id}
+                          className={`transition-colors ${
+                            rIdx % 2 === 0 ? "bg-white" : "bg-slate-50/40"
+                          } hover:bg-sky-50/30`}
+                        >
+                          {/* 1. رقم مجموعة نسك */}
+                          <td className="py-3.5 px-4 align-middle border-l border-gray-100 font-mono">
+                            {r.nusukGroupNumber ? (
+                              <div className="inline-flex items-center gap-1.5">
+                                <span
+                                  className={`px-2.5 py-1 rounded-md text-xs font-bold font-mono transition-all ${
+                                    isNusukMatch
+                                      ? "bg-emerald-600 text-white ring-2 ring-emerald-300"
+                                      : "bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-2xs"
+                                  }`}
+                                >
+                                  {r.nusukGroupNumber}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => copyToClipboard(r.nusukGroupNumber!, e)}
+                                  className="text-gray-400 hover:text-emerald-700 p-1 cursor-pointer transition-colors"
+                                  title="نسخ رقم نسك"
+                                >
+                                  {copiedNusuk === r.nusukGroupNumber ? (
+                                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                  ) : (
+                                    <Copy className="w-3.5 h-3.5" />
+                                  )}
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-gray-400 text-xs italic">قيد التسجيل</span>
+                            )}
+                          </td>
+
+                          {/* 2. الحالة: تم الاستلام أو اكتملت المعاملة فقط */}
+                          <td className="py-3.5 px-4 align-middle text-center border-l border-gray-100">
+                            <div className="flex flex-col items-center gap-1">
+                              {isCompleted ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-300 shadow-2xs">
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                  <span>اكتملت المعاملة</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-sky-50 text-sky-700 border border-sky-300 shadow-2xs">
+                                  <Check className="w-3.5 h-3.5 text-sky-600" />
+                                  <span>تم الاستلام</span>
+                                </span>
+                              )}
+
+                              {r.status === "Completed" && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAgentArchive(r.id, r.requestNumber, e);
+                                  }}
+                                  className="px-2 py-0.5 text-[10px] font-bold text-emerald-800 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 rounded-md cursor-pointer transition-colors flex items-center gap-1 shadow-2xs mt-0.5"
+                                  title="إيداع في الأرشيف (تم)"
+                                >
+                                  <Check className="w-3 h-3 text-emerald-700" />
+                                  <span>تم (أرشفة)</span>
+                                </button>
+                              )}
+                              {r.status === "Archived" && (
+                                <span className="px-2 py-0.5 text-[10px] font-bold text-purple-700 bg-purple-50 border border-purple-200 rounded-md flex items-center gap-1 mt-0.5">
+                                  <Archive className="w-3 h-3 text-purple-600" />
+                                  <span>مؤرشفة</span>
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* 3. رحلة الذهاب */}
+                          <td className="py-3.5 px-4 align-middle border-l border-gray-100">
+                            <div className="space-y-1">
+                              <div className="font-mono font-bold text-gray-900 flex items-center gap-1.5 text-xs">
+                                <Plane className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                                <span>{r.flightNumber || r.airline || "تذكرة مشتركة"}</span>
+                              </div>
+                              <div className="text-[11px] text-gray-700 font-bold flex items-center gap-1.5">
+                                <Calendar className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                                <span>{formatDayMonth(r.departureDate || r.travelDate)}</span>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* 4. رحلة العودة */}
+                          <td className="py-3.5 px-4 align-middle border-l border-gray-100">
+                            <div className="space-y-1">
+                              <div className="font-mono font-bold text-gray-900 flex items-center gap-1.5 text-xs">
+                                <Plane className="w-3.5 h-3.5 text-indigo-600 -scale-x-100 shrink-0" />
+                                <span>{r.returnFlightNumber || r.flightNumber || "رحلة العودة"}</span>
+                              </div>
+                              <div className="text-[11px] text-gray-700 font-bold flex items-center gap-1.5">
+                                <Calendar className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                                <span>{r.returnDate ? formatDayMonth(r.returnDate) : "لم يُحدد"}</span>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* 5. بيانات المستضيف (الهوية والميلاد والهاتف والاسم مع النسخ) */}
+                          <td className="py-3 px-4 align-middle border-l border-gray-100">
+                            <div className="bg-amber-50/40 border border-amber-200/80 rounded-xl p-2 text-[11px] space-y-1 min-w-[200px] max-w-xs">
+                              {/* الهوية */}
+                              <div className="flex items-center justify-between gap-1 border-b border-amber-100/80 pb-0.5">
+                                <span className="text-gray-500 font-medium">الهوية:</span>
+                                <div className="flex items-center gap-1">
+                                  <span className="font-mono font-bold text-gray-900" dir="ltr">
+                                    {r.hostNationalId || "-"}
+                                  </span>
+                                  {r.hostNationalId && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => copyText(r.hostNationalId!, `d-hostId-${r.id}`, e)}
+                                      className="text-gray-400 hover:text-amber-700 p-0.5 cursor-pointer"
+                                      title="نسخ رقم الهوية"
+                                    >
+                                      {copiedKey === `d-hostId-${r.id}` ? (
+                                        <Check className="w-3 h-3 text-emerald-600" />
+                                      ) : (
+                                        <Copy className="w-3 h-3" />
+                                      )}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* تاريخ الميلاد */}
+                              <div className="flex items-center justify-between gap-1 border-b border-amber-100/80 pb-0.5">
+                                <span className="text-gray-500 font-medium">الميلاد:</span>
+                                <div className="flex items-center gap-1">
+                                  <span className="font-mono font-bold text-gray-900" dir="ltr">
+                                    {r.hostBirthDate || "-"}
+                                  </span>
+                                  {r.hostBirthDate && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => copyText(r.hostBirthDate!, `d-hostBirth-${r.id}`, e)}
+                                      className="text-gray-400 hover:text-amber-700 p-0.5 cursor-pointer"
+                                      title="نسخ تاريخ الميلاد"
+                                    >
+                                      {copiedKey === `d-hostBirth-${r.id}` ? (
+                                        <Check className="w-3 h-3 text-emerald-600" />
+                                      ) : (
+                                        <Copy className="w-3 h-3" />
+                                      )}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* هاتف المستضيف */}
+                              <div className="flex items-center justify-between gap-1 border-b border-amber-100/80 pb-0.5">
+                                <span className="text-gray-500 font-medium">الهاتف:</span>
+                                <div className="flex items-center gap-1">
+                                  <span className="font-mono font-bold text-gray-900" dir="ltr">
+                                    {r.hostPhone || (r.hasHosting ? r.contactPhone : "-")}
+                                  </span>
+                                  {(r.hostPhone || (r.hasHosting && r.contactPhone)) && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => copyText(r.hostPhone || r.contactPhone, `d-hostPhone-${r.id}`, e)}
+                                      className="text-gray-400 hover:text-amber-700 p-0.5 cursor-pointer"
+                                      title="نسخ رقم الهاتف"
+                                    >
+                                      {copiedKey === `d-hostPhone-${r.id}` ? (
+                                        <Check className="w-3 h-3 text-emerald-600" />
+                                      ) : (
+                                        <Copy className="w-3 h-3" />
+                                      )}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* اسم المستضيف */}
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="text-gray-500 font-medium">الاسم:</span>
+                                <div className="flex items-center gap-1">
+                                  <span className="font-bold text-gray-900 truncate max-w-[130px]" title={r.hostName}>
+                                    {r.hostName || "-"}
+                                  </span>
+                                  {r.hostName && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => copyText(r.hostName!, `d-hostName-${r.id}`, e)}
+                                      className="text-gray-400 hover:text-amber-700 p-0.5 cursor-pointer"
+                                      title="نسخ اسم المستضيف"
+                                    >
+                                      {copiedKey === `d-hostName-${r.id}` ? (
+                                        <Check className="w-3 h-3 text-emerald-600" />
+                                      ) : (
+                                        <Copy className="w-3.5 h-3.5" />
+                                      )}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* 6. المستندات: تذكرة وهوية (معاينة وتحميل) */}
+                          <td className="py-3 px-4 align-middle border-l border-gray-100 text-center">
+                            <div className="inline-flex flex-col gap-1.5 items-center">
+                              {/* تذكرة الطيران */}
+                              <div className="flex items-center gap-1 bg-sky-50 border border-sky-200 px-2 py-1 rounded-lg">
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleViewDoc(r.flightTicketDocumentId, r.flightTicketDocumentUrl, `تذكرة طيران - ${r.groupName}`, e)}
+                                  className={`p-1 text-sky-700 hover:bg-sky-100 rounded-md transition-colors cursor-pointer flex items-center gap-1 ${
+                                    !r.flightTicketDocumentId && !r.flightTicketDocumentUrl ? "opacity-40" : ""
+                                  }`}
+                                  title="معاينة تذكرة الطيران"
+                                >
+                                  <Plane className="w-3.5 h-3.5" />
+                                  <span className="text-[10px] font-bold">التذكرة</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleDownloadDoc(r.flightTicketDocumentId, r.flightTicketDocumentUrl, `ticket-${r.requestNumber}.pdf`, e)}
+                                  className={`p-1 text-sky-700 hover:bg-sky-100 rounded-md transition-colors cursor-pointer ${
+                                    !r.flightTicketDocumentId && !r.flightTicketDocumentUrl ? "opacity-40" : ""
+                                  }`}
+                                  title="تحميل تذكرة الطيران"
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+
+                              {/* هوية المستضيف */}
+                              <div className="flex items-center gap-1 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg">
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleViewDoc(r.hostIdDocumentId, r.hostIdDocumentUrl, `هوية المستضيف - ${r.hostName || r.groupName}`, e)}
+                                  className={`p-1 text-amber-800 hover:bg-amber-100 rounded-md transition-colors cursor-pointer flex items-center gap-1 ${
+                                    !r.hostIdDocumentId && !r.hostIdDocumentUrl ? "opacity-40" : ""
+                                  }`}
+                                  title="معاينة هوية المستضيف"
+                                >
+                                  <IdCard className="w-3.5 h-3.5" />
+                                  <span className="text-[10px] font-bold">الهوية</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleDownloadDoc(r.hostIdDocumentId, r.hostIdDocumentUrl, `host-id-${r.requestNumber}.jpg`, e)}
+                                  className={`p-1 text-amber-800 hover:bg-amber-100 rounded-md transition-colors cursor-pointer ${
+                                    !r.hostIdDocumentId && !r.hostIdDocumentUrl ? "opacity-40" : ""
+                                  }`}
+                                  title="تحميل هوية المستضيف"
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* 7. الإجراء */}
+                          <td className="py-3.5 px-4 align-middle text-center">
+                            <Link
+                              href={`/requests/${r.id}`}
+                              className="inline-flex items-center gap-1 text-xs font-bold text-sky-700 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-3 py-1.5 rounded-xl transition-colors shadow-2xs cursor-pointer"
+                              title="فتح المعاملة"
+                            >
+                              <span>فتح</span>
+                              <ArrowRight className="w-3.5 h-3.5 rotate-180" />
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              ) : (
+                <table className="w-full text-right text-xs border-collapse">
+                  <thead className="bg-gray-50/90 border-b border-gray-200 text-gray-700 font-bold">
                   <tr>
                     <th className="py-3.5 px-4">رقم مجموعة نسك</th>
                     <th className="py-3.5 px-4 text-center">الحالة</th>
@@ -1196,11 +1859,6 @@ ${travelersLines}
                                 >
                                   <div className="flex flex-col items-center gap-1">
                                     <RequestStatusBadge status={r.status} />
-                                    {role === "SaudiAgent" && r.status === "ReadyForSaudiAgent" && (
-                                      <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-amber-500 text-white shadow-2xs">
-                                        جديد من صفا
-                                      </span>
-                                    )}
                                   </div>
                                 </td>
 
@@ -1368,9 +2026,98 @@ ${travelersLines}
                   );
                 })}
               </table>
+            )}
             </div>
           </div>
         </>
+      )}
+
+      {/* Document Preview Modal */}
+      {docPreviewModal.isOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+          onClick={() => setDocPreviewModal((prev) => ({ ...prev, isOpen: false }))}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-200 bg-gray-50/80">
+              <h3 className="font-bold text-gray-800 text-sm truncate">
+                {docPreviewModal.title}
+              </h3>
+              <div className="flex items-center gap-2">
+                {docPreviewModal.url && (
+                  <>
+                    <a
+                      href={docPreviewModal.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="p-1.5 text-gray-500 hover:text-sky-600 hover:bg-white rounded-lg transition-colors cursor-pointer"
+                      title="فتح في نافذة مستقلة"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleDownloadDoc(
+                          docPreviewModal.docId,
+                          docPreviewModal.url!,
+                          docPreviewModal.downloadName
+                        )
+                      }
+                      className="p-1.5 text-gray-500 hover:text-emerald-600 hover:bg-white rounded-lg transition-colors cursor-pointer"
+                      title="تحميل الملف"
+                    >
+                      <Download className="w-4 h-4" />
+                    </button>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setDocPreviewModal((prev) => ({ ...prev, isOpen: false }))
+                  }
+                  className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-white rounded-lg transition-colors cursor-pointer"
+                  title="إغلاق"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-4 flex-1 overflow-auto flex items-center justify-center bg-gray-100 min-h-[300px]">
+              {docPreviewModal.loading ? (
+                <div className="flex flex-col items-center gap-2 text-gray-500">
+                  <div className="w-8 h-8 border-3 border-sky-600 border-t-transparent rounded-full animate-spin"></div>
+                  <span className="text-xs">جاري تحميل المستند...</span>
+                </div>
+              ) : docPreviewModal.url ? (
+                docPreviewModal.url.includes("application/pdf") ||
+                docPreviewModal.downloadName?.endsWith(".pdf") ? (
+                  <iframe
+                    src={docPreviewModal.url}
+                    className="w-full h-[70vh] rounded-lg border border-gray-200 bg-white"
+                    title={docPreviewModal.title}
+                  />
+                ) : (
+                  <img
+                    src={docPreviewModal.url}
+                    alt={docPreviewModal.title}
+                    className="max-h-[70vh] max-w-full object-contain rounded-lg shadow-xs"
+                  />
+                )
+              ) : (
+                <div className="text-center text-gray-400 text-xs py-8">
+                  تعذر عرض معاينة للمستند
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

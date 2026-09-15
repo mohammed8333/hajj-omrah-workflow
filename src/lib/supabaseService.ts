@@ -370,7 +370,7 @@ export const supabaseService = {
       // Fetch hosting infos
       const { data: hostingInfos } = await client
         .from("hosting_infos")
-        .select("group_request_id, host_name, host_phone")
+        .select("group_request_id, host_name, host_phone, host_national_id, host_birth_date, host_id_document_id")
         .in("group_request_id", requestIds);
 
       return requests.map((r) => {
@@ -381,6 +381,33 @@ export const supabaseService = {
         const hostRow = hostingInfos?.find((h) => h.group_request_id === r.id);
         const hostPhone = hostRow?.host_phone || (r.has_hosting ? r.contact_phone : undefined);
         const hostName = hostRow?.host_name || undefined;
+        const hostNationalId = hostRow?.host_national_id || undefined;
+        const hostBirthDate = hostRow?.host_birth_date || undefined;
+
+        const ticketDoc = docs?.find(
+          (d) => d.group_request_id === r.id && d.document_type === "FlightTicket"
+        );
+        const hostDoc = docs?.find(
+          (d) =>
+            d.group_request_id === r.id &&
+            (d.document_type === "HostId" || d.id === hostRow?.host_id_document_id)
+        );
+
+        let ticketUrl = ticketDoc?.storage_url;
+        if (!ticketUrl && ticketDoc?.storage_path) {
+          const { data: pubData } = client.storage
+            .from(BUCKET_NAME)
+            .getPublicUrl(ticketDoc.storage_path);
+          ticketUrl = pubData?.publicUrl;
+        }
+
+        let hostDocUrl = hostDoc?.storage_url;
+        if (!hostDocUrl && hostDoc?.storage_path) {
+          const { data: pubData } = client.storage
+            .from(BUCKET_NAME)
+            .getPublicUrl(hostDoc.storage_path);
+          hostDocUrl = pubData?.publicUrl;
+        }
 
         const reqTravelers = matchingTravelers.map((t) => {
           const photoDoc = docs?.find(
@@ -416,6 +443,13 @@ export const supabaseService = {
           hasHosting: Boolean(r.has_hosting),
           hostName: hostName,
           hostPhone: hostPhone,
+          hostNationalId: hostNationalId,
+          hostBirthDate: hostBirthDate,
+          hostIdDocumentId: hostRow?.host_id_document_id || hostDoc?.id,
+          hostIdDocumentUrl: hostDocUrl || undefined,
+          flightTicketDocumentId: ticketDoc?.id || undefined,
+          flightTicketDocumentUrl: ticketUrl || undefined,
+          returnFlightNumber: r.return_flight_number || undefined,
           contactPhone: r.contact_phone || "",
           travelDate: r.travel_date || undefined,
           departureDate: r.departure_date || undefined,

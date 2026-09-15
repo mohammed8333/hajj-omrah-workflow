@@ -151,6 +151,10 @@ export const DEFAULT_REQUESTS: GroupRequestDetail[] = [
     status: "Submitted",
     hasHosting: true,
     contactPhone: "+966551234567",
+    flightNumber: "SV341",
+    returnFlightNumber: "SV342",
+    departureDate: "2026-10-15",
+    returnDate: "2026-10-25",
     travelDate: "2026-10-15",
     destination: "مكة المكرمة والمدينة المنورة",
     notes: "المجموعة تضم كبار سن، يرجى إعطاء الأولوية في ترتيبات النقل.",
@@ -161,6 +165,8 @@ export const DEFAULT_REQUESTS: GroupRequestDetail[] = [
       groupRequestId: "req-001",
       hostName: "فندق أبراج الكسوة",
       hostPhone: "+966125559999",
+      hostNationalId: "1089345612",
+      hostBirthDate: "1982-05-14",
       hostAddress: "مكة المكرمة - التيسير",
     },
     travelers: [
@@ -410,11 +416,24 @@ export const DEFAULT_REQUESTS: GroupRequestDetail[] = [
     nusukGroupNumber: "NSK-11223344",
     hasHosting: true,
     contactPhone: "+966567788990",
+    flightNumber: "XY204",
+    returnFlightNumber: "XY205",
+    departureDate: "2026-09-01",
+    returnDate: "2026-09-12",
     travelDate: "2026-09-01",
     destination: "مكة المكرمة",
     createdAt: "2026-08-20T09:00:00.000Z",
     updatedAt: "2026-08-28T18:00:00.000Z",
     completedAt: "2026-08-28T18:00:00.000Z",
+    hostingInfo: {
+      id: "host-004",
+      groupRequestId: "req-004",
+      hostName: "عبدالرحمن الشريف",
+      hostPhone: "+966567788990",
+      hostNationalId: "1098765432",
+      hostBirthDate: "1979-08-20",
+      hostAddress: "مكة المكرمة - العزيزية",
+    },
     travelers: [
       {
         id: "trv-005",
@@ -925,6 +944,13 @@ class LocalDatabaseEngine {
         };
       });
 
+      const flightTicketDoc =
+        r.flightTicketDocument ||
+        r.groupDocuments?.find((d) => d.documentType === "FlightTicket");
+      const hostDoc =
+        r.hostingInfo?.hostIdDocument ||
+        r.groupDocuments?.find((d) => d.documentType === "HostId");
+
       const summary: GroupRequestSummary = {
         id: r.id,
         requestNumber: r.requestNumber,
@@ -940,6 +966,13 @@ class LocalDatabaseEngine {
         hasHosting: r.hasHosting,
         hostName: r.hostingInfo?.hostName,
         hostPhone: r.hostingInfo?.hostPhone || (r.hasHosting ? r.contactPhone : undefined),
+        hostNationalId: r.hostingInfo?.hostNationalId,
+        hostBirthDate: r.hostingInfo?.hostBirthDate,
+        hostIdDocumentId: r.hostingInfo?.hostIdDocumentId || hostDoc?.id,
+        hostIdDocumentUrl: (hostDoc as any)?.storageUrl || (hostDoc as any)?.fileDataUrl,
+        flightTicketDocumentId: r.flightTicketDocumentId || flightTicketDoc?.id,
+        flightTicketDocumentUrl: (flightTicketDoc as any)?.storageUrl || (flightTicketDoc as any)?.fileDataUrl,
+        returnFlightNumber: r.returnFlightNumber,
         contactPhone: r.contactPhone,
         travelDate: r.travelDate,
         departureDate: r.departureDate || r.travelDate,
