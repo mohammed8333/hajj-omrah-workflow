@@ -322,19 +322,23 @@ export default function RequestsListPage() {
   const handleAgentArchive = async (id: string, reqNumber: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const ok = await confirm({
-      title: "إيداع في الأرشيف (تم)",
-      message: `هل أنت متأكد من إتمام المعاملة (${reqNumber}) نهائياً ونقلها إلى سجل المؤرشفة؟`,
-      confirmText: "تم - إيداع في الأرشيف",
+      title: "تأكيد إنجاز المعاملة (تم)",
+      message: `هل أنت متأكد من إنجاز معاملة (${reqNumber}) نهائياً ونقلها إلى سجل المؤرشفة؟`,
+      confirmText: "نعم، تم الإنجاز ✓",
       cancelText: "إلغاء",
       variant: "success",
     });
     if (!ok) return;
     try {
+      const targetReq = requests.find((x) => x.id === id);
+      if (targetReq && targetReq.status !== "Completed" && targetReq.status !== "Archived") {
+        await api.requests.agentComplete(id, "تم إنجاز كافة التأشيرات والخدمات بنجاح");
+      }
       await api.requests.archive(id, "تم إنجاز المعاملة وأرشفتها بواسطة الوكيل السعودي (تم)");
       await loadRequests();
       await alert({
-        title: "تمت الأرشفة بنجاح",
-        message: "تم نقل المعاملة إلى قسم المعاملات المؤرشفة بنجاح.",
+        title: "تمت المعاملة بنجاح",
+        message: `تم اعتماد معاملة (${reqNumber}) وإيداعها في سجل المؤرشفة (تم) بنجاح.`,
         variant: "success",
       });
     } catch (err: unknown) {
@@ -1213,25 +1217,25 @@ ${travelersLines}
                       </div>
                     </div>
 
-                    {/* الشريط السفلي: أزرار التذكرة والهوية (معاينة وتحميل) */}
-                    <div className="pt-2 border-t border-gray-100 flex items-center justify-between gap-2">
-                      {/* يمين: أزرار التذكرة */}
-                      <div className="flex items-center gap-1 bg-sky-50/80 border border-sky-200 px-2 py-1 rounded-xl">
+                    {/* الشريط السفلي: تذكرة جنبها الهوية جنبها تم */}
+                    <div className="pt-2 border-t border-gray-100 flex items-center justify-between gap-1.5 flex-wrap">
+                      {/* تذكرة */}
+                      <div className="flex items-center gap-1 bg-sky-50/80 border border-sky-200 px-2 py-1 rounded-xl shadow-2xs">
                         <button
                           type="button"
                           onClick={(e) => handleViewDoc(r.flightTicketDocumentId, r.flightTicketDocumentUrl, `تذكرة طيران - ${r.groupName}`, e)}
-                          className={`p-1.5 rounded-lg text-sky-700 hover:bg-sky-100 transition-colors cursor-pointer flex items-center gap-1 ${
+                          className={`p-1 rounded-lg text-sky-700 hover:bg-sky-100 transition-colors cursor-pointer flex items-center gap-1 ${
                             !r.flightTicketDocumentId && !r.flightTicketDocumentUrl ? "opacity-40" : ""
                           }`}
                           title="معاينة تذكرة الطيران"
                         >
-                          <Plane className="w-4 h-4 text-sky-600" />
+                          <Plane className="w-3.5 h-3.5 text-sky-600" />
                           <span className="text-[11px] font-bold">التذكرة</span>
                         </button>
                         <button
                           type="button"
                           onClick={(e) => handleDownloadDoc(r.flightTicketDocumentId, r.flightTicketDocumentUrl, `ticket-${r.requestNumber}.pdf`, e)}
-                          className={`p-1.5 rounded-lg text-sky-700 hover:bg-sky-100 transition-colors cursor-pointer ${
+                          className={`p-1 rounded-lg text-sky-700 hover:bg-sky-100 transition-colors cursor-pointer ${
                             !r.flightTicketDocumentId && !r.flightTicketDocumentUrl ? "opacity-40" : ""
                           }`}
                           title="تحميل تذكرة الطيران"
@@ -1240,23 +1244,23 @@ ${travelersLines}
                         </button>
                       </div>
 
-                      {/* يسار: أزرار الهوية */}
-                      <div className="flex items-center gap-1 bg-amber-50/80 border border-amber-200 px-2 py-1 rounded-xl">
+                      {/* الهوية */}
+                      <div className="flex items-center gap-1 bg-amber-50/80 border border-amber-200 px-2 py-1 rounded-xl shadow-2xs">
                         <button
                           type="button"
                           onClick={(e) => handleViewDoc(r.hostIdDocumentId, r.hostIdDocumentUrl, `هوية المستضيف - ${r.hostName || r.groupName}`, e)}
-                          className={`p-1.5 rounded-lg text-amber-800 hover:bg-amber-100 transition-colors cursor-pointer flex items-center gap-1 ${
+                          className={`p-1 rounded-lg text-amber-800 hover:bg-amber-100 transition-colors cursor-pointer flex items-center gap-1 ${
                             !r.hostIdDocumentId && !r.hostIdDocumentUrl ? "opacity-40" : ""
                           }`}
                           title="معاينة هوية المستضيف"
                         >
-                          <IdCard className="w-4 h-4 text-amber-700" />
+                          <IdCard className="w-3.5 h-3.5 text-amber-700" />
                           <span className="text-[11px] font-bold">الهوية</span>
                         </button>
                         <button
                           type="button"
                           onClick={(e) => handleDownloadDoc(r.hostIdDocumentId, r.hostIdDocumentUrl, `host-id-${r.requestNumber}.jpg`, e)}
-                          className={`p-1.5 rounded-lg text-amber-800 hover:bg-amber-100 transition-colors cursor-pointer ${
+                          className={`p-1 rounded-lg text-amber-800 hover:bg-amber-100 transition-colors cursor-pointer ${
                             !r.hostIdDocumentId && !r.hostIdDocumentUrl ? "opacity-40" : ""
                           }`}
                           title="تحميل هوية المستضيف"
@@ -1264,6 +1268,24 @@ ${travelersLines}
                           <Download className="w-3.5 h-3.5" />
                         </button>
                       </div>
+
+                      {/* زر تم */}
+                      {r.status === "Archived" ? (
+                        <span className="px-2.5 py-1 text-[11px] font-bold text-purple-700 bg-purple-50 border border-purple-200 rounded-xl flex items-center gap-1 shadow-2xs">
+                          <Archive className="w-3 h-3 text-purple-600" />
+                          <span>مؤرشفة</span>
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => handleAgentArchive(r.id, r.requestNumber, e)}
+                          className="px-3.5 py-1.5 text-xs font-black text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 rounded-xl cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95"
+                          title="إنجاز المعاملة ونقلها إلى الأرشيف (تم)"
+                        >
+                          <Check className="w-3.5 h-3.5 stroke-[3]" />
+                          <span>تم</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -1488,8 +1510,7 @@ ${travelersLines}
                       <th className="py-3.5 px-4">رحلة الذهاب</th>
                       <th className="py-3.5 px-4">رحلة العودة</th>
                       <th className="py-3.5 px-4">بيانات المستضيف</th>
-                      <th className="py-3.5 px-4 text-center">المستندات</th>
-                      <th className="py-3.5 px-4 text-center">الإجراء</th>
+                      <th className="py-3.5 px-4 text-center">المستندات والإجراء</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -1540,40 +1561,17 @@ ${travelersLines}
 
                           {/* 2. الحالة: تم الاستلام أو اكتملت المعاملة فقط */}
                           <td className="py-3.5 px-4 align-middle text-center border-l border-gray-100">
-                            <div className="flex flex-col items-center gap-1">
-                              {isCompleted ? (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-300 shadow-2xs">
-                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                                  <span>اكتملت المعاملة</span>
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-sky-50 text-sky-700 border border-sky-300 shadow-2xs">
-                                  <Check className="w-3.5 h-3.5 text-sky-600" />
-                                  <span>تم الاستلام</span>
-                                </span>
-                              )}
-
-                              {r.status === "Completed" && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleAgentArchive(r.id, r.requestNumber, e);
-                                  }}
-                                  className="px-2 py-0.5 text-[10px] font-bold text-emerald-800 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 rounded-md cursor-pointer transition-colors flex items-center gap-1 shadow-2xs mt-0.5"
-                                  title="إيداع في الأرشيف (تم)"
-                                >
-                                  <Check className="w-3 h-3 text-emerald-700" />
-                                  <span>تم (أرشفة)</span>
-                                </button>
-                              )}
-                              {r.status === "Archived" && (
-                                <span className="px-2 py-0.5 text-[10px] font-bold text-purple-700 bg-purple-50 border border-purple-200 rounded-md flex items-center gap-1 mt-0.5">
-                                  <Archive className="w-3 h-3 text-purple-600" />
-                                  <span>مؤرشفة</span>
-                                </span>
-                              )}
-                            </div>
+                            {isCompleted ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-300 shadow-2xs">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>{r.status === "Archived" ? "مؤرشفة (تم)" : "اكتملت المعاملة"}</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-sky-50 text-sky-700 border border-sky-300 shadow-2xs">
+                                <Check className="w-3.5 h-3.5 text-sky-600" />
+                                <span>تم الاستلام</span>
+                              </span>
+                            )}
                           </td>
 
                           {/* 3. رحلة الذهاب */}
@@ -1705,11 +1703,11 @@ ${travelersLines}
                             </div>
                           </td>
 
-                          {/* 6. المستندات: تذكرة وهوية (معاينة وتحميل) */}
-                          <td className="py-3 px-4 align-middle border-l border-gray-100 text-center">
-                            <div className="inline-flex flex-col gap-1.5 items-center">
+                          {/* 6. المستندات والإجراء: تذكرة جنبها الهوية جنبها تم */}
+                          <td className="py-3 px-4 align-middle text-center">
+                            <div className="inline-flex items-center justify-center gap-2 flex-wrap">
                               {/* تذكرة الطيران */}
-                              <div className="flex items-center gap-1 bg-sky-50 border border-sky-200 px-2 py-1 rounded-lg">
+                              <div className="flex items-center gap-1 bg-sky-50 border border-sky-200 px-2 py-1 rounded-lg shadow-2xs">
                                 <button
                                   type="button"
                                   onClick={(e) => handleViewDoc(r.flightTicketDocumentId, r.flightTicketDocumentUrl, `تذكرة طيران - ${r.groupName}`, e)}
@@ -1718,8 +1716,8 @@ ${travelersLines}
                                   }`}
                                   title="معاينة تذكرة الطيران"
                                 >
-                                  <Plane className="w-3.5 h-3.5" />
-                                  <span className="text-[10px] font-bold">التذكرة</span>
+                                  <Plane className="w-3.5 h-3.5 text-sky-600" />
+                                  <span className="text-[11px] font-bold">التذكرة</span>
                                 </button>
                                 <button
                                   type="button"
@@ -1734,7 +1732,7 @@ ${travelersLines}
                               </div>
 
                               {/* هوية المستضيف */}
-                              <div className="flex items-center gap-1 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg">
+                              <div className="flex items-center gap-1 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg shadow-2xs">
                                 <button
                                   type="button"
                                   onClick={(e) => handleViewDoc(r.hostIdDocumentId, r.hostIdDocumentUrl, `هوية المستضيف - ${r.hostName || r.groupName}`, e)}
@@ -1743,8 +1741,8 @@ ${travelersLines}
                                   }`}
                                   title="معاينة هوية المستضيف"
                                 >
-                                  <IdCard className="w-3.5 h-3.5" />
-                                  <span className="text-[10px] font-bold">الهوية</span>
+                                  <IdCard className="w-3.5 h-3.5 text-amber-700" />
+                                  <span className="text-[11px] font-bold">الهوية</span>
                                 </button>
                                 <button
                                   type="button"
@@ -1757,19 +1755,35 @@ ${travelersLines}
                                   <Download className="w-3.5 h-3.5" />
                                 </button>
                               </div>
-                            </div>
-                          </td>
 
-                          {/* 7. الإجراء */}
-                          <td className="py-3.5 px-4 align-middle text-center">
-                            <Link
-                              href={`/requests/${r.id}`}
-                              className="inline-flex items-center gap-1 text-xs font-bold text-sky-700 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-3 py-1.5 rounded-xl transition-colors shadow-2xs cursor-pointer"
-                              title="فتح المعاملة"
-                            >
-                              <span>فتح</span>
-                              <ArrowRight className="w-3.5 h-3.5 rotate-180" />
-                            </Link>
+                              {/* زر تم */}
+                              {r.status === "Archived" ? (
+                                <span className="px-2.5 py-1 text-xs font-bold text-purple-700 bg-purple-50 border border-purple-200 rounded-lg flex items-center gap-1 shadow-2xs">
+                                  <Archive className="w-3.5 h-3.5 text-purple-600" />
+                                  <span>مؤرشفة</span>
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleAgentArchive(r.id, r.requestNumber, e)}
+                                  className="px-3.5 py-1.5 text-xs font-black text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 border border-emerald-600 rounded-lg cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95"
+                                  title="إنجاز المعاملة ونقلها إلى الأرشيف (تم)"
+                                >
+                                  <Check className="w-3.5 h-3.5 stroke-[3]" />
+                                  <span>تم</span>
+                                </button>
+                              )}
+
+                              {/* زر فتح/عرض المعاملة */}
+                              <Link
+                                href={`/requests/${r.id}`}
+                                className="inline-flex items-center gap-1 text-xs font-bold text-gray-700 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 border border-gray-300 px-2.5 py-1.5 rounded-lg transition-colors shadow-2xs cursor-pointer"
+                                title="عرض تفاصيل المعاملة"
+                              >
+                                <span>عرض</span>
+                                <ArrowRight className="w-3 h-3 rotate-180" />
+                              </Link>
+                            </div>
                           </td>
                         </tr>
                       );

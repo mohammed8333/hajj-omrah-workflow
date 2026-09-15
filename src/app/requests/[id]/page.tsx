@@ -1184,17 +1184,20 @@ export default function RequestDetailPage({
 
   const handleAgentArchive = async () => {
     const ok = await confirm({
-      title: "أرشفة المعاملة (تم)",
-      message: "هل ترغب في وضع هذه المعاملة في الأرشيف (تم)؟",
-      confirmText: "تم - إيداع في الأرشيف",
+      title: "تأكيد إنجاز المعاملة (تم)",
+      message: `هل أنت متأكد من إنجاز معاملة (${request.requestNumber}) نهائياً ونقلها إلى سجل المؤرشفة؟`,
+      confirmText: "نعم، تم الإنجاز ✓",
       cancelText: "إلغاء",
       variant: "success",
     });
     if (!ok) return;
     try {
       setActionLoading(true);
+      if (request.status !== "Completed" && request.status !== "Archived") {
+        await api.requests.agentComplete(requestId, "تم إنجاز كافة التأشيرات والخدمات بنجاح");
+      }
       await api.requests.archive(requestId, "تم إنجاز المعاملة وأرشفتها بواسطة الوكيل السعودي (تم)");
-      setSuccess("تم إيداع المعاملة في الأرشيف بنجاح (تم).");
+      setSuccess("تم إنجاز المعاملة بنجاح ونقلها إلى سجل المؤرشفة (تم) ✓.");
       await loadRequest();
     } catch (err: unknown) {
       if (err instanceof Error) setError(err.message);
@@ -1570,7 +1573,21 @@ export default function RequestDetailPage({
         </div>
 
         <div className="flex flex-col items-start md:items-end gap-2 shrink-0">
-          <RequestStatusBadge status={request.status} />
+          {isSaudiAgent ? (
+            request.status === "Completed" || request.status === "Archived" ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-300 shadow-2xs">
+                <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                <span>{request.status === "Archived" ? "المعاملة في الأرشيف (تم)" : "اكتملت المعاملة"}</span>
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-sky-50 text-sky-700 border border-sky-300 shadow-2xs">
+                <Check className="w-3.5 h-3.5 text-sky-600" />
+                <span>تم الاستلام</span>
+              </span>
+            )
+          ) : (
+            <RequestStatusBadge status={request.status} />
+          )}
 
           {/* Action buttons by Role */}
           <div className="flex flex-wrap items-center gap-2 mt-2">
@@ -1684,8 +1701,32 @@ export default function RequestDetailPage({
                 </>
               )}
 
-            {/* Saudi Agent Actions */}
-            {isAgent && request.status === "ReadyForSaudiAgent" && (
+            {/* Saudi Agent Actions: زر "تم" فقط */}
+            {isSaudiAgent && (
+              request.status === "Archived" ? (
+                <div className="flex items-center gap-1.5 bg-purple-50 text-purple-700 border border-purple-200 px-4 py-2 rounded-xl text-xs font-black shadow-xs">
+                  <Archive className="w-4 h-4 text-purple-600" />
+                  <span>المعاملة في الأرشيف (تم) ✓</span>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleAgentArchive();
+                  }}
+                  disabled={actionLoading}
+                  className="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs sm:text-sm font-black px-6 py-2.5 rounded-xl shadow-md hover:shadow-lg flex items-center gap-2 cursor-pointer transition-all active:scale-95"
+                  title="اعتماد المعاملة ونقلها إلى الأرشيف (تم)"
+                >
+                  <Check className="w-4 h-4 stroke-[3]" />
+                  <span>تم</span>
+                </button>
+              )
+            )}
+
+            {/* Admin Testing Workflow Actions */}
+            {isAdmin && !isSaudiAgent && request.status === "ReadyForSaudiAgent" && (
               <button
                 type="button"
                 onClick={(e) => {
@@ -1700,8 +1741,8 @@ export default function RequestDetailPage({
               </button>
             )}
 
-            {/* Step 1: Saudi Agent after receiving sees "طلب تصحيح" + "تم ربط البرنامج" */}
-            {isAgent &&
+            {isAdmin &&
+              !isSaudiAgent &&
               (request.status === "ReceivedBySaudiAgent" ||
                 request.status === "SaudiAgentProcessing") && (
                 <>
@@ -1733,8 +1774,7 @@ export default function RequestDetailPage({
                 </>
               )}
 
-            {/* Step 2: Saudi Agent after Program Linked sees "طلب قبول الاستضافة" (أو إنهاء المعاملة إن لم تكن هناك استضافة) */}
-            {isAgent && request.status === "ProgramLinked" && (
+            {isAdmin && !isSaudiAgent && request.status === "ProgramLinked" && (
               request.hasHosting ? (
                 <button
                   type="button"
@@ -1796,8 +1836,7 @@ export default function RequestDetailPage({
               </button>
             )}
 
-            {/* Step 5: Saudi Agent when HostingConfirmed sees "تم اعتماده وإنهاء المعاملة ✓" */}
-            {isAgent && request.status === "HostingConfirmed" && (
+            {isAdmin && !isSaudiAgent && request.status === "HostingConfirmed" && (
               <button
                 type="button"
                 onClick={(e) => {
@@ -1812,8 +1851,7 @@ export default function RequestDetailPage({
               </button>
             )}
 
-            {/* Step 6: Saudi Agent when Completed sees "تم (إيداع في الأرشيف)" */}
-            {isAgent && request.status === "Completed" && (
+            {isAdmin && !isSaudiAgent && request.status === "Completed" && (
               <button
                 type="button"
                 onClick={(e) => {
@@ -1829,8 +1867,7 @@ export default function RequestDetailPage({
               </button>
             )}
 
-            {/* When Archived */}
-            {isAgent && request.status === "Archived" && (
+            {isAdmin && !isSaudiAgent && request.status === "Archived" && (
               <div className="flex items-center gap-1.5 bg-purple-50 text-purple-700 border border-purple-200 px-3 py-1.5 rounded-xl text-xs font-bold">
                 <Archive className="w-3.5 h-3.5 text-purple-600" />
                 <span>المعاملة مؤرشفة (تم) ✓</span>
@@ -2066,6 +2103,7 @@ export default function RequestDetailPage({
           onUpdateTraveler={handleUpdateTraveler}
           onSaveNusukNumber={handleSaveNusukNumber}
           onArchiveRequest={handleAgentArchive}
+          onDoneRequest={handleAgentArchive}
           actionLoading={actionLoading}
         />
       ) : isSafaEmployee ? (

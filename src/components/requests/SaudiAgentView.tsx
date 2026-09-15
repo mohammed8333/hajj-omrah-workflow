@@ -36,6 +36,7 @@ interface SaudiAgentViewProps {
   ) => Promise<void>;
   onSaveNusukNumber: (num: string) => Promise<void>;
   onArchiveRequest?: () => Promise<void>;
+  onDoneRequest?: () => Promise<void>;
   actionLoading: boolean;
 }
 
@@ -48,6 +49,7 @@ export const SaudiAgentView: React.FC<SaudiAgentViewProps> = ({
   onUpdateTraveler,
   onSaveNusukNumber,
   onArchiveRequest,
+  onDoneRequest,
   actionLoading,
 }) => {
   const [editingNusuk, setEditingNusuk] = useState(false);
@@ -87,30 +89,33 @@ export const SaudiAgentView: React.FC<SaudiAgentViewProps> = ({
     setEditingNusuk(false);
   };
 
+  const handleDoneClick = onDoneRequest || onArchiveRequest;
+
   return (
     <div className="space-y-6">
-      {/* Archive / Completed Callout */}
-      {request.status === "Completed" && onArchiveRequest && (
+      {/* زر "تم" للوكيل السعودي */}
+      {request.status !== "Archived" && handleDoneClick && (
         <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
-              <Check className="w-5 h-5" />
+              <Check className="w-5 h-5 stroke-[3]" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-emerald-950">المعاملة مكتملة ومعتمدة بنجاح</h3>
+              <h3 className="text-sm font-black text-emerald-950">إنجاز المعاملة</h3>
               <p className="text-xs text-emerald-800 mt-0.5">
-                يمكنك الآن الضغط على زر &quot;تم - إيداع في الأرشيف&quot; لنقل المعاملة مباشرة إلى سجل المؤرشفة.
+                اضغط على زر &quot;تم&quot; لاعتماد المعاملة ونقلها إلى سجل المعاملات المؤرشفة.
               </p>
             </div>
           </div>
           <button
             type="button"
-            onClick={onArchiveRequest}
+            onClick={handleDoneClick}
             disabled={actionLoading}
-            className="w-full sm:w-auto px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer flex items-center justify-center gap-2 shrink-0 transition-colors"
+            className="w-full sm:w-auto px-8 py-3 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-sm font-black shadow-md hover:shadow-lg flex items-center justify-center gap-2 shrink-0 transition-all cursor-pointer active:scale-95"
+            title="اعتماد المعاملة ونقلها إلى الأرشيف (تم)"
           >
-            <Check className="w-4 h-4" />
-            <span>تم (إيداع في الأرشيف)</span>
+            <Check className="w-4 h-4 stroke-[3]" />
+            <span>تم</span>
           </button>
         </div>
       )}
@@ -121,7 +126,7 @@ export const SaudiAgentView: React.FC<SaudiAgentViewProps> = ({
             <Archive className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-purple-950">المعاملة في الأرشيف</h3>
+            <h3 className="text-sm font-bold text-purple-950">المعاملة في الأرشيف (تم)</h3>
             <p className="text-xs text-purple-800 mt-0.5">
               تم إنجاز هذه المعاملة ونقلها إلى سجل المعاملات المؤرشفة (تم) بنجاح.
             </p>
