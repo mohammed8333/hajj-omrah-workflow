@@ -867,6 +867,20 @@ ${travelersLines}
               </button>
             </>
           )}
+
+          {(!role || !["SaudiAgent", "SafaEmployee", "Sender", "Admin"].includes(role)) && (
+            <button
+              type="button"
+              onClick={() => setActiveTab("ALL")}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                activeTab === "ALL"
+                  ? "bg-sky-600 text-white shadow-xs"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              الكل ({roleRequests.length})
+            </button>
+          )}
         </div>
 
         <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
@@ -901,7 +915,7 @@ ${travelersLines}
             >
               {role === "SaudiAgent" ? (
                 <>
-                  <option value="">جميع الحالات</option>
+                  <option value="">الكل (جميع الحالات)</option>
                   <option value="ReadyForSaudiAgent">جديد محال من صفا</option>
                   <option value="ReceivedBySaudiAgent">مستلم من الوكيل</option>
                   <option value="SaudiAgentProcessing">قيد المعالجة</option>
@@ -915,7 +929,7 @@ ${travelersLines}
                 </>
               ) : (
                 <>
-                  <option value="">جميع الحالات</option>
+                  <option value="">الكل (جميع الحالات)</option>
                   <option value="Draft">مسودة</option>
                   <option value="Submitted">تم التقديم</option>
                   <option value="UnderReview">قيد المراجعة</option>

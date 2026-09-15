@@ -19,6 +19,7 @@ import {
   ArrowRight,
   TrendingUp,
   Hash,
+  Filter,
   Copy,
   Check,
   X,
@@ -159,6 +160,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>("ALL");
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [nusukFilter, setNusukFilter] = useState<"ALL" | "WITH_NUSUK" | "WITHOUT_NUSUK">("ALL");
   const [copiedNusuk, setCopiedNusuk] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
@@ -496,6 +498,8 @@ ${travelersLines}
 
     if (nusukFilter === "WITH_NUSUK" && !r.nusukGroupNumber) return false;
     if (nusukFilter === "WITHOUT_NUSUK" && r.nusukGroupNumber) return false;
+
+    if (statusFilter && r.status !== statusFilter) return false;
 
     if (activeTab === "ALL") return true;
     if (activeTab === "NEW") return r.status === "Submitted" || r.status === "Draft";
@@ -953,10 +957,24 @@ ${travelersLines}
               </button>
             </>
           )}
+
+          {(!role || !["SaudiAgent", "SafaEmployee", "Sender", "Admin"].includes(role)) && (
+            <button
+              type="button"
+              onClick={() => setActiveTab("ALL")}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                activeTab === "ALL"
+                  ? "bg-sky-600 text-white shadow-xs"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              الكل ({roleRequests.length})
+            </button>
+          )}
         </div>
 
         {/* Search Input Row */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
           <div className="flex-1 relative">
             <input
               type="text"
@@ -975,6 +993,53 @@ ${travelersLines}
                 <X className="w-4 h-4" />
               </button>
             )}
+          </div>
+
+          {/* Status Filter Dropdown */}
+          <div className="flex items-center gap-2 shrink-0">
+            <Filter className="w-4 h-4 text-gray-400 shrink-0" />
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full sm:w-48 px-3 py-2.5 text-xs rounded-xl border border-gray-300 focus:outline-hidden focus:ring-1 focus:ring-sky-500 bg-white cursor-pointer"
+            >
+              {role === "SaudiAgent" ? (
+                <>
+                  <option value="">الكل (جميع الحالات)</option>
+                  <option value="ReadyForSaudiAgent">جديد محال من صفا</option>
+                  <option value="ReceivedBySaudiAgent">مستلم من الوكيل</option>
+                  <option value="SaudiAgentProcessing">قيد المعالجة</option>
+                  <option value="ProgramLinked">تم ربط البرنامج</option>
+                  <option value="HostingAcceptanceRequested">بانتظار قبول الاستضافة</option>
+                  <option value="HostingAcceptedBySender">تم قبول الاستضافة</option>
+                  <option value="HostingConfirmed">تم تأكيد الاستضافة</option>
+                  <option value="SaudiAgentCorrectionRequired">مطلوب تصحيح</option>
+                  <option value="Completed">مكتمل نهائياً</option>
+                  <option value="Archived">معاملات مؤرشفة</option>
+                </>
+              ) : (
+                <>
+                  <option value="">الكل (جميع الحالات)</option>
+                  <option value="Draft">مسودة</option>
+                  <option value="Submitted">تم التقديم</option>
+                  <option value="UnderReview">قيد المراجعة</option>
+                  <option value="MissingDocuments">مستندات ناقصة</option>
+                  <option value="CorrectionRequired">مطلوب تصحيح</option>
+                  <option value="DocumentsCompleted">المستندات مكتملة</option>
+                  <option value="SafaRegistrationCompleted">اكتمل تسجيل صفا</option>
+                  <option value="ReadyForSaudiAgent">جاهز للوكيل السعودي</option>
+                  <option value="ReceivedBySaudiAgent">مستلم من الوكيل</option>
+                  <option value="ProgramLinked">تم ربط البرنامج</option>
+                  <option value="HostingAcceptanceRequested">بانتظار قبول الاستضافة</option>
+                  <option value="HostingAcceptedBySender">تم قبول الاستضافة</option>
+                  <option value="HostingConfirmed">تم تأكيد الاستضافة</option>
+                  <option value="SaudiAgentProcessing">قيد المعالجة</option>
+                  <option value="Completed">مكتمل نهائياً</option>
+                  <option value="Cancelled">ملغي</option>
+                  <option value="Archived">معاملات مؤرشفة</option>
+                </>
+              )}
+            </select>
           </div>
 
           {searchTerm && (
