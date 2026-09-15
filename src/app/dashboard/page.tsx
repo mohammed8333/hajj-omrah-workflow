@@ -421,12 +421,6 @@ ${travelersLines}
   };
 
   useEffect(() => {
-    if (role === "SaudiAgent" && activeTab === "ALL") {
-      setActiveTab("AGENT_INBOX");
-    }
-  }, [role, activeTab]);
-
-  useEffect(() => {
     if (!authLoading && !user) {
       router.push("/login");
       return;
@@ -711,6 +705,17 @@ ${travelersLines}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-2 border-b border-gray-100 scrollbar-none">
           {role === "SaudiAgent" && (
             <>
+              <button
+                type="button"
+                onClick={() => setActiveTab("ALL")}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                  activeTab === "ALL"
+                    ? "bg-sky-600 text-white shadow-xs"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                الكل ({roleRequests.length})
+              </button>
               <button
                 type="button"
                 onClick={() => setActiveTab("AGENT_INBOX")}
