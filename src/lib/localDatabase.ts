@@ -839,8 +839,8 @@ class LocalDatabaseEngine {
   }
 
   public archiveRequest(id: string, reason?: string, currentUser?: User): void {
-    if (currentUser && currentUser.role !== "Admin") {
-      throw new Error("عذراً، هذه الصلاحية مقتصرة فقط على مدير النظام (Admin).");
+    if (currentUser && currentUser.role !== "Admin" && currentUser.role !== "SaudiAgent") {
+      throw new Error("عذراً، هذه الصلاحية مقتصرة فقط على إدارة النظام والوكيل السعودي.");
     }
     const req = this.requests.find((r) => r.id === id);
     if (!req) throw new Error("المعاملة غير موجودة");
@@ -852,9 +852,9 @@ class LocalDatabaseEngine {
       groupRequestId: req.id,
       fromStatus: prev,
       toStatus: "Archived",
-      changedById: currentUser?.id || "admin",
-      changedByName: currentUser?.fullName || "مدير النظام",
-      note: reason || "تمت أرشفة المعاملة يدوياً بواسطة مدير النظام",
+      changedById: currentUser?.id || (currentUser?.role === "SaudiAgent" ? "agent" : "admin"),
+      changedByName: currentUser?.fullName || (currentUser?.role === "SaudiAgent" ? "الوكيل السعودي" : "مدير النظام"),
+      note: reason || (currentUser?.role === "SaudiAgent" ? "تم إنجاز المعاملة وأرشفتها بواسطة الوكيل السعودي (تم)" : "تمت أرشفة المعاملة يدوياً بواسطة مدير النظام"),
       createdAt: new Date().toISOString(),
     });
     this.persistRequests();
@@ -1556,6 +1556,26 @@ class LocalDatabaseEngine {
       "GroupRequest",
       req.id
     );
+  }
+
+  public sendToSaudiAgent(id: string, saudiAgentId?: string, note?: string, currentUser?: User) {
+    return this.sendToAgent(id, saudiAgentId, note, currentUser);
+  }
+
+  public linkProgram(id: string, note?: string, currentUser?: User) {
+    return this.agentLinkProgram(id, note, currentUser);
+  }
+
+  public requestHostingAcceptance(id: string, note?: string, currentUser?: User) {
+    return this.agentRequestHostingAcceptance(id, note, currentUser);
+  }
+
+  public acceptHosting(id: string, note?: string, currentUser?: User) {
+    return this.senderAcceptHosting(id, note, currentUser);
+  }
+
+  public confirmHosting(id: string, note?: string, currentUser?: User) {
+    return this.senderConfirmHosting(id, note, currentUser);
   }
 
   public requestCorrection(

@@ -1182,6 +1182,27 @@ export default function RequestDetailPage({
     }
   };
 
+  const handleAgentArchive = async () => {
+    const ok = await confirm({
+      title: "أرشفة المعاملة (تم)",
+      message: "هل ترغب في وضع هذه المعاملة في الأرشيف (تم)؟",
+      confirmText: "تم - إيداع في الأرشيف",
+      cancelText: "إلغاء",
+      variant: "success",
+    });
+    if (!ok) return;
+    try {
+      setActionLoading(true);
+      await api.requests.archive(requestId, "تم إنجاز المعاملة وأرشفتها بواسطة الوكيل السعودي (تم)");
+      setSuccess("تم إيداع المعاملة في الأرشيف بنجاح (تم).");
+      await loadRequest();
+    } catch (err: unknown) {
+      if (err instanceof Error) setError(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleLinkProgram = async () => {
     try {
       setActionLoading(true);
@@ -1440,6 +1461,40 @@ export default function RequestDetailPage({
   const docCheck = checkAllDocumentsAccepted();
   const canCompleteSafa = docCheck.isAllAccepted;
 
+  const isAgentEligible = [
+    "ReadyForSaudiAgent",
+    "ReceivedBySaudiAgent",
+    "SaudiAgentProcessing",
+    "SaudiAgentCorrectionRequired",
+    "ProgramLinked",
+    "HostingAcceptanceRequested",
+    "HostingAcceptedBySender",
+    "HostingConfirmed",
+    "Completed",
+    "Archived",
+  ].includes(request.status);
+
+  if (isSaudiAgent && !isAgentEligible) {
+    return (
+      <div className="max-w-2xl mx-auto my-16 p-8 bg-white rounded-2xl border border-amber-200 shadow-sm text-center space-y-4">
+        <div className="w-14 h-14 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto border border-amber-200">
+          <AlertTriangle className="w-7 h-7" />
+        </div>
+        <h2 className="text-xl font-bold text-gray-900">المعاملة غير متاحة للوكيل السعودي بعد</h2>
+        <p className="text-sm text-gray-600 max-w-md mx-auto leading-relaxed">
+          هذه المعاملة ما زالت في مرحلة المراجعة وتدقيق المستندات لدى موظف صفا، ولم يتم إحالتها بعد إلى الوكيل السعودي.
+        </p>
+        <button
+          onClick={() => router.push("/dashboard")}
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-xs"
+        >
+          <ArrowRight className="w-4 h-4 rotate-180" />
+          <span>العودة إلى لوحة التحكم</span>
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       {/* Top Breadcrumb & Status Header */}
@@ -1678,20 +1733,35 @@ export default function RequestDetailPage({
                 </>
               )}
 
-            {/* Step 2: Saudi Agent after Program Linked sees "طلب قبول الاستضافة" (Correction button is hidden) */}
+            {/* Step 2: Saudi Agent after Program Linked sees "طلب قبول الاستضافة" (أو إنهاء المعاملة إن لم تكن هناك استضافة) */}
             {isAgent && request.status === "ProgramLinked" && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleRequestHostingAcceptance();
-                }}
-                disabled={actionLoading}
-                className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
-              >
-                <Home className="w-3.5 h-3.5" />
-                <span>طلب قبول الاستضافة</span>
-              </button>
+              request.hasHosting ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleRequestHostingAcceptance();
+                  }}
+                  disabled={actionLoading}
+                  className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Home className="w-3.5 h-3.5" />
+                  <span>طلب قبول الاستضافة</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleAgentComplete();
+                  }}
+                  disabled={actionLoading}
+                  className="bg-green-600 hover:bg-green-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>تم اعتماده وإنهاء المعاملة ✓</span>
+                </button>
+              )
             )}
 
             {/* Step 3: Sender when HostingAcceptanceRequested sees "تم قبول طلب الاستضافة" */}
@@ -1740,6 +1810,31 @@ export default function RequestDetailPage({
                 <Check className="w-3.5 h-3.5" />
                 <span>تم اعتماده وإنهاء المعاملة ✓</span>
               </button>
+            )}
+
+            {/* Step 6: Saudi Agent when Completed sees "تم (إيداع في الأرشيف)" */}
+            {isAgent && request.status === "Completed" && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleAgentArchive();
+                }}
+                disabled={actionLoading}
+                className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                title="إيداع المعاملة في الأرشيف (تم)"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>تم (إيداع في الأرشيف)</span>
+              </button>
+            )}
+
+            {/* When Archived */}
+            {isAgent && request.status === "Archived" && (
+              <div className="flex items-center gap-1.5 bg-purple-50 text-purple-700 border border-purple-200 px-3 py-1.5 rounded-xl text-xs font-bold">
+                <Archive className="w-3.5 h-3.5 text-purple-600" />
+                <span>المعاملة مؤرشفة (تم) ✓</span>
+              </div>
             )}
 
             {/* Admin Management Actions: Archive & Delete */}
@@ -1970,6 +2065,7 @@ export default function RequestDetailPage({
           onDownloadDoc={handleDownloadDoc}
           onUpdateTraveler={handleUpdateTraveler}
           onSaveNusukNumber={handleSaveNusukNumber}
+          onArchiveRequest={handleAgentArchive}
           actionLoading={actionLoading}
         />
       ) : isSafaEmployee ? (

@@ -15,6 +15,7 @@ import {
   Edit2,
   Check,
   MessageSquare,
+  Archive,
 } from "lucide-react";
 import { DocumentItem, GroupRequestDetail } from "@/types";
 import { getWhatsAppUrl, getTelUrl, normalizePhone } from "@/lib/phoneUtils";
@@ -34,6 +35,7 @@ interface SaudiAgentViewProps {
     dateOfBirth?: string
   ) => Promise<void>;
   onSaveNusukNumber: (num: string) => Promise<void>;
+  onArchiveRequest?: () => Promise<void>;
   actionLoading: boolean;
 }
 
@@ -45,6 +47,7 @@ export const SaudiAgentView: React.FC<SaudiAgentViewProps> = ({
   onDownloadDoc,
   onUpdateTraveler,
   onSaveNusukNumber,
+  onArchiveRequest,
   actionLoading,
 }) => {
   const [editingNusuk, setEditingNusuk] = useState(false);
@@ -86,6 +89,46 @@ export const SaudiAgentView: React.FC<SaudiAgentViewProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Archive / Completed Callout */}
+      {request.status === "Completed" && onArchiveRequest && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+              <Check className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-emerald-950">المعاملة مكتملة ومعتمدة بنجاح</h3>
+              <p className="text-xs text-emerald-800 mt-0.5">
+                يمكنك الآن الضغط على زر &quot;تم - إيداع في الأرشيف&quot; لنقل المعاملة مباشرة إلى سجل المؤرشفة.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onArchiveRequest}
+            disabled={actionLoading}
+            className="w-full sm:w-auto px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer flex items-center justify-center gap-2 shrink-0 transition-colors"
+          >
+            <Check className="w-4 h-4" />
+            <span>تم (إيداع في الأرشيف)</span>
+          </button>
+        </div>
+      )}
+
+      {request.status === "Archived" && (
+        <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4 flex items-center gap-3 shadow-xs">
+          <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+            <Archive className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-purple-950">المعاملة في الأرشيف</h3>
+            <p className="text-xs text-purple-800 mt-0.5">
+              تم إنجاز هذه المعاملة ونقلها إلى سجل المعاملات المؤرشفة (تم) بنجاح.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* 1. Nusuk Group Number Card */}
       <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-xs space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">

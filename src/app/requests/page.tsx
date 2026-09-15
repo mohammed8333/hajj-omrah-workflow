@@ -151,6 +151,7 @@ export default function RequestsListPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [nusukFilter, setNusukFilter] = useState<"ALL" | "WITH_NUSUK" | "WITHOUT_NUSUK">("ALL");
+  const [agentTab, setAgentTab] = useState<"AGENT_INBOX" | "COMPLETED" | "ARCHIVED">("AGENT_INBOX");
   const [copiedNusuk, setCopiedNusuk] = useState<string | null>(null);
 
   // Read initial search from URL params if present
@@ -202,6 +203,29 @@ export default function RequestsListPage() {
     try {
       await api.requests.archive(id, "أرشفة يدوية بواسطة مدير النظام");
       await loadRequests();
+    } catch (err: unknown) {
+      if (err instanceof Error) await alert({ title: "خطأ", message: err.message, variant: "danger" });
+    }
+  };
+
+  const handleAgentArchive = async (id: string, reqNumber: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const ok = await confirm({
+      title: "إيداع في الأرشيف (تم)",
+      message: `هل أنت متأكد من إتمام المعاملة (${reqNumber}) نهائياً ونقلها إلى سجل المؤرشفة؟`,
+      confirmText: "تم - إيداع في الأرشيف",
+      cancelText: "إلغاء",
+      variant: "success",
+    });
+    if (!ok) return;
+    try {
+      await api.requests.archive(id, "تم إنجاز المعاملة وأرشفتها بواسطة الوكيل السعودي (تم)");
+      await loadRequests();
+      await alert({
+        title: "تمت الأرشفة بنجاح",
+        message: "تم نقل المعاملة إلى قسم المعاملات المؤرشفة بنجاح.",
+        variant: "success",
+      });
     } catch (err: unknown) {
       if (err instanceof Error) await alert({ title: "خطأ", message: err.message, variant: "danger" });
     }
@@ -297,6 +321,41 @@ ${travelersLines}
   };
 
   const filtered = requests.filter((r) => {
+    // Saudi Agent isolation: strictly only transactions referred to the agent or beyond
+    if (role === "SaudiAgent") {
+      const isAgentEligible = [
+        "ReadyForSaudiAgent",
+        "ReceivedBySaudiAgent",
+        "SaudiAgentProcessing",
+        "SaudiAgentCorrectionRequired",
+        "ProgramLinked",
+        "HostingAcceptanceRequested",
+        "HostingAcceptedBySender",
+        "HostingConfirmed",
+        "Completed",
+        "Archived",
+      ].includes(r.status);
+      if (!isAgentEligible) return false;
+
+      if (agentTab === "AGENT_INBOX") {
+        const isInbox = [
+          "ReadyForSaudiAgent",
+          "ReceivedBySaudiAgent",
+          "SaudiAgentProcessing",
+          "SaudiAgentCorrectionRequired",
+          "ProgramLinked",
+          "HostingAcceptanceRequested",
+          "HostingAcceptedBySender",
+          "HostingConfirmed",
+        ].includes(r.status);
+        if (!isInbox) return false;
+      } else if (agentTab === "COMPLETED") {
+        if (r.status !== "Completed") return false;
+      } else if (agentTab === "ARCHIVED") {
+        if (r.status !== "Archived") return false;
+      }
+    }
+
     const term = search.trim().toLowerCase();
     const matchesTerm =
       !term ||
@@ -344,6 +403,59 @@ ${travelersLines}
 
       {/* Filter & Search Bar */}
       <div className="bg-white p-4 sm:p-5 rounded-2xl border border-gray-200 shadow-xs space-y-3">
+        {role === "SaudiAgent" && (
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-2 border-b border-gray-100">
+            <button
+              type="button"
+              onClick={() => setAgentTab("AGENT_INBOX")}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                agentTab === "AGENT_INBOX"
+                  ? "bg-sky-600 text-white shadow-xs"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              الوارد والجديد للمعالجة (
+              {
+                requests.filter((r) =>
+                  [
+                    "ReadyForSaudiAgent",
+                    "ReceivedBySaudiAgent",
+                    "SaudiAgentProcessing",
+                    "SaudiAgentCorrectionRequired",
+                    "ProgramLinked",
+                    "HostingAcceptanceRequested",
+                    "HostingAcceptedBySender",
+                    "HostingConfirmed",
+                  ].includes(r.status)
+                ).length
+              }
+              )
+            </button>
+            <button
+              type="button"
+              onClick={() => setAgentTab("COMPLETED")}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                agentTab === "COMPLETED"
+                  ? "bg-green-600 text-white shadow-xs"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              مكتملة ({requests.filter((r) => r.status === "Completed").length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setAgentTab("ARCHIVED")}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                agentTab === "ARCHIVED"
+                  ? "bg-purple-600 text-white shadow-xs"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              مؤرشفة ({requests.filter((r) => r.status === "Archived").length})
+            </button>
+          </div>
+        )}
+
         <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
           {/* Main Search Input with Nusuk support */}
           <div className="relative flex-1">
@@ -374,24 +486,42 @@ ${travelersLines}
               onChange={(e) => setStatusFilter(e.target.value)}
               className="w-full sm:w-48 px-3 py-2.5 text-xs rounded-xl border border-gray-300 focus:outline-hidden focus:ring-1 focus:ring-sky-500 bg-white cursor-pointer"
             >
-              <option value="">جميع الحالات</option>
-              <option value="Draft">مسودة</option>
-              <option value="Submitted">تم التقديم</option>
-              <option value="UnderReview">قيد المراجعة</option>
-              <option value="MissingDocuments">مستندات ناقصة</option>
-              <option value="CorrectionRequired">مطلوب تصحيح</option>
-              <option value="DocumentsCompleted">المستندات مكتملة</option>
-              <option value="SafaRegistrationCompleted">اكتمل تسجيل صفا</option>
-              <option value="ReadyForSaudiAgent">جاهز للوكيل السعودي</option>
-              <option value="ReceivedBySaudiAgent">مستلم من الوكيل</option>
-              <option value="ProgramLinked">تم ربط البرنامج</option>
-              <option value="HostingAcceptanceRequested">بانتظار قبول الاستضافة</option>
-              <option value="HostingAcceptedBySender">تم قبول الاستضافة</option>
-              <option value="HostingConfirmed">تم تأكيد الاستضافة</option>
-              <option value="SaudiAgentProcessing">قيد المعالجة</option>
-              <option value="Completed">مكتمل نهائياً</option>
-              <option value="Cancelled">ملغي</option>
-              <option value="Archived">معاملات مؤرشفة</option>
+              {role === "SaudiAgent" ? (
+                <>
+                  <option value="">جميع الحالات</option>
+                  <option value="ReadyForSaudiAgent">جديد محال من صفا</option>
+                  <option value="ReceivedBySaudiAgent">مستلم من الوكيل</option>
+                  <option value="SaudiAgentProcessing">قيد المعالجة</option>
+                  <option value="ProgramLinked">تم ربط البرنامج</option>
+                  <option value="HostingAcceptanceRequested">بانتظار قبول الاستضافة</option>
+                  <option value="HostingAcceptedBySender">تم قبول الاستضافة</option>
+                  <option value="HostingConfirmed">تم تأكيد الاستضافة</option>
+                  <option value="SaudiAgentCorrectionRequired">مطلوب تصحيح</option>
+                  <option value="Completed">مكتمل نهائياً</option>
+                  <option value="Archived">معاملات مؤرشفة</option>
+                </>
+              ) : (
+                <>
+                  <option value="">جميع الحالات</option>
+                  <option value="Draft">مسودة</option>
+                  <option value="Submitted">تم التقديم</option>
+                  <option value="UnderReview">قيد المراجعة</option>
+                  <option value="MissingDocuments">مستندات ناقصة</option>
+                  <option value="CorrectionRequired">مطلوب تصحيح</option>
+                  <option value="DocumentsCompleted">المستندات مكتملة</option>
+                  <option value="SafaRegistrationCompleted">اكتمل تسجيل صفا</option>
+                  <option value="ReadyForSaudiAgent">جاهز للوكيل السعودي</option>
+                  <option value="ReceivedBySaudiAgent">مستلم من الوكيل</option>
+                  <option value="ProgramLinked">تم ربط البرنامج</option>
+                  <option value="HostingAcceptanceRequested">بانتظار قبول الاستضافة</option>
+                  <option value="HostingAcceptedBySender">تم قبول الاستضافة</option>
+                  <option value="HostingConfirmed">تم تأكيد الاستضافة</option>
+                  <option value="SaudiAgentProcessing">قيد المعالجة</option>
+                  <option value="Completed">مكتمل نهائياً</option>
+                  <option value="Cancelled">ملغي</option>
+                  <option value="Archived">معاملات مؤرشفة</option>
+                </>
+              )}
             </select>
           </div>
         </div>
@@ -518,9 +648,38 @@ ${travelersLines}
                       )}
                     </div>
 
-                    {/* المستطيل فوق على الشمال: حالة المجموعة + أزرار الأدمن إن وجدت */}
+                    {/* المستطيل فوق على الشمال: حالة المجموعة + أزرار الأدمن والوكيل إن وجدت */}
                     <div className="flex items-center gap-1.5">
+                      {role === "SaudiAgent" && r.status === "ReadyForSaudiAgent" && (
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-amber-500 text-white shadow-2xs">
+                          جديد من صفا
+                        </span>
+                      )}
                       <RequestStatusBadge status={r.status} />
+                      {role === "SaudiAgent" && (
+                        <div className="flex items-center gap-1">
+                          {r.status === "Completed" && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAgentArchive(r.id, r.requestNumber, e);
+                              }}
+                              className="px-2.5 py-1 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-lg cursor-pointer transition-colors flex items-center gap-1 shadow-2xs"
+                              title="إيداع في الأرشيف (تم)"
+                            >
+                              <Check className="w-3 h-3 text-emerald-600" />
+                              <span>تم (أرشفة)</span>
+                            </button>
+                          )}
+                          {r.status === "Archived" && (
+                            <span className="px-2 py-0.5 text-[11px] font-bold text-purple-700 bg-purple-50 border border-purple-200 rounded-lg flex items-center gap-1">
+                              <Archive className="w-3 h-3 text-purple-600" />
+                              <span>مؤرشفة</span>
+                            </span>
+                          )}
+                        </div>
+                      )}
                       {role === "Admin" && (
                         <div className="flex items-center gap-1">
                           {r.status === "Archived" ? (
@@ -736,7 +895,14 @@ ${travelersLines}
                                   rowSpan={rowCount}
                                   className="py-3.5 px-4 align-middle text-center border-l border-gray-100"
                                 >
-                                  <RequestStatusBadge status={r.status} />
+                                  <div className="flex flex-col items-center gap-1">
+                                    <RequestStatusBadge status={r.status} />
+                                    {role === "SaudiAgent" && r.status === "ReadyForSaudiAgent" && (
+                                      <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-amber-500 text-white shadow-2xs">
+                                        جديد من صفا
+                                      </span>
+                                    )}
+                                  </div>
                                 </td>
 
                                 {/* 3. بيانات الرحلة: رقم الرحلة فوق وتحتيها التاريخ والسفر خلال قد ايه */}
@@ -869,6 +1035,28 @@ ${travelersLines}
                                       >
                                         <Trash2 className="w-3.5 h-3.5" />
                                       </button>
+                                    </div>
+                                  )}
+
+                                  {role === "SaudiAgent" && (
+                                    <div className="flex items-center gap-1 border-r border-gray-200 pr-1.5 mr-0.5">
+                                      {r.status === "Completed" && (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => handleAgentArchive(r.id, r.requestNumber, e)}
+                                          className="inline-flex items-center gap-1 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-2.5 py-1 rounded-xl transition-colors cursor-pointer shadow-2xs"
+                                          title="إيداع في الأرشيف (تم)"
+                                        >
+                                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                          <span>تم (أرشفة)</span>
+                                        </button>
+                                      )}
+                                      {r.status === "Archived" && (
+                                        <span className="inline-flex items-center gap-1 text-xs font-bold text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-lg">
+                                          <Archive className="w-3.5 h-3.5 text-purple-600" />
+                                          <span>مؤرشفة</span>
+                                        </span>
+                                      )}
                                     </div>
                                   )}
                                 </div>

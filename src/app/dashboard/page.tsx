@@ -288,6 +288,37 @@ ${travelersLines}
     }
   };
 
+  const handleAgentArchive = async (id: string, reqNumber: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const ok = await confirm({
+      title: "إيداع في الأرشيف (تم)",
+      message: `هل أنت متأكد من إتمام المعاملة (${reqNumber}) نهائياً ونقلها إلى سجل المؤرشفة؟`,
+      confirmText: "تم - إيداع في الأرشيف",
+      cancelText: "إلغاء",
+      variant: "success",
+    });
+    if (!ok) return;
+    try {
+      await api.requests.archive(id, "تم إنجاز المعاملة وأرشفتها بواسطة الوكيل السعودي (تم)");
+      const reqsRes = await api.requests.getAll();
+      setRequests(reqsRes);
+      await alert({
+        title: "تمت الأرشفة بنجاح",
+        message: "تم نقل المعاملة إلى قسم المعاملات المؤرشفة بنجاح.",
+        variant: "success",
+      });
+    } catch (err: unknown) {
+      if (err instanceof Error) await alert({ title: "خطأ", message: err.message, variant: "danger" });
+    }
+  };
+
+  useEffect(() => {
+    if (role === "SaudiAgent" && activeTab === "ALL") {
+      setActiveTab("AGENT_INBOX");
+    }
+  }, [role, activeTab]);
+
   useEffect(() => {
     if (!authLoading && !user) {
       router.push("/login");
@@ -331,6 +362,23 @@ ${travelersLines}
 
   // Filter requests based on tab and search term
   const filteredRequests = requests.filter((r) => {
+    // Saudi Agent isolation: strictly only transactions referred to the agent or beyond
+    if (role === "SaudiAgent") {
+      const isAgentEligible = [
+        "ReadyForSaudiAgent",
+        "ReceivedBySaudiAgent",
+        "SaudiAgentProcessing",
+        "SaudiAgentCorrectionRequired",
+        "ProgramLinked",
+        "HostingAcceptanceRequested",
+        "HostingAcceptedBySender",
+        "HostingConfirmed",
+        "Completed",
+        "Archived",
+      ].includes(r.status);
+      if (!isAgentEligible) return false;
+    }
+
     const term = searchTerm.trim().toLowerCase();
     const matchesSearch =
       !term ||
@@ -364,12 +412,14 @@ ${travelersLines}
         r.status === "ReadyForSaudiAgent" ||
         r.status === "ReceivedBySaudiAgent" ||
         r.status === "SaudiAgentProcessing" ||
+        r.status === "SaudiAgentCorrectionRequired" ||
         r.status === "ProgramLinked" ||
         r.status === "HostingAcceptanceRequested" ||
         r.status === "HostingAcceptedBySender" ||
         r.status === "HostingConfirmed"
       );
     if (activeTab === "COMPLETED") return r.status === "Completed";
+    if (activeTab === "ARCHIVED") return r.status === "Archived";
 
     return true;
   });
@@ -506,16 +556,18 @@ ${travelersLines}
       {/* Tabs / Filters Bar */}
       <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 bg-white p-4 rounded-xl border border-gray-200 shadow-xs">
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-          <button
-            onClick={() => setActiveTab("ALL")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap cursor-pointer transition-colors ${
-              activeTab === "ALL"
-                ? "bg-sky-600 text-white"
-                : "text-gray-600 hover:bg-gray-100"
-            }`}
-          >
-            الكل ({requests.length})
-          </button>
+          {role !== "SaudiAgent" && (
+            <button
+              onClick={() => setActiveTab("ALL")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap cursor-pointer transition-colors ${
+                activeTab === "ALL"
+                  ? "bg-sky-600 text-white"
+                  : "text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              الكل ({requests.length})
+            </button>
+          )}
 
           {role === "SafaEmployee" && (
             <>
@@ -566,33 +618,48 @@ ${travelersLines}
             <>
               <button
                 onClick={() => setActiveTab("AGENT_INBOX")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap cursor-pointer transition-colors ${
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
                   activeTab === "AGENT_INBOX"
-                    ? "bg-sky-600 text-white"
+                    ? "bg-sky-600 text-white shadow-xs"
                     : "text-gray-600 hover:bg-gray-100"
                 }`}
               >
-                الوارد والمعالجة
-              </button>
-              <button
-                onClick={() => setActiveTab("ISSUES")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap cursor-pointer transition-colors ${
-                  activeTab === "ISSUES"
-                    ? "bg-rose-600 text-white"
-                    : "text-gray-600 hover:bg-gray-100"
-                }`}
-              >
-                بها ملاحظات
+                الوارد والجديد للمعالجة (
+                {
+                  requests.filter((r) =>
+                    [
+                      "ReadyForSaudiAgent",
+                      "ReceivedBySaudiAgent",
+                      "SaudiAgentProcessing",
+                      "SaudiAgentCorrectionRequired",
+                      "ProgramLinked",
+                      "HostingAcceptanceRequested",
+                      "HostingAcceptedBySender",
+                      "HostingConfirmed",
+                    ].includes(r.status)
+                  ).length
+                }
+                )
               </button>
               <button
                 onClick={() => setActiveTab("COMPLETED")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap cursor-pointer transition-colors ${
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
                   activeTab === "COMPLETED"
-                    ? "bg-green-600 text-white"
+                    ? "bg-green-600 text-white shadow-xs"
                     : "text-gray-600 hover:bg-gray-100"
                 }`}
               >
-                المكتملة
+                مكتملة ({requests.filter((r) => r.status === "Completed").length})
+              </button>
+              <button
+                onClick={() => setActiveTab("ARCHIVED")}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                  activeTab === "ARCHIVED"
+                    ? "bg-purple-600 text-white shadow-xs"
+                    : "text-gray-600 hover:bg-gray-100"
+                }`}
+              >
+                مؤرشفة ({requests.filter((r) => r.status === "Archived").length})
               </button>
             </>
           )}
@@ -1035,9 +1102,16 @@ ${travelersLines}
             >
               <div>
                 <div className="flex justify-between items-start mb-3 gap-2">
-                  <span className="text-xs font-mono font-bold bg-gray-100 text-gray-800 px-2 py-0.5 rounded-md">
-                    {req.requestNumber}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-mono font-bold bg-gray-100 text-gray-800 px-2 py-0.5 rounded-md">
+                      {req.requestNumber}
+                    </span>
+                    {role === "SaudiAgent" && req.status === "ReadyForSaudiAgent" && (
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-amber-500 text-white shadow-2xs">
+                        جديد من صفا
+                      </span>
+                    )}
+                  </div>
                   <RequestStatusBadge status={req.status} />
                 </div>
 
@@ -1168,6 +1242,28 @@ ${travelersLines}
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
+                  </div>
+                )}
+
+                {role === "SaudiAgent" && (
+                  <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                    {req.status === "Completed" && (
+                      <button
+                        type="button"
+                        onClick={(e) => handleAgentArchive(req.id, req.requestNumber, e)}
+                        className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-3 py-1.5 rounded-xl transition-colors cursor-pointer shadow-2xs"
+                        title="إيداع في الأرشيف (تم)"
+                      >
+                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>تم (أرشفة)</span>
+                      </button>
+                    )}
+                    {req.status === "Archived" && (
+                      <span className="inline-flex items-center gap-1 text-xs font-bold text-purple-700 bg-purple-50 border border-purple-200 px-2.5 py-1 rounded-xl">
+                        <Archive className="w-3.5 h-3.5 text-purple-600" />
+                        <span>مؤرشفة</span>
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
