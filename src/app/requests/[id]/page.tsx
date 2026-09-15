@@ -1577,7 +1577,7 @@ export default function RequestDetailPage({
             request.status === "Completed" || request.status === "Archived" ? (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-300 shadow-2xs">
                 <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
-                <span>{request.status === "Archived" ? "المعاملة في الأرشيف (تم)" : "اكتملت المعاملة"}</span>
+                <span>(تم)</span>
               </span>
             ) : (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-sky-50 text-sky-700 border border-sky-300 shadow-2xs">

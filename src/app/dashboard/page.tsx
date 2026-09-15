@@ -1085,33 +1085,12 @@ ${travelersLines}
                         {isCompleted ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-300 shadow-2xs">
                             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                            <span>اكتملت المعاملة</span>
+                            <span>(تم)</span>
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-sky-50 text-sky-700 border border-sky-300 shadow-2xs">
                             <Check className="w-3.5 h-3.5 text-sky-600" />
                             <span>تم الاستلام</span>
-                          </span>
-                        )}
-
-                        {r.status === "Completed" && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleAgentArchive(r.id, r.requestNumber, e);
-                            }}
-                            className="px-2 py-1 text-[11px] font-bold text-emerald-800 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 rounded-lg cursor-pointer transition-colors flex items-center gap-1 shadow-2xs"
-                            title="إيداع في الأرشيف (تم)"
-                          >
-                            <Check className="w-3 h-3 text-emerald-700" />
-                            <span>تم (أرشفة)</span>
-                          </button>
-                        )}
-                        {r.status === "Archived" && (
-                          <span className="px-2 py-0.5 text-[10px] font-bold text-purple-700 bg-purple-50 border border-purple-200 rounded-lg flex items-center gap-1">
-                            <Archive className="w-3 h-3 text-purple-600" />
-                            <span>مؤرشفة</span>
                           </span>
                         )}
                       </div>
@@ -1590,12 +1569,12 @@ ${travelersLines}
                             )}
                           </td>
 
-                          {/* 2. الحالة: تم الاستلام أو اكتملت المعاملة فقط */}
+                          {/* 2. الحالة: تم الاستلام أو (تم) */}
                           <td className="py-3.5 px-4 align-middle text-center border-l border-gray-100">
                             {isCompleted ? (
                               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-300 shadow-2xs">
                                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                                <span>{r.status === "Archived" ? "مؤرشفة (تم)" : "اكتملت المعاملة"}</span>
+                                <span>(تم)</span>
                               </span>
                             ) : (
                               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-sky-50 text-sky-700 border border-sky-300 shadow-2xs">
