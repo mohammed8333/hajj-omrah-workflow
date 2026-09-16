@@ -346,6 +346,11 @@ export default function RequestDetailPage({
             await api.requests.update(requestId, {
               airline: scanResult.airline || request?.airline,
               flightNumber: scanResult.flightNumber || request?.flightNumber,
+              returnFlightNumber: scanResult.returnFlightNumber || request?.returnFlightNumber,
+              arrivalAirport: scanResult.arrivalAirport || request?.arrivalAirport,
+              saudiArrivalTime: scanResult.saudiArrivalTime || request?.saudiArrivalTime,
+              returnDepartureAirport: scanResult.returnDepartureAirport || request?.returnDepartureAirport,
+              returnFlightDepartureTime: scanResult.returnFlightDepartureTime || request?.returnFlightDepartureTime,
               departureDate: scanResult.departureDate || request?.departureDate,
               returnDate: scanResult.returnDate || request?.returnDate,
               flightDepartureTime: scanResult.flightDepartureTime || request?.flightDepartureTime,
@@ -796,6 +801,11 @@ export default function RequestDetailPage({
         await api.requests.update(requestId, {
           airline: result.airline || request?.airline,
           flightNumber: result.flightNumber || request?.flightNumber,
+          returnFlightNumber: result.returnFlightNumber || request?.returnFlightNumber,
+          arrivalAirport: result.arrivalAirport || request?.arrivalAirport,
+          saudiArrivalTime: result.saudiArrivalTime || request?.saudiArrivalTime,
+          returnDepartureAirport: result.returnDepartureAirport || request?.returnDepartureAirport,
+          returnFlightDepartureTime: result.returnFlightDepartureTime || request?.returnFlightDepartureTime,
           departureDate: result.departureDate || request?.departureDate,
           returnDate: result.returnDate || request?.returnDate,
           flightDepartureTime: result.flightDepartureTime || request?.flightDepartureTime,

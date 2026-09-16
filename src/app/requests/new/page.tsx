@@ -169,6 +169,11 @@ export default function UnifiedNewRequestPage() {
       ) {
         if (result.airline) setAirline(result.airline);
         if (result.flightNumber) setFlightNumber(result.flightNumber);
+        if (result.returnFlightNumber) setReturnFlightNumber(result.returnFlightNumber);
+        if (result.arrivalAirport) setArrivalAirport(result.arrivalAirport);
+        if (result.saudiArrivalTime) setSaudiArrivalTime(result.saudiArrivalTime);
+        if (result.returnDepartureAirport) setReturnDepartureAirport(result.returnDepartureAirport);
+        if (result.returnFlightDepartureTime) setReturnFlightDepartureTime(result.returnFlightDepartureTime);
         if (result.departureDate) setDepartureDate(result.departureDate);
         if (result.returnDate) setReturnDate(result.returnDate);
         if (result.flightDepartureTime) {

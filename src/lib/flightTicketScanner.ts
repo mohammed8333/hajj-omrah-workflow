@@ -7,6 +7,11 @@ export interface ScannedFlightTicketData {
   airportArrivalTime?: string;
   airline?: string;
   flightNumber?: string;
+  returnFlightNumber?: string;
+  arrivalAirport?: string;
+  saudiArrivalTime?: string;
+  returnDepartureAirport?: string;
+  returnFlightDepartureTime?: string;
   rawText?: string;
 }
 
@@ -54,6 +59,11 @@ export async function scanFlightTicket(
           airportArrivalTime: arrivalTime,
           airline: geminiResult.airline,
           flightNumber: geminiResult.flightNumber,
+          returnFlightNumber: geminiResult.returnFlightNumber,
+          arrivalAirport: geminiResult.arrivalAirport,
+          saudiArrivalTime: geminiResult.saudiArrivalTime,
+          returnDepartureAirport: geminiResult.returnDepartureAirport,
+          returnFlightDepartureTime: geminiResult.returnFlightDepartureTime,
         };
       }
     } catch (err) {

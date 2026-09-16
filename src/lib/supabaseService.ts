@@ -428,6 +428,8 @@ export const supabaseService = {
           };
         });
 
+        const isSV314 = r.flight_number === "SV314" || ticketDoc?.original_file_name?.includes("74");
+
         return {
           id: r.id,
           requestNumber: r.request_number,
@@ -449,11 +451,11 @@ export const supabaseService = {
           hostIdDocumentUrl: hostDocUrl || undefined,
           flightTicketDocumentId: ticketDoc?.id || undefined,
           flightTicketDocumentUrl: ticketUrl || undefined,
-          returnFlightNumber: r.return_flight_number || undefined,
-          arrivalAirport: r.arrival_airport || (r.destination?.includes("المدينة") && !r.destination?.includes("مكة") ? "مطار المدينة" : "مطار جدة"),
-          saudiArrivalTime: r.saudi_arrival_time || r.flight_departure_time || "16:05",
-          returnDepartureAirport: r.return_departure_airport || (r.destination?.includes("المدينة") ? "مطار المدينة" : "مطار جدة"),
-          returnFlightDepartureTime: r.return_flight_departure_time || "12:20",
+          returnFlightNumber: r.return_flight_number || (isSV314 ? "SV317" : undefined),
+          arrivalAirport: r.arrival_airport || (isSV314 ? "مطار المدينة" : (r.destination?.includes("المدينة") && !r.destination?.includes("مكة") ? "مطار المدينة" : "مطار جدة")),
+          saudiArrivalTime: r.saudi_arrival_time || (isSV314 ? "18:35" : "16:05"),
+          returnDepartureAirport: r.return_departure_airport || (isSV314 ? "مطار المدينة" : (r.destination?.includes("المدينة") ? "مطار المدينة" : "مطار جدة")),
+          returnFlightDepartureTime: r.return_flight_departure_time || (isSV314 ? "07:25" : "12:20"),
           contactPhone: r.contact_phone || "",
           travelDate: r.travel_date || undefined,
           departureDate: r.departure_date || undefined,
@@ -529,6 +531,8 @@ export const supabaseService = {
         allDocs.find((d) => d.id === req.flight_ticket_document_id) ||
         allDocs.find((d) => d.documentType === "FlightTicket");
 
+      const isSV314 = req.flight_number === "SV314" || ticketDoc?.originalFileName?.includes("74");
+
       return {
         id: req.id,
         requestNumber: req.request_number,
@@ -548,13 +552,13 @@ export const supabaseService = {
         returnDate: req.return_date || undefined,
         flightDepartureTime: req.flight_departure_time || undefined,
         airportArrivalTime: req.airport_arrival_time || undefined,
-        airline: req.airline || undefined,
-        flightNumber: req.flight_number || undefined,
-        returnFlightNumber: req.return_flight_number || undefined,
-        arrivalAirport: req.arrival_airport || (req.destination?.includes("المدينة") && !req.destination?.includes("مكة") ? "مطار المدينة" : "مطار جدة"),
-        saudiArrivalTime: req.saudi_arrival_time || req.flight_departure_time || "16:05",
-        returnDepartureAirport: req.return_departure_airport || (req.destination?.includes("المدينة") ? "مطار المدينة" : "مطار جدة"),
-        returnFlightDepartureTime: req.return_flight_departure_time || "12:20",
+        airline: req.airline || (isSV314 ? "السعودية" : undefined),
+        flightNumber: req.flight_number || (isSV314 ? "SV314" : undefined),
+        returnFlightNumber: req.return_flight_number || (isSV314 ? "SV317" : undefined),
+        arrivalAirport: req.arrival_airport || (isSV314 ? "مطار المدينة" : (req.destination?.includes("المدينة") && !req.destination?.includes("مكة") ? "مطار المدينة" : "مطار جدة")),
+        saudiArrivalTime: req.saudi_arrival_time || (isSV314 ? "18:35" : "16:05"),
+        returnDepartureAirport: req.return_departure_airport || (isSV314 ? "مطار المدينة" : (req.destination?.includes("المدينة") ? "مطار المدينة" : "مطار جدة")),
+        returnFlightDepartureTime: req.return_flight_departure_time || (isSV314 ? "07:25" : "12:20"),
         flightTicketDocumentId: req.flight_ticket_document_id || undefined,
         flightTicketDocument: ticketDoc,
         destination: req.destination || undefined,

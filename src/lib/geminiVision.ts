@@ -34,6 +34,11 @@ export interface GeminiFlightTicketResult {
   airportArrivalTime?: string;
   airline?: string;
   flightNumber?: string;
+  returnFlightNumber?: string;
+  arrivalAirport?: string;
+  saudiArrivalTime?: string;
+  returnDepartureAirport?: string;
+  returnFlightDepartureTime?: string;
 }
 
 // 1. Storage & Key Management
@@ -455,38 +460,72 @@ export async function scanFlightTicketWithGemini(
   apiKey?: string
 ): Promise<GeminiFlightTicketResult | null> {
   const prompt = `
-You are an expert airline ticket and boarding pass inspection system.
-Examine the provided flight ticket, e-ticket receipt, or boarding pass.
+You are an expert airline ticket, e-ticket, and flight itinerary analysis system.
+Carefully examine the provided flight document (which contains outbound flight and/or return flight details).
 
-Extract the following flight schedule details:
-1. "departureDate": Departure date in YYYY-MM-DD format.
-2. "returnDate": Return flight date in YYYY-MM-DD format (if a round trip, otherwise null).
-3. "flightDepartureTime": Scheduled flight takeoff / departure time in 24-hour HH:MM format (e.g. "14:30" or "08:15").
-4. "airportArrivalTime": Recommended airport arrival time (usually 3 hours before international departure) in 24-hour HH:MM format.
-5. "airline": Name of the airline (e.g. "مصر للطيران", "الخطوط السعودية", "طيران ناس", "Flynas", "Saudia").
-6. "flightNumber": Flight number (e.g. "SV123", "MS665").
+Extract the following flight schedule details accurately:
+1. "airline": Name of airline in Arabic if possible, or standard name (e.g. "السعودية", "مصر للطيران", "طيران ناس", "Saudia", "Flynas").
+2. Outbound Leg (رحلة الذهاب إلى السعودية):
+   - "flightNumber": Outbound flight number (e.g. "SV314", "MS665").
+   - "departureDate": Outbound departure date in YYYY-MM-DD format (e.g. "2026-09-16").
+   - "flightDepartureTime": Outbound departure takeoff time in 24-hour HH:MM format (e.g. "16:40").
+   - "arrivalAirport": Destination airport in Saudi Arabia in Arabic. If it arrives in Madinah / Prince Mohammad Bin Abdulaziz, return "مطار المدينة". If Jeddah / King Abdulaziz, return "مطار جدة". If Riyadh, return "مطار الرياض".
+   - "saudiArrivalTime": Scheduled landing / arrival time in Saudi Arabia in 24-hour HH:MM format (e.g. "18:35").
+   - "airportArrivalTime": Passenger recommended airport arrival time before departure (e.g. 3 hours prior) in 24-hour HH:MM format (e.g. "13:40").
+3. Return Leg (رحلة العودة من السعودية):
+   - "returnFlightNumber": Return flight number (e.g. "SV317"). Look for the return flight, second sector, or incoming flight.
+   - "returnDate": Return flight departure date in YYYY-MM-DD format (e.g. "2026-12-05").
+   - "returnDepartureAirport": Saudi departure airport in Arabic (e.g. "مطار المدينة" or "مطار جدة").
+   - "returnFlightDepartureTime": Scheduled return flight takeoff time from Saudi Arabia in 24-hour HH:MM format (e.g. "07:25").
 
-Return strictly a JSON object with this structure:
+Return strictly a valid JSON object matching this structure:
 {
-  "departureDate": "YYYY-MM-DD or null",
-  "returnDate": "YYYY-MM-DD or null",
-  "flightDepartureTime": "HH:MM or null",
-  "airportArrivalTime": "HH:MM or null",
   "airline": "string or null",
-  "flightNumber": "string or null"
+  "flightNumber": "string or null",
+  "departureDate": "YYYY-MM-DD or null",
+  "flightDepartureTime": "HH:MM or null",
+  "arrivalAirport": "string or null",
+  "saudiArrivalTime": "HH:MM or null",
+  "airportArrivalTime": "HH:MM or null",
+  "returnFlightNumber": "string or null",
+  "returnDate": "YYYY-MM-DD or null",
+  "returnDepartureAirport": "string or null",
+  "returnFlightDepartureTime": "HH:MM or null"
 }
 `;
 
   const rawJson = await callGeminiVision(prompt, fileOrUrl, apiKey);
   try {
     const parsed = JSON.parse(rawJson);
+
+    // Normalize airport names to clean standard Arabic labels
+    const normalizeAirport = (airport?: string) => {
+      if (!airport) return undefined;
+      const a = airport.trim();
+      if (a.includes("المدينة") || a.includes("محمد بن عبد العزيز") || a.toLowerCase().includes("medina") || a.toLowerCase().includes("madinah") || a.toUpperCase().includes("MED")) {
+        return "مطار المدينة";
+      }
+      if (a.includes("جدة") || a.includes("عبد العزيز") || a.toLowerCase().includes("jeddah") || a.toUpperCase().includes("JED")) {
+        return "مطار جدة";
+      }
+      if (a.includes("الرياض") || a.includes("خالد") || a.toLowerCase().includes("riyadh") || a.toUpperCase().includes("RUH")) {
+        return "مطار الرياض";
+      }
+      return a;
+    };
+
     return {
-      departureDate: parsed.departureDate?.trim() || undefined,
-      returnDate: parsed.returnDate?.trim() || undefined,
-      flightDepartureTime: parsed.flightDepartureTime?.trim() || undefined,
-      airportArrivalTime: parsed.airportArrivalTime?.trim() || undefined,
       airline: parsed.airline?.trim() || undefined,
-      flightNumber: parsed.flightNumber?.trim() || undefined,
+      flightNumber: parsed.flightNumber?.trim()?.toUpperCase() || undefined,
+      departureDate: parsed.departureDate?.trim() || undefined,
+      flightDepartureTime: parsed.flightDepartureTime?.trim() || undefined,
+      arrivalAirport: normalizeAirport(parsed.arrivalAirport),
+      saudiArrivalTime: parsed.saudiArrivalTime?.trim() || undefined,
+      airportArrivalTime: parsed.airportArrivalTime?.trim() || undefined,
+      returnFlightNumber: parsed.returnFlightNumber?.trim()?.toUpperCase() || undefined,
+      returnDate: parsed.returnDate?.trim() || undefined,
+      returnDepartureAirport: normalizeAirport(parsed.returnDepartureAirport),
+      returnFlightDepartureTime: parsed.returnFlightDepartureTime?.trim() || undefined,
     };
   } catch (err) {
     console.error("Failed to parse Gemini Flight Ticket JSON response:", rawJson, err);

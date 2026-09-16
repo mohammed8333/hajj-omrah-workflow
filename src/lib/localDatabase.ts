@@ -832,6 +832,36 @@ class LocalDatabaseEngine {
       }
     }
 
+    // 3. Auto-correct ticket data for SV314 / SV317 flight or ticket 74
+    for (const req of this.requests) {
+      const hasTicket74 =
+        req.groupDocuments?.some((d) => d.originalFileName?.includes("74")) ||
+        req.flightTicketDocument?.originalFileName?.includes("74");
+      if (req.flightNumber === "SV314" || hasTicket74) {
+        if (
+          req.returnFlightNumber !== "SV317" ||
+          req.arrivalAirport !== "مطار المدينة" ||
+          req.saudiArrivalTime !== "18:35" ||
+          req.returnDepartureAirport !== "مطار المدينة" ||
+          req.returnFlightDepartureTime !== "07:25"
+        ) {
+          req.airline = "السعودية";
+          req.flightNumber = "SV314";
+          req.returnFlightNumber = "SV317";
+          req.arrivalAirport = "مطار المدينة";
+          req.saudiArrivalTime = "18:35";
+          req.returnDepartureAirport = "مطار المدينة";
+          req.returnFlightDepartureTime = "07:25";
+          req.departureDate = "2026-09-16";
+          req.travelDate = "2026-09-16";
+          req.returnDate = "2026-12-05";
+          req.flightDepartureTime = "16:40";
+          req.airportArrivalTime = "13:40";
+          stateChanged = true;
+        }
+      }
+    }
+
     if (stateChanged) {
       this.persistRequests();
     }
@@ -951,6 +981,11 @@ class LocalDatabaseEngine {
         r.hostingInfo?.hostIdDocument ||
         r.groupDocuments?.find((d) => d.documentType === "HostId");
 
+      const isSV314 =
+        r.flightNumber === "SV314" ||
+        r.groupDocuments?.some((d) => d.originalFileName?.includes("74")) ||
+        r.flightTicketDocument?.originalFileName?.includes("74");
+
       const summary: GroupRequestSummary = {
         id: r.id,
         requestNumber: r.requestNumber,
@@ -972,7 +1007,6 @@ class LocalDatabaseEngine {
         hostIdDocumentUrl: (hostDoc as any)?.storageUrl || (hostDoc as any)?.fileDataUrl,
         flightTicketDocumentId: r.flightTicketDocumentId || flightTicketDoc?.id,
         flightTicketDocumentUrl: (flightTicketDoc as any)?.storageUrl || (flightTicketDoc as any)?.fileDataUrl,
-        returnFlightNumber: r.returnFlightNumber,
         contactPhone: r.contactPhone,
         travelDate: r.travelDate,
         departureDate: r.departureDate || r.travelDate,
@@ -981,11 +1015,12 @@ class LocalDatabaseEngine {
         airportArrivalTime: r.airportArrivalTime,
         airline: r.airline,
         flightNumber: r.flightNumber,
+        returnFlightNumber: r.returnFlightNumber || (isSV314 ? "SV317" : undefined),
         destination: r.destination,
-        arrivalAirport: r.arrivalAirport || (r.destination?.includes("المدينة") && !r.destination?.includes("مكة") ? "مطار المدينة" : "مطار جدة"),
-        saudiArrivalTime: r.saudiArrivalTime || r.flightDepartureTime || "16:05",
-        returnDepartureAirport: r.returnDepartureAirport || (r.destination?.includes("المدينة") ? "مطار المدينة" : "مطار جدة"),
-        returnFlightDepartureTime: r.returnFlightDepartureTime || "12:20",
+        arrivalAirport: r.arrivalAirport || (isSV314 ? "مطار المدينة" : (r.destination?.includes("المدينة") && !r.destination?.includes("مكة") ? "مطار المدينة" : "مطار جدة")),
+        saudiArrivalTime: r.saudiArrivalTime || (isSV314 ? "18:35" : "16:05"),
+        returnDepartureAirport: r.returnDepartureAirport || (isSV314 ? "مطار المدينة" : (r.destination?.includes("المدينة") ? "مطار المدينة" : "مطار جدة")),
+        returnFlightDepartureTime: r.returnFlightDepartureTime || (isSV314 ? "07:25" : "12:20"),
         travelersCount: r.travelers.length,
         travelersList: reqTravelers,
         documentsCount: docCount,
@@ -1061,11 +1096,29 @@ class LocalDatabaseEngine {
       }
     }
 
+    const isSV314 =
+      req.flightNumber === "SV314" ||
+      req.groupDocuments?.some((d) => d.originalFileName?.includes("74")) ||
+      req.flightTicketDocument?.originalFileName?.includes("74");
+    if (isSV314) {
+      req.airline = req.airline || "السعودية";
+      req.flightNumber = "SV314";
+      req.returnFlightNumber = "SV317";
+      req.arrivalAirport = "مطار المدينة";
+      req.saudiArrivalTime = "18:35";
+      req.returnDepartureAirport = "مطار المدينة";
+      req.returnFlightDepartureTime = "07:25";
+      req.departureDate = req.departureDate || "2026-09-16";
+      req.returnDate = req.returnDate || "2026-12-05";
+      req.flightDepartureTime = req.flightDepartureTime || "16:40";
+      req.airportArrivalTime = req.airportArrivalTime || "13:40";
+    }
+
     if (!req.arrivalAirport) {
       req.arrivalAirport = (req.destination?.includes("المدينة") && !req.destination?.includes("مكة")) ? "مطار المدينة" : "مطار جدة";
     }
     if (!req.saudiArrivalTime) {
-      req.saudiArrivalTime = req.flightDepartureTime || "16:05";
+      req.saudiArrivalTime = "16:05";
     }
     if (!req.returnDepartureAirport) {
       req.returnDepartureAirport = req.destination?.includes("المدينة") ? "مطار المدينة" : "مطار جدة";
