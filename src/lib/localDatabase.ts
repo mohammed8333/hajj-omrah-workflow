@@ -998,8 +998,6 @@ class LocalDatabaseEngine {
         assignedSaudiAgentName: r.assignedSaudiAgentName,
         status: r.status,
         nusukGroupNumber: r.nusukGroupNumber,
-        nusukStatus: r.nusukStatus,
-        nusukSyncedAt: r.nusukSyncedAt,
         hasHosting: r.hasHosting,
         hostName: r.hostingInfo?.hostName,
         hostPhone: r.hostingInfo?.hostPhone || (r.hasHosting ? r.contactPhone : undefined),
@@ -1466,62 +1464,6 @@ class LocalDatabaseEngine {
       "GroupRequest",
       req.id
     );
-  }
-
-  public syncNusukStatus(
-    id: string,
-    nusukStatus: string,
-    note?: string,
-    autoComplete?: boolean,
-    currentUser?: User
-  ): { message: string; completed?: boolean } {
-    const req = this.requests.find((r) => r.id === id);
-    if (!req) throw new Error("المعاملة غير موجودة");
-
-    const now = new Date().toISOString();
-    const prev = req.status;
-    req.nusukStatus = nusukStatus;
-    req.nusukSyncedAt = now;
-    req.updatedAt = now;
-
-    const shouldComplete =
-      autoComplete ||
-      nusukStatus.includes("مقبولة") ||
-      nusukStatus.includes("تم إصدار") ||
-      nusukStatus === "Approved";
-
-    if (shouldComplete) {
-      req.status = "Completed";
-      req.completedAt = now;
-    }
-
-    req.statusHistories.unshift({
-      id: "sh-" + Date.now(),
-      groupRequestId: req.id,
-      fromStatus: prev,
-      toStatus: shouldComplete ? "Completed" : prev,
-      changedById: currentUser?.id || "system",
-      changedByName: currentUser?.fullName || "مزامنة نسك",
-      note: note
-        ? `مزامنة نسك (${nusukStatus}): ${note}`
-        : `تمت مزامنة حالة نسك إلى: ${nusukStatus}${shouldComplete ? " واكتملت المعاملة (تم)" : ""}`,
-      createdAt: now,
-    });
-
-    this.persistRequests();
-    this.logAction(
-      currentUser || null,
-      `مزامنة حالة نسك (${nusukStatus}) للمعاملة: ${req.groupName}`,
-      "GroupRequest",
-      req.id
-    );
-
-    return {
-      message: shouldComplete
-        ? "تمت مزامنة حالة نسك واعتماد المعاملة (تم) بنجاح"
-        : "تمت مزامنة وتحديث حالة نسك بنجاح",
-      completed: shouldComplete,
-    };
   }
 
   public sendToAgent(

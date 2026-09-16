@@ -442,8 +442,6 @@ export const supabaseService = {
           assignedSaudiAgentName: r.assigned_saudi_agent_name || undefined,
           status: r.status as RequestStatus,
           nusukGroupNumber: r.nusuk_group_number || undefined,
-          nusukStatus: r.nusuk_status || undefined,
-          nusukSyncedAt: r.nusuk_synced_at || undefined,
           hasHosting: Boolean(r.has_hosting),
           hostName: hostName,
           hostPhone: hostPhone,
@@ -547,8 +545,6 @@ export const supabaseService = {
         assignedSaudiAgentName: req.assigned_saudi_agent_name || undefined,
         status: req.status as RequestStatus,
         nusukGroupNumber: req.nusuk_group_number || undefined,
-        nusukStatus: req.nusuk_status || undefined,
-        nusukSyncedAt: req.nusuk_synced_at || undefined,
         hasHosting: Boolean(req.has_hosting),
         contactPhone: req.contact_phone || "",
         travelDate: req.travel_date || undefined,
@@ -778,64 +774,6 @@ export const supabaseService = {
       });
 
       return { message: "تم اكتمال تسجيل صفا وتوثيق رقم نسك بنجاح" };
-    },
-
-    syncNusukStatus: async (
-      id: string,
-      nusukStatus: string,
-      note?: string,
-      autoComplete?: boolean,
-      currentUser?: User
-    ): Promise<{ message: string; completed?: boolean }> => {
-      const client = getClient();
-      const now = new Date().toISOString();
-
-      // Get current request to know previous status
-      const { data: currentReq } = await client
-        .from("group_requests")
-        .select("status")
-        .eq("id", id)
-        .single();
-
-      const fromStatus = currentReq?.status || "Unknown";
-      const shouldComplete =
-        autoComplete ||
-        nusukStatus.includes("مقبولة") ||
-        nusukStatus.includes("تم إصدار") ||
-        nusukStatus === "Approved";
-
-      const updatePayload: Record<string, any> = {
-        nusuk_status: nusukStatus,
-        nusuk_synced_at: now,
-        updated_at: now,
-      };
-
-      if (shouldComplete) {
-        updatePayload.status = "Completed";
-        updatePayload.completed_at = now;
-      }
-
-      await client.from("group_requests").update(updatePayload).eq("id", id);
-
-      await client.from("status_histories").insert({
-        id: `sh-${Date.now()}`,
-        group_request_id: id,
-        from_status: fromStatus,
-        to_status: shouldComplete ? "Completed" : fromStatus,
-        changed_by_id: currentUser?.id || "system",
-        changed_by_name: currentUser?.fullName || "مزامنة نسك",
-        note: note
-          ? `مزامنة نسك (${nusukStatus}): ${note}`
-          : `تمت مزامنة حالة نسك إلى: ${nusukStatus}${shouldComplete ? " واكتملت المعاملة (تم)" : ""}`,
-        created_at: now,
-      });
-
-      return {
-        message: shouldComplete
-          ? "تمت مزامنة حالة نسك واعتماد المعاملة (تم) بنجاح"
-          : "تمت مزامنة وتحديث حالة نسك بنجاح",
-        completed: shouldComplete,
-      };
     },
 
     sendToAgent: async (id: string, agentId?: string, note?: string, currentUser?: User) => {

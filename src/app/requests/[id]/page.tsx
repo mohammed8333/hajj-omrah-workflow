@@ -156,6 +156,9 @@ export default function RequestDetailPage({
   const [editDestination, setEditDestination] = useState("");
   const [editNotes, setEditNotes] = useState("");
 
+  // Admin View Switching State
+  const [adminViewMode, setAdminViewMode] = useState<"agent" | "safa" | "full">("agent");
+
   useEffect(() => {
     let isMounted = true;
     if (previewDoc) {
@@ -194,6 +197,19 @@ export default function RequestDetailPage({
       if (data.nusukGroupNumber) {
         setNusukInput(data.nusukGroupNumber);
       }
+      const isAgentEligibleStatus = [
+        "ReadyForSaudiAgent",
+        "ReceivedBySaudiAgent",
+        "SaudiAgentProcessing",
+        "SaudiAgentCorrectionRequired",
+        "ProgramLinked",
+        "HostingAcceptanceRequested",
+        "HostingAcceptedBySender",
+        "HostingConfirmed",
+        "Completed",
+        "Archived",
+      ].includes(data.status);
+      setAdminViewMode(isAgentEligibleStatus ? "agent" : "safa");
 
       // If URL contains docId (e.g. clicked from Excel export), auto-open preview modal
       if (typeof window !== "undefined") {
@@ -1145,23 +1161,6 @@ export default function RequestDetailPage({
     }
   };
 
-  const handleSyncNusukStatus = async (nusukStatus: string, autoComplete?: boolean) => {
-    if (!request) return;
-    try {
-      setActionLoading(true);
-      setError(null);
-      setSuccess(null);
-      const res = await api.requests.syncNusukStatus(requestId, nusukStatus, undefined, autoComplete);
-      setSuccess(res.message);
-      await loadRequest(false);
-    } catch (err: unknown) {
-      if (err instanceof Error) setError(err.message);
-      else setError("فشلت مزامنة حالة نسك.");
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
   const handleSendToSaudiAgent = async () => {
     const ok = await confirm({
       title: "إحالة للوكيل السعودي",
@@ -1601,46 +1600,25 @@ export default function RequestDetailPage({
             {request.nusukGroupNumber && (
               <>
                 <span>•</span>
-                <span className="bg-emerald-50 text-emerald-800 font-bold px-2 py-0.5 rounded border border-emerald-200 inline-flex items-center gap-1.5">
-                  <span>رقم نسك: {request.nusukGroupNumber}</span>
-                  <a
-                    href="https://masar.nusuk.sa/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-teal-700 hover:text-teal-900 p-0.5 cursor-pointer"
-                    title="فتح في منصة نسك مسار"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
+                <span className="bg-emerald-50 text-emerald-800 font-bold px-2 py-0.5 rounded border border-emerald-200">
+                  رقم نسك: {request.nusukGroupNumber}
                 </span>
-                {request.nusukStatus && (
-                  <span className="bg-blue-50 text-blue-800 font-bold px-2 py-0.5 rounded border border-blue-200">
-                    حالة نسك: {request.nusukStatus}
-                  </span>
-                )}
-                {request.nusukSyncedAt && (
-                  <span className="text-gray-400 text-[11px]">
-                    (مزامنة: {new Date(request.nusukSyncedAt).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })})
-                  </span>
-                )}
               </>
             )}
           </div>
         </div>
 
         <div className="flex flex-col items-start md:items-end gap-2 shrink-0">
-          {isSaudiAgent ? (
-            request.status === "Completed" || request.status === "Archived" ? (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-300 shadow-2xs">
-                <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
-                <span>(تم)</span>
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-sky-50 text-sky-700 border border-sky-300 shadow-2xs">
-                <Check className="w-3.5 h-3.5 text-sky-600" />
-                <span>تم الاستلام</span>
-              </span>
-            )
+          {request.status === "Completed" || request.status === "Archived" ? (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-300 shadow-2xs">
+              <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+              <span>(تم)</span>
+            </span>
+          ) : isSaudiAgent ? (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-sky-50 text-sky-700 border border-sky-300 shadow-2xs">
+              <Check className="w-3.5 h-3.5 text-sky-600" />
+              <span>تم الاستلام</span>
+            </span>
           ) : (
             <RequestStatusBadge status={request.status} />
           )}
@@ -1982,6 +1960,53 @@ export default function RequestDetailPage({
         </div>
       </div>
 
+      {/* Admin View Mode Switcher */}
+      {isAdmin && (
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-gray-200 shadow-xs">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-bold text-gray-500">تقسيم الواجهة والعرض (خاص بالإدارة):</span>
+            <div className="inline-flex rounded-xl bg-gray-100 p-1">
+              <button
+                type="button"
+                onClick={() => setAdminViewMode("agent")}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  adminViewMode === "agent"
+                    ? "bg-sky-600 text-white shadow-xs"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                عرض الوكيل السعودي
+              </button>
+              <button
+                type="button"
+                onClick={() => setAdminViewMode("safa")}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  adminViewMode === "safa"
+                    ? "bg-sky-600 text-white shadow-xs"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                عرض مراجعة صفا
+              </button>
+              <button
+                type="button"
+                onClick={() => setAdminViewMode("full")}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  adminViewMode === "full"
+                    ? "bg-sky-600 text-white shadow-xs"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                النموذج الشامل (المرسل)
+              </button>
+            </div>
+          </div>
+          <div className="text-[11px] text-gray-400 font-medium">
+            عرض الواجهة الموحدة لكافة أطراف المعاملة
+          </div>
+        </div>
+      )}
+
       {/* Notifications / Alerts */}
       {error && (
         <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-center gap-3">
@@ -2149,7 +2174,7 @@ export default function RequestDetailPage({
       )}
 
       {/* Role-Customized Layouts */}
-      {isSaudiAgent ? (
+      {isSaudiAgent || (isAdmin && adminViewMode === "agent") ? (
         <SaudiAgentView
           request={request}
           ticketDoc={ticketDoc}
@@ -2158,12 +2183,11 @@ export default function RequestDetailPage({
           onDownloadDoc={handleDownloadDoc}
           onUpdateTraveler={handleUpdateTraveler}
           onSaveNusukNumber={handleSaveNusukNumber}
-          onSyncNusukStatus={handleSyncNusukStatus}
           onArchiveRequest={handleAgentArchive}
           onDoneRequest={handleAgentArchive}
           actionLoading={actionLoading}
         />
-      ) : isSafaEmployee ? (
+      ) : isSafaEmployee || (isAdmin && adminViewMode === "safa") ? (
         <SafaEmployeeView
           request={request}
           ticketDoc={ticketDoc}

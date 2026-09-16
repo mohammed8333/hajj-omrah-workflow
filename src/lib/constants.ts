@@ -31,7 +31,7 @@ export const STATUS_MAP: Record<
   HostingAcceptanceRequested: { label: "بانتظار قبول الاستضافة من المرسل", color: "bg-amber-50 text-amber-800 border-amber-300", step: 8 },
   HostingAcceptedBySender: { label: "تم قبول الاستضافة - بانتظار التأكيد", color: "bg-blue-50 text-blue-800 border-blue-200", step: 8 },
   HostingConfirmed: { label: "تم تأكيد الاستضافة للوكيل", color: "bg-teal-50 text-teal-800 border-teal-200", step: 8 },
-  Completed: { label: "مكتمل نهائياً ✓", color: "bg-green-100 text-green-800 border-green-300", step: 9 },
+  Completed: { label: "(تم)", color: "bg-emerald-100 text-emerald-800 border-emerald-300", step: 9 },
   Cancelled: { label: "ملغي", color: "bg-zinc-200 text-zinc-700 border-zinc-300", step: 0 },
   Archived: { label: "مؤرشف", color: "bg-slate-200 text-slate-700 border-slate-300", step: 0 },
 };
