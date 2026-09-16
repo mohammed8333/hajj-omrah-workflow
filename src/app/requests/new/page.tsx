@@ -136,6 +136,11 @@ export default function UnifiedNewRequestPage() {
   // Shared Flight & Travel Details
   const [airline, setAirline] = useState("");
   const [flightNumber, setFlightNumber] = useState("");
+  const [returnFlightNumber, setReturnFlightNumber] = useState("");
+  const [arrivalAirport, setArrivalAirport] = useState("");
+  const [saudiArrivalTime, setSaudiArrivalTime] = useState("");
+  const [returnDepartureAirport, setReturnDepartureAirport] = useState("");
+  const [returnFlightDepartureTime, setReturnFlightDepartureTime] = useState("");
   const [departureDate, setDepartureDate] = useState("");
   const [returnDate, setReturnDate] = useState("");
   const [flightDepartureTime, setFlightDepartureTime] = useState("");
@@ -488,6 +493,11 @@ export default function UnifiedNewRequestPage() {
         hostPhone: isHostingActive ? formattedHostPhone : undefined,
         airline: airline.trim() || undefined,
         flightNumber: flightNumber.trim() || undefined,
+        returnFlightNumber: returnFlightNumber.trim() || undefined,
+        arrivalAirport: arrivalAirport.trim() || undefined,
+        saudiArrivalTime: saudiArrivalTime.trim() || undefined,
+        returnDepartureAirport: returnDepartureAirport.trim() || undefined,
+        returnFlightDepartureTime: returnFlightDepartureTime.trim() || undefined,
         departureDate: departureDate || undefined,
         returnDate: returnDate || undefined,
         flightDepartureTime: flightDepartureTime || undefined,

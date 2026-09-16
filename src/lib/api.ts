@@ -135,6 +135,11 @@ export const api = {
       airportArrivalTime?: string;
       airline?: string;
       flightNumber?: string;
+      returnFlightNumber?: string;
+      arrivalAirport?: string;
+      saudiArrivalTime?: string;
+      returnDepartureAirport?: string;
+      returnFlightDepartureTime?: string;
       destination?: string;
       notes?: string;
       hasHosting: boolean;
@@ -165,6 +170,11 @@ export const api = {
         airportArrivalTime?: string;
         airline?: string;
         flightNumber?: string;
+        returnFlightNumber?: string;
+        arrivalAirport?: string;
+        saudiArrivalTime?: string;
+        returnDepartureAirport?: string;
+        returnFlightDepartureTime?: string;
         flightTicketDocumentId?: string;
         nusukGroupNumber?: string;
         destination?: string;

@@ -117,6 +117,11 @@ export default function RequestDetailPage({
   const [showFlightEditModal, setShowFlightEditModal] = useState(false);
   const [editAirline, setEditAirline] = useState("");
   const [editFlightNumber, setEditFlightNumber] = useState("");
+  const [editReturnFlightNumber, setEditReturnFlightNumber] = useState("");
+  const [editArrivalAirport, setEditArrivalAirport] = useState("");
+  const [editSaudiArrivalTime, setEditSaudiArrivalTime] = useState("");
+  const [editReturnDepartureAirport, setEditReturnDepartureAirport] = useState("");
+  const [editReturnFlightDepartureTime, setEditReturnFlightDepartureTime] = useState("");
   const [editDepartureDate, setEditDepartureDate] = useState("");
   const [editReturnDate, setEditReturnDate] = useState("");
   const [editFlightDepartureTime, setEditFlightDepartureTime] = useState("");
@@ -832,6 +837,11 @@ export default function RequestDetailPage({
         hostAddress: request.hostingInfo?.hostAddress,
         airline: editAirline || undefined,
         flightNumber: editFlightNumber || undefined,
+        returnFlightNumber: editReturnFlightNumber || undefined,
+        arrivalAirport: editArrivalAirport || undefined,
+        saudiArrivalTime: editSaudiArrivalTime || undefined,
+        returnDepartureAirport: editReturnDepartureAirport || undefined,
+        returnFlightDepartureTime: editReturnFlightDepartureTime || undefined,
         departureDate: editDepartureDate || undefined,
         returnDate: editReturnDate || undefined,
         flightDepartureTime: editFlightDepartureTime || undefined,
@@ -2534,6 +2544,11 @@ export default function RequestDetailPage({
                 onClick={() => {
                   setEditAirline(request.airline || "");
                   setEditFlightNumber(request.flightNumber || "");
+                  setEditReturnFlightNumber(request.returnFlightNumber || "");
+                  setEditArrivalAirport(request.arrivalAirport || (request.destination?.includes("المدينة") && !request.destination?.includes("مكة") ? "مطار المدينة" : "مطار جدة"));
+                  setEditSaudiArrivalTime(request.saudiArrivalTime || request.flightDepartureTime || "16:05");
+                  setEditReturnDepartureAirport(request.returnDepartureAirport || (request.destination?.includes("المدينة") ? "مطار المدينة" : "مطار جدة"));
+                  setEditReturnFlightDepartureTime(request.returnFlightDepartureTime || "12:20");
                   setEditDepartureDate(request.departureDate || request.travelDate || "");
                   setEditReturnDate(request.returnDate || "");
                   setEditFlightDepartureTime(request.flightDepartureTime || "");
@@ -2548,7 +2563,7 @@ export default function RequestDetailPage({
           </div>
         </div>
 
-        {/* 6 Flight Information Grid Items */}
+        {/* Flight Information Grid Items */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 text-xs">
           {/* 1. شركة / نوع الطيران */}
           <div className="bg-gray-50 p-3.5 rounded-xl border border-gray-100">
@@ -2561,22 +2576,33 @@ export default function RequestDetailPage({
             </span>
           </div>
 
-          {/* 2. رقم الرحلة */}
-          <div className="bg-gray-50 p-3.5 rounded-xl border border-gray-100">
-            <div className="flex items-center gap-1.5 text-gray-400 mb-1">
+          {/* 2. رقم رحلة الذهاب */}
+          <div className="bg-sky-50/50 p-3.5 rounded-xl border border-sky-100">
+            <div className="flex items-center gap-1.5 text-sky-700 mb-1">
               <Ticket className="w-3.5 h-3.5 text-sky-600" />
-              <span>رقم الرحلة:</span>
+              <span>رقم رحلة الذهاب:</span>
             </div>
-            <span className="font-bold text-gray-800 text-sm font-mono uppercase">
+            <span className="font-bold text-gray-900 text-sm font-mono uppercase">
               {request.flightNumber || "غير محدد"}
             </span>
           </div>
 
-          {/* 3. تاريخ ذهاب */}
+          {/* 3. مطار الوصول للسعودية (الذهاب) */}
+          <div className="bg-sky-50/50 p-3.5 rounded-xl border border-sky-100">
+            <div className="flex items-center gap-1.5 text-sky-700 mb-1">
+              <Plane className="w-3.5 h-3.5 text-sky-600" />
+              <span>مطار الوصول للسعودية (الذهاب):</span>
+            </div>
+            <span className="font-bold text-sky-950 text-sm">
+              {request.arrivalAirport || (request.destination?.includes("المدينة") && !request.destination?.includes("مكة") ? "مطار المدينة" : "مطار جدة")}
+            </span>
+          </div>
+
+          {/* 4. تاريخ الذهاب */}
           <div className="bg-gray-50 p-3.5 rounded-xl border border-gray-100">
             <div className="flex items-center gap-1.5 text-gray-400 mb-1">
               <Calendar className="w-3.5 h-3.5 text-sky-600" />
-              <span>تاريخ ذهاب:</span>
+              <span>تاريخ الذهاب:</span>
             </div>
             <span className="font-bold text-gray-800 text-sm">
               {request.departureDate || request.travelDate
@@ -2585,11 +2611,55 @@ export default function RequestDetailPage({
             </span>
           </div>
 
-          {/* 4. تاريخ عودة */}
+          {/* 5. وقت إقلاع طائرة الذهاب */}
+          <div className="bg-gray-50 p-3.5 rounded-xl border border-gray-100">
+            <div className="flex items-center gap-1.5 text-gray-400 mb-1">
+              <Clock className="w-3.5 h-3.5 text-sky-600" />
+              <span>وقت إقلاع طائرة الذهاب:</span>
+            </div>
+            <span className="font-bold text-gray-800 text-sm font-mono" dir="ltr">
+              {request.flightDepartureTime || "غير محدد"}
+            </span>
+          </div>
+
+          {/* 6. وقت وصول الطائرة للسعودية (الذهاب) */}
+          <div className="bg-sky-50/50 p-3.5 rounded-xl border border-sky-100">
+            <div className="flex items-center gap-1.5 text-sky-700 mb-1">
+              <Clock className="w-3.5 h-3.5 text-sky-600" />
+              <span>وقت وصول الطائرة للسعودية:</span>
+            </div>
+            <span className="font-bold text-sky-950 text-sm font-mono" dir="ltr">
+              {request.saudiArrivalTime || request.flightDepartureTime || "16:05"}
+            </span>
+          </div>
+
+          {/* 7. رقم رحلة العودة */}
+          <div className="bg-indigo-50/50 p-3.5 rounded-xl border border-indigo-100">
+            <div className="flex items-center gap-1.5 text-indigo-700 mb-1">
+              <Ticket className="w-3.5 h-3.5 text-indigo-600" />
+              <span>رقم رحلة العودة:</span>
+            </div>
+            <span className="font-bold text-gray-900 text-sm font-mono uppercase">
+              {request.returnFlightNumber || request.flightNumber || "غير محدد"}
+            </span>
+          </div>
+
+          {/* 8. مطار الإقلاع من السعودية (العودة) */}
+          <div className="bg-indigo-50/50 p-3.5 rounded-xl border border-indigo-100">
+            <div className="flex items-center gap-1.5 text-indigo-700 mb-1">
+              <Plane className="w-3.5 h-3.5 text-indigo-600 -scale-x-100" />
+              <span>مطار الإقلاع من السعودية (العودة):</span>
+            </div>
+            <span className="font-bold text-indigo-950 text-sm">
+              {request.returnDepartureAirport || (request.destination?.includes("المدينة") ? "مطار المدينة" : "مطار جدة")}
+            </span>
+          </div>
+
+          {/* 9. تاريخ العودة */}
           <div className="bg-gray-50 p-3.5 rounded-xl border border-gray-100">
             <div className="flex items-center gap-1.5 text-gray-400 mb-1">
               <Calendar className="w-3.5 h-3.5 text-teal-600" />
-              <span>تاريخ عودة:</span>
+              <span>تاريخ العودة:</span>
             </div>
             <span className="font-bold text-gray-800 text-sm">
               {request.returnDate
@@ -2598,25 +2668,25 @@ export default function RequestDetailPage({
             </span>
           </div>
 
-          {/* 5. وقت إقلاع الطائرة */}
-          <div className="bg-gray-50 p-3.5 rounded-xl border border-gray-100">
-            <div className="flex items-center gap-1.5 text-gray-400 mb-1">
+          {/* 10. وقت إقلاع رحلة العودة من السعودية */}
+          <div className="bg-indigo-50/50 p-3.5 rounded-xl border border-indigo-100">
+            <div className="flex items-center gap-1.5 text-indigo-700 mb-1">
               <Clock className="w-3.5 h-3.5 text-indigo-600" />
-              <span>وقت إقلاع طائرة الذهاب:</span>
+              <span>وقت إقلاع رحلة العودة:</span>
             </div>
-            <span className="font-bold text-gray-800 text-sm font-mono" dir="ltr">
-              {request.flightDepartureTime || "غير محدد"}
+            <span className="font-bold text-indigo-950 text-sm font-mono" dir="ltr">
+              {request.returnFlightDepartureTime || "12:20"}
             </span>
           </div>
 
-          {/* 6. وقت تواجد المسافر في المطار */}
-          <div className="bg-amber-50/60 p-3.5 rounded-xl border border-amber-200">
+          {/* 11. وقت تواجد المسافر في المطار */}
+          <div className="bg-amber-50/60 p-3.5 rounded-xl border border-amber-200 sm:col-span-2">
             <div className="flex items-center justify-between text-amber-900 mb-1">
               <span className="flex items-center gap-1.5 font-bold">
                 <Clock className="w-3.5 h-3.5 text-amber-600" />
                 <span>وقت تواجد المسافر في المطار:</span>
               </span>
-              <span className="text-[10px] bg-amber-200/80 text-amber-900 px-1 rounded font-bold">
+              <span className="text-[10px] bg-amber-200/80 text-amber-900 px-1.5 py-0.5 rounded font-bold">
                 قبل الإقلاع بـ 3 ساعات
               </span>
             </div>
@@ -3607,8 +3677,9 @@ export default function RequestDetailPage({
             </div>
 
             <form onSubmit={handleSaveFlightDetails} className="space-y-4 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[70vh] overflow-y-auto px-1 py-1">
+                {/* 1. نوع / شركة الطيران */}
+                <div className="sm:col-span-2">
                   <label className="block font-bold text-gray-700 mb-1 flex items-center gap-1">
                     <Plane className="w-3.5 h-3.5 text-sky-600" />
                     <span>نوع / شركة الطيران</span>
@@ -3622,77 +3693,145 @@ export default function RequestDetailPage({
                   />
                 </div>
 
-                <div>
-                  <label className="block font-bold text-gray-700 mb-1 flex items-center gap-1">
-                    <Ticket className="w-3.5 h-3.5 text-sky-600" />
-                    <span>رقم الرحلة</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={editFlightNumber}
-                    onChange={(e) => setEditFlightNumber(e.target.value)}
-                    placeholder="مثال: SV123 أو MS665"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-sky-500 text-gray-800 font-bold uppercase"
-                  />
+                {/* قسم رحلة الذهاب */}
+                <div className="sm:col-span-2 bg-sky-50/50 p-2.5 rounded-xl border border-sky-100">
+                  <span className="font-bold text-sky-800 text-xs flex items-center gap-1 mb-2">
+                    <Plane className="w-3.5 h-3.5 text-sky-600" />
+                    <span>بيانات رحلة الذهاب</span>
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="block font-medium text-gray-700 mb-1">
+                        رقم رحلة الذهاب
+                      </label>
+                      <input
+                        type="text"
+                        value={editFlightNumber}
+                        onChange={(e) => setEditFlightNumber(e.target.value)}
+                        placeholder="مثال: SV123"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-sky-500 text-gray-800 font-bold uppercase"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-medium text-gray-700 mb-1">
+                        مطار الوصول للسعودية (الذهاب)
+                      </label>
+                      <input
+                        type="text"
+                        value={editArrivalAirport}
+                        onChange={(e) => setEditArrivalAirport(e.target.value)}
+                        placeholder="مثال: مطار جدة أو مطار المدينة"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-sky-500 text-gray-800 font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-medium text-gray-700 mb-1">
+                        تاريخ الذهاب
+                      </label>
+                      <input
+                        type="date"
+                        value={editDepartureDate}
+                        onChange={(e) => setEditDepartureDate(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-sky-500 text-gray-800"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-medium text-gray-700 mb-1">
+                        وقت إقلاع طائرة الذهاب
+                      </label>
+                      <input
+                        type="time"
+                        value={editFlightDepartureTime}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setEditFlightDepartureTime(val);
+                          if (val) {
+                            const calc = calculateAirportArrivalTime(val);
+                            if (calc) setEditAirportArrivalTime(calc);
+                          }
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-sky-500 text-gray-800 font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-medium text-gray-700 mb-1">
+                        وقت وصول الطائرة للسعودية (الذهاب)
+                      </label>
+                      <input
+                        type="time"
+                        value={editSaudiArrivalTime}
+                        onChange={(e) => setEditSaudiArrivalTime(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-sky-500 text-gray-800 font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-medium text-gray-700 mb-1">
+                        وقت تواجد المسافر في المطار (قبل الإقلاع بـ 3 ساعات)
+                      </label>
+                      <input
+                        type="time"
+                        value={editAirportArrivalTime}
+                        onChange={(e) => setEditAirportArrivalTime(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-sky-500 text-gray-800 font-bold"
+                      />
+                    </div>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block font-bold text-gray-700 mb-1 flex items-center gap-1">
-                    <Calendar className="w-3.5 h-3.5 text-sky-600" />
-                    <span>تاريخ ذهاب</span>
-                  </label>
-                  <input
-                    type="date"
-                    value={editDepartureDate}
-                    onChange={(e) => setEditDepartureDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-sky-500 text-gray-800"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-gray-700 mb-1 flex items-center gap-1">
-                    <Calendar className="w-3.5 h-3.5 text-teal-600" />
-                    <span>تاريخ عودة</span>
-                  </label>
-                  <input
-                    type="date"
-                    value={editReturnDate}
-                    onChange={(e) => setEditReturnDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-sky-500 text-gray-800"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-gray-700 mb-1 flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>وقت إقلاع الطائرة</span>
-                  </label>
-                  <input
-                    type="time"
-                    value={editFlightDepartureTime}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setEditFlightDepartureTime(val);
-                      if (val) {
-                        const calc = calculateAirportArrivalTime(val);
-                        if (calc) setEditAirportArrivalTime(calc);
-                      }
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-sky-500 text-gray-800"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-gray-700 mb-1 flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5 text-amber-600" />
-                    <span>وقت تواجد المسافر في المطار (قبل الإقلاع بـ 3 ساعات)</span>
-                  </label>
-                  <input
-                    type="time"
-                    value={editAirportArrivalTime}
-                    onChange={(e) => setEditAirportArrivalTime(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-sky-500 text-gray-800 font-bold"
-                  />
+                {/* قسم رحلة العودة */}
+                <div className="sm:col-span-2 bg-indigo-50/50 p-2.5 rounded-xl border border-indigo-100">
+                  <span className="font-bold text-indigo-800 text-xs flex items-center gap-1 mb-2">
+                    <Plane className="w-3.5 h-3.5 text-indigo-600 -scale-x-100" />
+                    <span>بيانات رحلة العودة</span>
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="block font-medium text-gray-700 mb-1">
+                        رقم رحلة العودة
+                      </label>
+                      <input
+                        type="text"
+                        value={editReturnFlightNumber}
+                        onChange={(e) => setEditReturnFlightNumber(e.target.value)}
+                        placeholder="مثال: SV124"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 text-gray-800 font-bold uppercase"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-medium text-gray-700 mb-1">
+                        مطار الإقلاع من السعودية (العودة)
+                      </label>
+                      <input
+                        type="text"
+                        value={editReturnDepartureAirport}
+                        onChange={(e) => setEditReturnDepartureAirport(e.target.value)}
+                        placeholder="مثال: مطار المدينة أو مطار جدة"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 text-gray-800 font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-medium text-gray-700 mb-1">
+                        تاريخ العودة
+                      </label>
+                      <input
+                        type="date"
+                        value={editReturnDate}
+                        onChange={(e) => setEditReturnDate(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 text-gray-800"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-medium text-gray-700 mb-1">
+                        وقت إقلاع رحلة العودة من السعودية
+                      </label>
+                      <input
+                        type="time"
+                        value={editReturnFlightDepartureTime}
+                        onChange={(e) => setEditReturnFlightDepartureTime(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 text-gray-800 font-bold"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 

@@ -450,6 +450,10 @@ export const supabaseService = {
           flightTicketDocumentId: ticketDoc?.id || undefined,
           flightTicketDocumentUrl: ticketUrl || undefined,
           returnFlightNumber: r.return_flight_number || undefined,
+          arrivalAirport: r.arrival_airport || (r.destination?.includes("المدينة") && !r.destination?.includes("مكة") ? "مطار المدينة" : "مطار جدة"),
+          saudiArrivalTime: r.saudi_arrival_time || r.flight_departure_time || "16:05",
+          returnDepartureAirport: r.return_departure_airport || (r.destination?.includes("المدينة") ? "مطار المدينة" : "مطار جدة"),
+          returnFlightDepartureTime: r.return_flight_departure_time || "12:20",
           contactPhone: r.contact_phone || "",
           travelDate: r.travel_date || undefined,
           departureDate: r.departure_date || undefined,
@@ -546,6 +550,11 @@ export const supabaseService = {
         airportArrivalTime: req.airport_arrival_time || undefined,
         airline: req.airline || undefined,
         flightNumber: req.flight_number || undefined,
+        returnFlightNumber: req.return_flight_number || undefined,
+        arrivalAirport: req.arrival_airport || (req.destination?.includes("المدينة") && !req.destination?.includes("مكة") ? "مطار المدينة" : "مطار جدة"),
+        saudiArrivalTime: req.saudi_arrival_time || req.flight_departure_time || "16:05",
+        returnDepartureAirport: req.return_departure_airport || (req.destination?.includes("المدينة") ? "مطار المدينة" : "مطار جدة"),
+        returnFlightDepartureTime: req.return_flight_departure_time || "12:20",
         flightTicketDocumentId: req.flight_ticket_document_id || undefined,
         flightTicketDocument: ticketDoc,
         destination: req.destination || undefined,
@@ -586,6 +595,11 @@ export const supabaseService = {
         airport_arrival_time: data.airportArrivalTime || null,
         airline: data.airline || null,
         flight_number: data.flightNumber || null,
+        return_flight_number: data.returnFlightNumber || null,
+        arrival_airport: data.arrivalAirport || null,
+        saudi_arrival_time: data.saudiArrivalTime || null,
+        return_departure_airport: data.returnDepartureAirport || null,
+        return_flight_departure_time: data.returnFlightDepartureTime || null,
         destination: data.destination || null,
         notes: data.notes || null,
         created_at: now,
@@ -637,6 +651,11 @@ export const supabaseService = {
       if (data.airportArrivalTime !== undefined) updatePayload.airport_arrival_time = data.airportArrivalTime;
       if (data.airline !== undefined) updatePayload.airline = data.airline;
       if (data.flightNumber !== undefined) updatePayload.flight_number = data.flightNumber;
+      if (data.returnFlightNumber !== undefined) updatePayload.return_flight_number = data.returnFlightNumber;
+      if (data.arrivalAirport !== undefined) updatePayload.arrival_airport = data.arrivalAirport;
+      if (data.saudiArrivalTime !== undefined) updatePayload.saudi_arrival_time = data.saudiArrivalTime;
+      if (data.returnDepartureAirport !== undefined) updatePayload.return_departure_airport = data.returnDepartureAirport;
+      if (data.returnFlightDepartureTime !== undefined) updatePayload.return_flight_departure_time = data.returnFlightDepartureTime;
       if (data.flightTicketDocumentId !== undefined) updatePayload.flight_ticket_document_id = data.flightTicketDocumentId;
       if (data.nusukGroupNumber !== undefined) updatePayload.nusuk_group_number = data.nusukGroupNumber;
       if (data.destination !== undefined) updatePayload.destination = data.destination;

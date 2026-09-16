@@ -1085,32 +1085,54 @@ ${travelersLines}
                       {/* الجزء الأيمن: مربعين تحت بعض لبيانات الرحلة */}
                       <div className="flex flex-col gap-2 justify-between">
                         {/* المربع الأول: رحلة الذهاب */}
-                        <div className="bg-sky-50/70 border border-sky-200 rounded-xl p-2.5 flex flex-col justify-center gap-1 flex-1">
-                          <div className="text-[10px] text-sky-700 font-bold flex items-center gap-1">
-                            <Plane className="w-3 h-3 text-sky-600" />
-                            <span>رحلة الذهاب:</span>
+                        <div className="bg-sky-50/70 border border-sky-200 rounded-xl p-2 flex flex-col justify-between flex-1 overflow-hidden">
+                          <div className="flex items-center justify-between gap-1">
+                            <div className="text-[10px] text-sky-700 font-bold flex items-center gap-1">
+                              <Plane className="w-3 h-3 text-sky-600 shrink-0" />
+                              <span>الذهاب</span>
+                            </div>
+                            <span className="text-[10px] text-sky-800 font-bold truncate max-w-[80px]" title={r.arrivalAirport || "مطار جدة"}>
+                              {r.arrivalAirport || "مطار جدة"}
+                            </span>
                           </div>
-                          <div className="font-mono font-bold text-gray-900 text-xs truncate">
-                            {r.flightNumber || r.airline || "تذكرة مشتركة"}
+                          <div className="flex items-center justify-between gap-1 mt-0.5">
+                            <div className="font-mono font-bold text-gray-900 text-xs truncate">
+                              {r.flightNumber || r.airline || "تذكرة مشتركة"}
+                            </div>
+                            <div className="font-mono font-bold text-gray-700 text-[10px] flex items-center gap-0.5" dir="ltr">
+                              <Clock className="w-2.5 h-2.5 text-sky-600 shrink-0" />
+                              <span>{r.saudiArrivalTime || "16:05"}</span>
+                            </div>
                           </div>
-                          <div className="text-[11px] font-bold text-gray-800 flex items-center gap-1 mt-0.5">
-                            <Calendar className="w-3 h-3 text-sky-600" />
-                            <span>{formatDayMonth(r.departureDate || r.travelDate)}</span>
+                          <div className="text-[10px] font-bold text-gray-800 flex items-center gap-1">
+                            <Calendar className="w-3 h-3 text-sky-600 shrink-0" />
+                            <span className="truncate">{formatDayMonth(r.departureDate || r.travelDate)}</span>
                           </div>
                         </div>
 
                         {/* المربع الثاني: رحلة العودة */}
-                        <div className="bg-indigo-50/60 border border-indigo-200 rounded-xl p-2.5 flex flex-col justify-center gap-1 flex-1">
-                          <div className="text-[10px] text-indigo-700 font-bold flex items-center gap-1">
-                            <Plane className="w-3 h-3 text-indigo-600 -scale-x-100" />
-                            <span>رحلة العودة:</span>
+                        <div className="bg-indigo-50/60 border border-indigo-200 rounded-xl p-2 flex flex-col justify-between flex-1 overflow-hidden">
+                          <div className="flex items-center justify-between gap-1">
+                            <div className="text-[10px] text-indigo-700 font-bold flex items-center gap-1">
+                              <Plane className="w-3 h-3 text-indigo-600 -scale-x-100 shrink-0" />
+                              <span>العودة</span>
+                            </div>
+                            <span className="text-[10px] text-indigo-800 font-bold truncate max-w-[80px]" title={r.returnDepartureAirport || (r.destination?.includes("المدينة") ? "مطار المدينة" : "مطار جدة")}>
+                              {r.returnDepartureAirport || (r.destination?.includes("المدينة") ? "مطار المدينة" : "مطار جدة")}
+                            </span>
                           </div>
-                          <div className="font-mono font-bold text-gray-900 text-xs truncate">
-                            {r.returnFlightNumber || r.flightNumber || "رحلة العودة"}
+                          <div className="flex items-center justify-between gap-1 mt-0.5">
+                            <div className="font-mono font-bold text-gray-900 text-xs truncate">
+                              {r.returnFlightNumber || r.flightNumber || "رحلة العودة"}
+                            </div>
+                            <div className="font-mono font-bold text-gray-700 text-[10px] flex items-center gap-0.5" dir="ltr">
+                              <Clock className="w-2.5 h-2.5 text-indigo-600 shrink-0" />
+                              <span>{r.returnFlightDepartureTime || "12:20"}</span>
+                            </div>
                           </div>
-                          <div className="text-[11px] font-bold text-gray-800 flex items-center gap-1 mt-0.5">
-                            <Calendar className="w-3 h-3 text-indigo-600" />
-                            <span>{r.returnDate ? formatDayMonth(r.returnDate) : "لم يُحدد"}</span>
+                          <div className="text-[10px] font-bold text-gray-800 flex items-center gap-1">
+                            <Calendar className="w-3 h-3 text-indigo-600 shrink-0" />
+                            <span className="truncate">{r.returnDate ? formatDayMonth(r.returnDate) : "لم يُحدد"}</span>
                           </div>
                         </div>
                       </div>
@@ -1583,6 +1605,15 @@ ${travelersLines}
                                 <Calendar className="w-3.5 h-3.5 text-sky-600 shrink-0" />
                                 <span>{formatDayMonth(r.departureDate || r.travelDate)}</span>
                               </div>
+                              <div className="flex items-center gap-2 text-[10px] text-sky-900 font-medium pt-0.5">
+                                <span className="bg-sky-100/70 text-sky-800 px-1.5 py-0.5 rounded font-bold">
+                                  {r.arrivalAirport || "مطار جدة"}
+                                </span>
+                                <span className="flex items-center gap-1 font-mono text-gray-600 font-bold" dir="ltr">
+                                  <Clock className="w-3 h-3 text-sky-600 shrink-0" />
+                                  {r.saudiArrivalTime || "16:05"}
+                                </span>
+                              </div>
                             </div>
                           </td>
 
@@ -1596,6 +1627,15 @@ ${travelersLines}
                               <div className="text-[11px] text-gray-700 font-bold flex items-center gap-1.5">
                                 <Calendar className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
                                 <span>{r.returnDate ? formatDayMonth(r.returnDate) : "لم يُحدد"}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-[10px] text-indigo-900 font-medium pt-0.5">
+                                <span className="bg-indigo-100/70 text-indigo-800 px-1.5 py-0.5 rounded font-bold">
+                                  {r.returnDepartureAirport || (r.destination?.includes("المدينة") ? "مطار المدينة" : "مطار جدة")}
+                                </span>
+                                <span className="flex items-center gap-1 font-mono text-gray-600 font-bold" dir="ltr">
+                                  <Clock className="w-3 h-3 text-indigo-600 shrink-0" />
+                                  {r.returnFlightDepartureTime || "12:20"}
+                                </span>
                               </div>
                             </div>
                           </td>

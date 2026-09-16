@@ -181,6 +181,10 @@ export interface GroupRequestSummary {
   airline?: string;
   flightNumber?: string;
   destination?: string;
+  arrivalAirport?: string;
+  saudiArrivalTime?: string;
+  returnDepartureAirport?: string;
+  returnFlightDepartureTime?: string;
   travelersCount: number;
   travelersList?: TravelerSummaryItem[];
   documentsCount: number;
@@ -211,6 +215,10 @@ export interface GroupRequestDetail {
   airline?: string;
   flightNumber?: string;
   returnFlightNumber?: string;
+  arrivalAirport?: string;
+  saudiArrivalTime?: string;
+  returnDepartureAirport?: string;
+  returnFlightDepartureTime?: string;
   flightTicketDocumentId?: string;
   flightTicketDocument?: DocumentItem;
   destination?: string;

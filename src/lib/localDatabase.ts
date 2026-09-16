@@ -982,6 +982,10 @@ class LocalDatabaseEngine {
         airline: r.airline,
         flightNumber: r.flightNumber,
         destination: r.destination,
+        arrivalAirport: r.arrivalAirport || (r.destination?.includes("المدينة") && !r.destination?.includes("مكة") ? "مطار المدينة" : "مطار جدة"),
+        saudiArrivalTime: r.saudiArrivalTime || r.flightDepartureTime || "16:05",
+        returnDepartureAirport: r.returnDepartureAirport || (r.destination?.includes("المدينة") ? "مطار المدينة" : "مطار جدة"),
+        returnFlightDepartureTime: r.returnFlightDepartureTime || "12:20",
         travelersCount: r.travelers.length,
         travelersList: reqTravelers,
         documentsCount: docCount,
@@ -1057,6 +1061,19 @@ class LocalDatabaseEngine {
       }
     }
 
+    if (!req.arrivalAirport) {
+      req.arrivalAirport = (req.destination?.includes("المدينة") && !req.destination?.includes("مكة")) ? "مطار المدينة" : "مطار جدة";
+    }
+    if (!req.saudiArrivalTime) {
+      req.saudiArrivalTime = req.flightDepartureTime || "16:05";
+    }
+    if (!req.returnDepartureAirport) {
+      req.returnDepartureAirport = req.destination?.includes("المدينة") ? "مطار المدينة" : "مطار جدة";
+    }
+    if (!req.returnFlightDepartureTime) {
+      req.returnFlightDepartureTime = "12:20";
+    }
+
     return JSON.parse(JSON.stringify(req));
   }
 
@@ -1071,6 +1088,11 @@ class LocalDatabaseEngine {
       airportArrivalTime?: string;
       airline?: string;
       flightNumber?: string;
+      returnFlightNumber?: string;
+      arrivalAirport?: string;
+      saudiArrivalTime?: string;
+      returnDepartureAirport?: string;
+      returnFlightDepartureTime?: string;
       destination?: string;
       notes?: string;
       hasHosting: boolean;
@@ -1114,6 +1136,11 @@ class LocalDatabaseEngine {
       airportArrivalTime: data.airportArrivalTime,
       airline: data.airline,
       flightNumber: data.flightNumber,
+      returnFlightNumber: data.returnFlightNumber,
+      arrivalAirport: data.arrivalAirport,
+      saudiArrivalTime: data.saudiArrivalTime,
+      returnDepartureAirport: data.returnDepartureAirport,
+      returnFlightDepartureTime: data.returnFlightDepartureTime,
       destination: data.destination || "مكة المكرمة والمدينة المنورة",
       notes: data.notes,
       createdAt: now,
@@ -1173,6 +1200,11 @@ class LocalDatabaseEngine {
       airportArrivalTime?: string;
       airline?: string;
       flightNumber?: string;
+      returnFlightNumber?: string;
+      arrivalAirport?: string;
+      saudiArrivalTime?: string;
+      returnDepartureAirport?: string;
+      returnFlightDepartureTime?: string;
       flightTicketDocumentId?: string;
       nusukGroupNumber?: string;
       destination?: string;
@@ -1199,6 +1231,11 @@ class LocalDatabaseEngine {
     if (data.airportArrivalTime !== undefined) req.airportArrivalTime = data.airportArrivalTime;
     if (data.airline !== undefined) req.airline = data.airline;
     if (data.flightNumber !== undefined) req.flightNumber = data.flightNumber;
+    if (data.returnFlightNumber !== undefined) req.returnFlightNumber = data.returnFlightNumber;
+    if (data.arrivalAirport !== undefined) req.arrivalAirport = data.arrivalAirport;
+    if (data.saudiArrivalTime !== undefined) req.saudiArrivalTime = data.saudiArrivalTime;
+    if (data.returnDepartureAirport !== undefined) req.returnDepartureAirport = data.returnDepartureAirport;
+    if (data.returnFlightDepartureTime !== undefined) req.returnFlightDepartureTime = data.returnFlightDepartureTime;
     if (data.flightTicketDocumentId !== undefined) req.flightTicketDocumentId = data.flightTicketDocumentId;
     if (data.nusukGroupNumber !== undefined) req.nusukGroupNumber = data.nusukGroupNumber;
     if (data.destination !== undefined) req.destination = data.destination;
