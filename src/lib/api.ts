@@ -234,6 +234,26 @@ export const api = {
       return { message: "تم توثيق رقم نسك وإكمال صفا بنجاح" };
     },
 
+    syncNusukStatus: async (
+      id: string,
+      nusukStatus: string,
+      note?: string,
+      autoComplete?: boolean
+    ): Promise<{ message: string; completed?: boolean }> => {
+      const current = await api.auth.getMe();
+      if (isSupabaseConfigured()) {
+        return await supabaseService.requests.syncNusukStatus(
+          id,
+          nusukStatus,
+          note,
+          autoComplete,
+          current
+        );
+      }
+      await delay();
+      return localDB.syncNusukStatus(id, nusukStatus, note, autoComplete, current);
+    },
+
     sendToAgent: async (
       id: string,
       agentId?: string,

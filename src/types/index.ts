@@ -162,6 +162,8 @@ export interface GroupRequestSummary {
   assignedSaudiAgentName?: string;
   status: RequestStatus;
   nusukGroupNumber?: string;
+  nusukStatus?: string;
+  nusukSyncedAt?: string;
   hasHosting: boolean;
   hostName?: string;
   hostPhone?: string;
@@ -205,6 +207,8 @@ export interface GroupRequestDetail {
   assignedSaudiAgentName?: string;
   status: RequestStatus;
   nusukGroupNumber?: string;
+  nusukStatus?: string;
+  nusukSyncedAt?: string;
   hasHosting: boolean;
   contactPhone: string;
   travelDate?: string;
@@ -267,3 +271,40 @@ export interface AuditLogItem {
   metadataJson?: string;
   createdAt: string;
 }
+
+export interface NusukStatusOption {
+  value: string;
+  label: string;
+  badgeColor: string;
+  isApproved?: boolean;
+}
+
+export const NUSUK_STATUS_OPTIONS: NusukStatusOption[] = [
+  {
+    value: "تحت الإدخال",
+    label: "تحت الإدخال (مسودة نسك)",
+    badgeColor: "bg-gray-100 text-gray-700 border-gray-200",
+  },
+  {
+    value: "تم الإرسال للمخاع",
+    label: "تم الإرسال للمخاع",
+    badgeColor: "bg-blue-50 text-blue-700 border-blue-200",
+  },
+  {
+    value: "بانتظار سداد التأشيرات",
+    label: "بانتظار سداد التأشيرات / الموافقة",
+    badgeColor: "bg-amber-50 text-amber-800 border-amber-200",
+  },
+  {
+    value: "تم إصدار التأشيرات (مقبولة)",
+    label: "تم إصدار التأشيرات (مقبولة)",
+    badgeColor: "bg-emerald-50 text-emerald-800 border-emerald-200",
+    isApproved: true,
+  },
+  {
+    value: "ملغاة / مرفوضة",
+    label: "ملغاة / مرفوضة",
+    badgeColor: "bg-rose-50 text-rose-700 border-rose-200",
+  },
+];
+

@@ -16,8 +16,10 @@ import {
   Check,
   MessageSquare,
   Archive,
+  ExternalLink,
+  RefreshCw,
 } from "lucide-react";
-import { DocumentItem, GroupRequestDetail } from "@/types";
+import { DocumentItem, GroupRequestDetail, NUSUK_STATUS_OPTIONS } from "@/types";
 import { getWhatsAppUrl, getTelUrl, normalizePhone } from "@/lib/phoneUtils";
 
 interface SaudiAgentViewProps {
@@ -35,6 +37,7 @@ interface SaudiAgentViewProps {
     dateOfBirth?: string
   ) => Promise<void>;
   onSaveNusukNumber: (num: string) => Promise<void>;
+  onSyncNusukStatus?: (nusukStatus: string, autoComplete?: boolean) => Promise<void>;
   onArchiveRequest?: () => Promise<void>;
   onDoneRequest?: () => Promise<void>;
   actionLoading: boolean;
@@ -48,12 +51,14 @@ export const SaudiAgentView: React.FC<SaudiAgentViewProps> = ({
   onDownloadDoc,
   onUpdateTraveler,
   onSaveNusukNumber,
+  onSyncNusukStatus,
   onArchiveRequest,
   onDoneRequest,
   actionLoading,
 }) => {
   const [editingNusuk, setEditingNusuk] = useState(false);
   const [nusukInput, setNusukInput] = useState(request.nusukGroupNumber || "");
+  const [syncingStatus, setSyncingStatus] = useState(false);
 
   const [editingTravelerId, setEditingTravelerId] = useState<string | null>(null);
   const [editTravelerName, setEditTravelerName] = useState("");
@@ -134,26 +139,45 @@ export const SaudiAgentView: React.FC<SaudiAgentViewProps> = ({
         </div>
       )}
 
-      {/* 1. Nusuk Group Number Card */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-xs space-y-3">
+      {/* 1. Nusuk Group Number & Status Sync Card */}
+      <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">
           <div className="flex items-center gap-2">
             <Building className="w-5 h-5 text-teal-600" />
-            <h2 className="text-base font-bold text-gray-900">رقم مجموعة نسك</h2>
+            <div>
+              <h2 className="text-base font-bold text-gray-900">توثيق ومزامنة نسك مسار</h2>
+              <p className="text-xs text-gray-500">
+                الربط مع بوابة وزارة الحج والعمرة (masar.nusuk.sa)
+              </p>
+            </div>
           </div>
-          {!editingNusuk && (
-            <button
-              type="button"
-              onClick={() => {
-                setNusukInput(request.nusukGroupNumber || "");
-                setEditingNusuk(true);
-              }}
-              className="text-xs text-teal-800 hover:text-teal-900 bg-teal-50 hover:bg-teal-100 border border-teal-200 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <Edit2 className="w-3.5 h-3.5" />
-              <span>{request.nusukGroupNumber ? "تعديل رقم نسك" : "إدخال رقم نسك"}</span>
-            </button>
-          )}
+          <div className="flex items-center gap-2 flex-wrap">
+            {request.nusukGroupNumber && (
+              <a
+                href="https://masar.nusuk.sa/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-teal-700 hover:text-teal-900 bg-teal-50 hover:bg-teal-100 border border-teal-200 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="فتح منصة نسك مسار في تبويب جديد"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>فتح في نسك مسار ↗</span>
+              </a>
+            )}
+            {!editingNusuk && (
+              <button
+                type="button"
+                onClick={() => {
+                  setNusukInput(request.nusukGroupNumber || "");
+                  setEditingNusuk(true);
+                }}
+                className="text-xs text-gray-700 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Edit2 className="w-3.5 h-3.5" />
+                <span>{request.nusukGroupNumber ? "تعديل رقم نسك" : "إدخال رقم نسك"}</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {editingNusuk ? (
@@ -185,16 +209,86 @@ export const SaudiAgentView: React.FC<SaudiAgentViewProps> = ({
             </div>
           </div>
         ) : (
-          <div className="flex items-center gap-3 bg-gray-50 p-4 rounded-xl border border-gray-100">
-            <span className="text-xs text-gray-500 font-semibold">الرقم المعتمد:</span>
-            {request.nusukGroupNumber ? (
-              <span className="text-base font-mono font-black text-teal-800 bg-teal-50 px-3 py-1 rounded-lg border border-teal-200">
-                {request.nusukGroupNumber}
-              </span>
-            ) : (
-              <span className="text-xs text-gray-400 font-medium">
-                لم يتم توثيق رقم مجموعة نسك بعد
-              </span>
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-gray-50 p-4 rounded-xl border border-gray-100">
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-gray-500 font-semibold">رقم مجموعة نسك:</span>
+                {request.nusukGroupNumber ? (
+                  <span className="text-base font-mono font-black text-teal-800 bg-teal-50 px-3 py-1 rounded-lg border border-teal-200">
+                    {request.nusukGroupNumber}
+                  </span>
+                ) : (
+                  <span className="text-xs text-gray-400 font-medium">
+                    لم يتم توثيق رقم مجموعة نسك بعد
+                  </span>
+                )}
+              </div>
+
+              {/* Status Badge & Synced timestamp */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500 font-semibold">حالة نسك:</span>
+                {request.nusukStatus ? (
+                  <span className="text-xs font-bold px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200">
+                    {request.nusukStatus}
+                  </span>
+                ) : (
+                  <span className="text-xs text-gray-400 italic">غير محددة</span>
+                )}
+                {request.nusukSyncedAt && (
+                  <span className="text-[11px] text-gray-400 mr-2">
+                    (تحديث: {new Date(request.nusukSyncedAt).toLocaleDateString("ar-SA", { hour: "2-digit", minute: "2-digit" })})
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Quick Nusuk Status Sync Buttons */}
+            {onSyncNusukStatus && request.nusukGroupNumber && (
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+                    <RefreshCw className={`w-3.5 h-3.5 text-teal-600 ${syncingStatus ? "animate-spin" : ""}`} />
+                    <span>تحديث ومزامنة حالة المجموعة من نسك:</span>
+                  </div>
+                  <span className="text-[11px] text-slate-400">
+                    اختر الحالة لمطابقتها مع المنصة
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {NUSUK_STATUS_OPTIONS.map((opt) => {
+                    const isCurrent = request.nusukStatus === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        disabled={actionLoading || syncingStatus}
+                        onClick={async () => {
+                          try {
+                            setSyncingStatus(true);
+                            await onSyncNusukStatus(opt.value, opt.isApproved);
+                          } finally {
+                            setSyncingStatus(false);
+                          }
+                        }}
+                        className={`text-xs px-3 py-1.5 rounded-lg font-bold border transition-all cursor-pointer flex items-center gap-1.5 ${
+                          isCurrent
+                            ? "ring-2 ring-teal-500 ring-offset-1 " + opt.badgeColor
+                            : "bg-white hover:bg-gray-50 text-gray-700 border-gray-200 shadow-2xs"
+                        }`}
+                      >
+                        {isCurrent && <Check className="w-3 h-3 text-emerald-600" />}
+                        <span>{opt.label}</span>
+                        {opt.isApproved && (
+                          <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-full font-bold">
+                            (اعتماد تم)
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             )}
           </div>
         )}

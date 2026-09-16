@@ -31,6 +31,8 @@ create table if not exists public.group_requests (
     assigned_saudi_agent_name text,
     status text not null default 'Draft',
     nusuk_group_number text,
+    nusuk_status text,
+    nusuk_synced_at timestamptz,
     has_hosting boolean not null default false,
     contact_phone text,
     travel_date text,

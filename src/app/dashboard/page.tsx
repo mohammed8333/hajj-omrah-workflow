@@ -1145,6 +1145,24 @@ ${travelersLines}
                                 <Copy className="w-3.5 h-3.5" />
                               )}
                             </button>
+                            <a
+                              href="https://masar.nusuk.sa/"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-teal-600 hover:text-teal-800 p-0.5 cursor-pointer"
+                              title="فتح في منصة نسك مسار"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </a>
+                            {r.nusukStatus && (
+                              <span
+                                className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 max-w-[85px] truncate"
+                                title={`حالة نسك: ${r.nusukStatus}`}
+                              >
+                                {r.nusukStatus}
+                              </span>
+                            )}
                           </div>
                         ) : (
                           <span className="text-gray-400 text-xs italic">قيد التسجيل</span>
@@ -1438,6 +1456,24 @@ ${travelersLines}
                               <Copy className="w-3.5 h-3.5" />
                             )}
                           </button>
+                          <a
+                            href="https://masar.nusuk.sa/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-teal-600 hover:text-teal-800 p-0.5 cursor-pointer"
+                            title="فتح في منصة نسك مسار"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                          {r.nusukStatus && (
+                            <span
+                              className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 max-w-[120px] truncate"
+                              title={`حالة نسك: ${r.nusukStatus}`}
+                            >
+                              {r.nusukStatus}
+                            </span>
+                          )}
                         </div>
                       ) : (
                         <span className="text-gray-400 text-xs italic">قيد التسجيل</span>

@@ -1145,6 +1145,23 @@ export default function RequestDetailPage({
     }
   };
 
+  const handleSyncNusukStatus = async (nusukStatus: string, autoComplete?: boolean) => {
+    if (!request) return;
+    try {
+      setActionLoading(true);
+      setError(null);
+      setSuccess(null);
+      const res = await api.requests.syncNusukStatus(requestId, nusukStatus, undefined, autoComplete);
+      setSuccess(res.message);
+      await loadRequest(false);
+    } catch (err: unknown) {
+      if (err instanceof Error) setError(err.message);
+      else setError("فشلت مزامنة حالة نسك.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleSendToSaudiAgent = async () => {
     const ok = await confirm({
       title: "إحالة للوكيل السعودي",
@@ -1584,9 +1601,28 @@ export default function RequestDetailPage({
             {request.nusukGroupNumber && (
               <>
                 <span>•</span>
-                <span className="bg-emerald-50 text-emerald-800 font-bold px-2 py-0.5 rounded border border-emerald-200">
-                  رقم نسك: {request.nusukGroupNumber}
+                <span className="bg-emerald-50 text-emerald-800 font-bold px-2 py-0.5 rounded border border-emerald-200 inline-flex items-center gap-1.5">
+                  <span>رقم نسك: {request.nusukGroupNumber}</span>
+                  <a
+                    href="https://masar.nusuk.sa/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-teal-700 hover:text-teal-900 p-0.5 cursor-pointer"
+                    title="فتح في منصة نسك مسار"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
                 </span>
+                {request.nusukStatus && (
+                  <span className="bg-blue-50 text-blue-800 font-bold px-2 py-0.5 rounded border border-blue-200">
+                    حالة نسك: {request.nusukStatus}
+                  </span>
+                )}
+                {request.nusukSyncedAt && (
+                  <span className="text-gray-400 text-[11px]">
+                    (مزامنة: {new Date(request.nusukSyncedAt).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })})
+                  </span>
+                )}
               </>
             )}
           </div>
@@ -2122,6 +2158,7 @@ export default function RequestDetailPage({
           onDownloadDoc={handleDownloadDoc}
           onUpdateTraveler={handleUpdateTraveler}
           onSaveNusukNumber={handleSaveNusukNumber}
+          onSyncNusukStatus={handleSyncNusukStatus}
           onArchiveRequest={handleAgentArchive}
           onDoneRequest={handleAgentArchive}
           actionLoading={actionLoading}
