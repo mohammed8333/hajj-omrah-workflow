@@ -11,6 +11,132 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
+      // =================================================================
+      // نظام الكشف الفوري عن التحديثات وتجاوز كاش المتصفح تلقائياً
+      // =================================================================
+      (function () {
+        var CURRENT_VERSION = "%APP_BUILD_TIME%";
+        var isUpdating = false;
+
+        // إلغاء أي Service Worker أو Cache قديم قد يعلق في كروم الموبايل
+        try {
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function (regs) {
+              for (var i = 0; i < regs.length; i++) {
+                regs[i].unregister();
+              }
+            });
+          }
+        } catch (e) {}
+
+        function getBaseUrl() {
+          var loc = window.location;
+          var path = loc.pathname;
+          var dir = path.substring(0, path.lastIndexOf('/') + 1);
+          return loc.origin + (dir || '/');
+        }
+
+        function triggerUpdate(serverVersion) {
+          if (isUpdating) return;
+          isUpdating = true;
+          sessionStorage.setItem('last_version_reload', String(Date.now()));
+
+          try {
+            if ('caches' in window) {
+              caches.keys().then(function (names) {
+                for (var j = 0; j < names.length; j++) {
+                  caches.delete(names[j]);
+                }
+              }).catch(function () {});
+            }
+          } catch (e) {}
+
+          // إجبار المتصفح على طلب النسخة الجديدة بتمرير معلمة فريدة للمسار
+          var currentUrl = new URL(window.location.href);
+          currentUrl.searchParams.set('_v', serverVersion);
+          window.location.replace(currentUrl.toString());
+        }
+
+        function checkVersion() {
+          if (isUpdating) return;
+          var lastReload = sessionStorage.getItem('last_version_reload');
+          // منع التكرار اللانهائي في غضون 4 ثوانٍ
+          if (lastReload && (Date.now() - parseInt(lastReload, 10) < 4000)) {
+            return;
+          }
+
+          try {
+            var url = getBaseUrl() + 'version.json?_t=' + Date.now();
+            fetch(url, {
+              cache: 'no-store',
+              headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache'
+              }
+            })
+              .then(function (res) {
+                return res.ok ? res.json() : null;
+              })
+              .then(function (data) {
+                if (!data || !data.version) return;
+                var serverVersion = String(data.version);
+                var localVersion = String(CURRENT_VERSION);
+
+                if (
+                  serverVersion !== localVersion &&
+                  serverVersion !== '%APP_BUILD_TIME%' &&
+                  localVersion !== '%APP_BUILD_TIME%'
+                ) {
+                  console.log('[AutoUpdate] New version detected:', serverVersion, 'local:', localVersion);
+                  triggerUpdate(serverVersion);
+                }
+              })
+              .catch(function () {});
+          } catch (e) {}
+        }
+
+        // 1. فحص فوري عند تحميل الصفحة
+        checkVersion(true);
+
+        // 2. فحص فوري عند فتح كروم أو الرجوع للتاب بعد قفله أو تصغيره (visibilitychange)
+        document.addEventListener('visibilitychange', function () {
+          if (document.visibilityState === 'visible') {
+            checkVersion(true);
+          }
+        });
+
+        // 3. فحص عند استعادة الصفحة من ذاكرة الموبايل (BFCache / pageshow)
+        window.addEventListener('pageshow', function () {
+          checkVersion(true);
+        });
+
+        // 4. فحص عند تركيز النافذة
+        window.addEventListener('focus', function () {
+          checkVersion(true);
+        });
+
+        // 5. فحص عند التنقل بين صفحات وأقسام المنظومة
+        window.addEventListener('hashchange', function () {
+          checkVersion(true);
+        });
+
+        // 6. فحص دوري كل دقيقتين في الخلفية
+        setInterval(function () {
+          if (!document.querySelector('input:focus, textarea:focus')) {
+            checkVersion(true);
+          }
+        }, 120000);
+
+        // تنظيف معلمة _v من شريط العنوان بعد إتمام التحديث ليظل الرابط نظيفاً
+        try {
+          var curr = new URL(window.location.href);
+          if (curr.searchParams.has('_v')) {
+            curr.searchParams.delete('_v');
+            window.history.replaceState(null, '', curr.pathname + (curr.search ? curr.search : '') + curr.hash);
+          }
+        } catch (e) {}
+      })();
+
       // Auto-recover from stale cached chunk 404 errors
       window.addEventListener('error', function (e) {
         if (e && (e.target && e.target.tagName === 'SCRIPT')) {

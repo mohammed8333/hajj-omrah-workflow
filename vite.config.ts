@@ -2,10 +2,64 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
+import fs from "fs";
+
+function autoVersionPlugin() {
+  const buildTimestamp = Date.now();
+  return {
+    name: "auto-version-plugin",
+    config() {
+      return {
+        define: {
+          __APP_BUILD_TIME__: JSON.stringify(buildTimestamp),
+        },
+      };
+    },
+    buildStart() {
+      const publicDir = path.resolve(__dirname, "./public");
+      if (!fs.existsSync(publicDir)) {
+        fs.mkdirSync(publicDir, { recursive: true });
+      }
+      fs.writeFileSync(
+        path.join(publicDir, "version.json"),
+        JSON.stringify({
+          version: buildTimestamp,
+          builtAt: new Date(buildTimestamp).toISOString(),
+        })
+      );
+    },
+    transformIndexHtml(html: string) {
+      return html.replace(/%APP_BUILD_TIME%/g, String(buildTimestamp));
+    },
+    generateBundle() {
+      this.emitFile({
+        type: "asset",
+        fileName: "version.json",
+        source: JSON.stringify({
+          version: buildTimestamp,
+          builtAt: new Date(buildTimestamp).toISOString(),
+        }),
+      });
+    },
+    closeBundle() {
+      const outDir = path.resolve(__dirname, "./docs");
+      const indexPath = path.join(outDir, "index.html");
+      const notFoundPath = path.join(outDir, "404.html");
+      if (fs.existsSync(indexPath)) {
+        try {
+          fs.copyFileSync(indexPath, notFoundPath);
+          console.log("[auto-version-plugin] Synchronized 404.html with index.html");
+        } catch (e) {
+          console.error("Failed to copy 404.html:", e);
+        }
+      }
+    },
+  };
+}
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [autoVersionPlugin(), react(), tailwindcss()],
   base: "./", // Makes all assets relative, ideal for GitHub Pages on any repository name
   resolve: {
     alias: {
