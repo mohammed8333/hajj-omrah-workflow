@@ -235,13 +235,19 @@ export default function RequestsListPage() {
       });
       return;
     }
+    const isImg =
+      docUrl?.startsWith("data:image/") ||
+      /\.(jpg|jpeg|png|webp|gif)/i.test(docUrl || "") ||
+      title?.includes("صورة") ||
+      title?.includes("هوية");
+    const ext = isImg ? ".jpg" : ".pdf";
     setDocPreviewModal({
       isOpen: true,
       title: title || "معاينة المستند",
       url: docUrl || null,
       loading: !docUrl,
       docId,
-      downloadName: (title || "document").replace(/\s+/g, "_") + ".pdf",
+      downloadName: (title || "document").replace(/\s+/g, "_") + ext,
     });
     if (!docUrl && docId) {
       try {
@@ -1028,6 +1034,10 @@ ${travelersLines}
           <div className="block md:hidden space-y-3">
             {filtered.map((r) => {
               const isCompleted = r.status === "Completed" || r.status === "Archived";
+              const reqTravelers =
+                r.travelersList && r.travelersList.length > 0
+                  ? r.travelersList
+                  : [{ id: `fb-${r.id}`, fullName: r.groupName || "المعتمر", photoUrl: undefined }];
               return (
                 <div
                   key={r.id}
@@ -1138,104 +1148,140 @@ ${travelersLines}
                       </div>
                     </div>
 
-                    {/* الجزء الأيسر: بيانات المستضيف الأربعة تحت بعض مع علامة نسخ لكل سطر */}
-                    <div className="bg-amber-50/30 border border-amber-200/80 rounded-xl p-2.5 flex flex-col justify-between text-xs space-y-1.5">
-                      {/* 1. رقم الهوية + نسخ */}
-                      <div className="flex items-center justify-between gap-1 border-b border-amber-100 pb-1">
-                        <div className="min-w-0 flex-1">
-                          <span className="text-[10px] text-gray-500 block leading-tight">رقم الهوية:</span>
-                          <span className="font-mono font-bold text-gray-900 text-[11px] truncate block" dir="ltr">
-                            {r.hostNationalId || "-"}
-                          </span>
+                    {/* الجزء الأيسر: بيانات المسافرين لمرسل المعاملات، أو بيانات المستضيف لباقي الحسابات */}
+                    {role === "Sender" ? (
+                      <div className="bg-purple-50/40 border border-purple-200/80 rounded-xl p-2.5 flex flex-col justify-center text-xs overflow-hidden">
+                        <div className="space-y-2 max-h-36 overflow-y-auto pr-0.5">
+                          {reqTravelers.map((t, idx) => (
+                            <div key={t.id || idx} className="flex items-center gap-2 min-w-0">
+                              {t.photoUrl ? (
+                                <img
+                                  src={t.photoUrl}
+                                  alt={t.fullName}
+                                  onClick={(e) => handleViewDoc(undefined, t.photoUrl, `صورة المسافر - ${t.fullName}`, e)}
+                                  className="w-8 h-8 rounded-full object-cover border border-purple-300 shrink-0 shadow-2xs cursor-pointer hover:opacity-80 transition-opacity"
+                                  title="معاينة الصورة"
+                                />
+                              ) : (
+                                <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-700 border border-purple-200 flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
+                                  {t.fullName && t.fullName.trim() ? (
+                                    t.fullName.trim().charAt(0)
+                                  ) : (
+                                    <User className="w-4 h-4 text-purple-600" />
+                                  )}
+                                </div>
+                              )}
+                              <div className="min-w-0 flex-1">
+                                <span
+                                  className="text-xs font-bold text-gray-900 block truncate leading-tight"
+                                  title={t.fullName}
+                                >
+                                  {t.fullName}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                        {r.hostNationalId && (
-                          <button
-                            type="button"
-                            onClick={(e) => copyText(r.hostNationalId!, `m-hostId-${r.id}`, e)}
-                            className="text-gray-400 hover:text-amber-700 p-1 cursor-pointer shrink-0"
-                            title="نسخ رقم الهوية"
-                          >
-                            {copiedKey === `m-hostId-${r.id}` ? (
-                              <Check className="w-3.5 h-3.5 text-emerald-600" />
-                            ) : (
-                              <Copy className="w-3.5 h-3.5" />
-                            )}
-                          </button>
-                        )}
                       </div>
+                    ) : (
+                      <div className="bg-amber-50/30 border border-amber-200/80 rounded-xl p-2.5 flex flex-col justify-between text-xs space-y-1.5">
+                        {/* 1. رقم الهوية + نسخ */}
+                        <div className="flex items-center justify-between gap-1 border-b border-amber-100 pb-1">
+                          <div className="min-w-0 flex-1">
+                            <span className="text-[10px] text-gray-500 block leading-tight">رقم الهوية:</span>
+                            <span className="font-mono font-bold text-gray-900 text-[11px] truncate block" dir="ltr">
+                              {r.hostNationalId || "-"}
+                            </span>
+                          </div>
+                          {r.hostNationalId && (
+                            <button
+                              type="button"
+                              onClick={(e) => copyText(r.hostNationalId!, `m-hostId-${r.id}`, e)}
+                              className="text-gray-400 hover:text-amber-700 p-1 cursor-pointer shrink-0"
+                              title="نسخ رقم الهوية"
+                            >
+                              {copiedKey === `m-hostId-${r.id}` ? (
+                                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                              ) : (
+                                <Copy className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          )}
+                        </div>
 
-                      {/* 2. تاريخ ميلاد المستضيف + نسخ */}
-                      <div className="flex items-center justify-between gap-1 border-b border-amber-100 pb-1">
-                        <div className="min-w-0 flex-1">
-                          <span className="text-[10px] text-gray-500 block leading-tight">تاريخ الميلاد:</span>
-                          <span className="font-mono font-bold text-gray-900 text-[11px] truncate block" dir="ltr">
-                            {r.hostBirthDate || "-"}
-                          </span>
+                        {/* 2. تاريخ ميلاد المستضيف + نسخ */}
+                        <div className="flex items-center justify-between gap-1 border-b border-amber-100 pb-1">
+                          <div className="min-w-0 flex-1">
+                            <span className="text-[10px] text-gray-500 block leading-tight">تاريخ الميلاد:</span>
+                            <span className="font-mono font-bold text-gray-900 text-[11px] truncate block" dir="ltr">
+                              {r.hostBirthDate || "-"}
+                            </span>
+                          </div>
+                          {r.hostBirthDate && (
+                            <button
+                              type="button"
+                              onClick={(e) => copyText(r.hostBirthDate!, `m-hostBirth-${r.id}`, e)}
+                              className="text-gray-400 hover:text-amber-700 p-1 cursor-pointer shrink-0"
+                              title="نسخ تاريخ الميلاد"
+                            >
+                              {copiedKey === `m-hostBirth-${r.id}` ? (
+                                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                              ) : (
+                                <Copy className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          )}
                         </div>
-                        {r.hostBirthDate && (
-                          <button
-                            type="button"
-                            onClick={(e) => copyText(r.hostBirthDate!, `m-hostBirth-${r.id}`, e)}
-                            className="text-gray-400 hover:text-amber-700 p-1 cursor-pointer shrink-0"
-                            title="نسخ تاريخ الميلاد"
-                          >
-                            {copiedKey === `m-hostBirth-${r.id}` ? (
-                              <Check className="w-3.5 h-3.5 text-emerald-600" />
-                            ) : (
-                              <Copy className="w-3.5 h-3.5" />
-                            )}
-                          </button>
-                        )}
-                      </div>
 
-                      {/* 3. تليفون المستضيف + نسخ */}
-                      <div className="flex items-center justify-between gap-1 border-b border-amber-100 pb-1">
-                        <div className="min-w-0 flex-1">
-                          <span className="text-[10px] text-gray-500 block leading-tight">هاتف المستضيف:</span>
-                          <span className="font-mono font-bold text-gray-900 text-[11px] truncate block" dir="ltr">
-                            {r.hostPhone || (r.hasHosting ? r.contactPhone : "-")}
-                          </span>
+                        {/* 3. تليفون المستضيف + نسخ */}
+                        <div className="flex items-center justify-between gap-1 border-b border-amber-100 pb-1">
+                          <div className="min-w-0 flex-1">
+                            <span className="text-[10px] text-gray-500 block leading-tight">هاتف المستضيف:</span>
+                            <span className="font-mono font-bold text-gray-900 text-[11px] truncate block" dir="ltr">
+                              {r.hostPhone || (r.hasHosting ? r.contactPhone : "-")}
+                            </span>
+                          </div>
+                          {(r.hostPhone || (r.hasHosting && r.contactPhone)) && (
+                            <button
+                              type="button"
+                              onClick={(e) => copyText(r.hostPhone || r.contactPhone, `m-hostPhone-${r.id}`, e)}
+                              className="text-gray-400 hover:text-amber-700 p-1 cursor-pointer shrink-0"
+                              title="نسخ رقم الهاتف"
+                            >
+                              {copiedKey === `m-hostPhone-${r.id}` ? (
+                                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                              ) : (
+                                <Copy className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          )}
                         </div>
-                        {(r.hostPhone || (r.hasHosting && r.contactPhone)) && (
-                          <button
-                            type="button"
-                            onClick={(e) => copyText(r.hostPhone || r.contactPhone, `m-hostPhone-${r.id}`, e)}
-                            className="text-gray-400 hover:text-amber-700 p-1 cursor-pointer shrink-0"
-                            title="نسخ رقم الهاتف"
-                          >
-                            {copiedKey === `m-hostPhone-${r.id}` ? (
-                              <Check className="w-3.5 h-3.5 text-emerald-600" />
-                            ) : (
-                              <Copy className="w-3.5 h-3.5" />
-                            )}
-                          </button>
-                        )}
-                      </div>
 
-                      {/* 4. اسم المستضيف + نسخ */}
-                      <div className="flex items-center justify-between gap-1">
-                        <div className="min-w-0 flex-1">
-                          <span className="text-[10px] text-gray-500 block leading-tight">اسم المستضيف:</span>
-                          <span className="font-bold text-gray-900 text-[11px] truncate block">
-                            {r.hostName || "-"}
-                          </span>
+                        {/* 4. اسم المستضيف + نسخ */}
+                        <div className="flex items-center justify-between gap-1">
+                          <div className="min-w-0 flex-1">
+                            <span className="text-[10px] text-gray-500 block leading-tight">اسم المستضيف:</span>
+                            <span className="font-bold text-gray-900 text-[11px] truncate block">
+                              {r.hostName || "-"}
+                            </span>
+                          </div>
+                          {r.hostName && (
+                            <button
+                              type="button"
+                              onClick={(e) => copyText(r.hostName!, `m-hostName-${r.id}`, e)}
+                              className="text-gray-400 hover:text-amber-700 p-1 cursor-pointer shrink-0"
+                              title="نسخ اسم المستضيف"
+                            >
+                              {copiedKey === `m-hostName-${r.id}` ? (
+                                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                              ) : (
+                                <Copy className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          )}
                         </div>
-                        {r.hostName && (
-                          <button
-                            type="button"
-                            onClick={(e) => copyText(r.hostName!, `m-hostName-${r.id}`, e)}
-                            className="text-gray-400 hover:text-amber-700 p-1 cursor-pointer shrink-0"
-                            title="نسخ اسم المستضيف"
-                          >
-                            {copiedKey === `m-hostName-${r.id}` ? (
-                              <Check className="w-3.5 h-3.5 text-emerald-600" />
-                            ) : (
-                              <Copy className="w-3.5 h-3.5" />
-                            )}
-                          </button>
-                        )}
                       </div>
-                    </div>
+                    )}
                   </div>
 
                   {/* الشريط السفلي: تذكرة جنبها الهوية جنبها تم والأزرار */}
@@ -1387,7 +1433,7 @@ ${travelersLines}
                     <th className="py-3.5 px-4 text-center">الحالة</th>
                     <th className="py-3.5 px-4">رحلة الذهاب</th>
                     <th className="py-3.5 px-4">رحلة العودة</th>
-                    <th className="py-3.5 px-4">بيانات المستضيف</th>
+                    <th className="py-3.5 px-4">{role === "Sender" ? "بيانات المسافرين" : "بيانات المستضيف"}</th>
                     <th className="py-3.5 px-4 text-center">المستندات والإجراء</th>
                   </tr>
                 </thead>
@@ -1398,6 +1444,10 @@ ${travelersLines}
                       Boolean(search.trim()) &&
                       Boolean(r.nusukGroupNumber) &&
                       r.nusukGroupNumber!.toLowerCase().includes(search.trim().toLowerCase());
+                    const reqTravelers =
+                      r.travelersList && r.travelersList.length > 0
+                        ? r.travelersList
+                        : [{ id: `fb-${r.id}`, fullName: r.groupName || "المعتمر", photoUrl: undefined }];
 
                     return (
                       <tr
@@ -1500,105 +1550,139 @@ ${travelersLines}
                           </div>
                         </td>
 
-                        {/* 5. بيانات المستضيف (الهوية والميلاد والهاتف والاسم مع النسخ) */}
+                        {/* 5. بيانات المستضيف أو بيانات المسافرين لمرسل المعاملات */}
                         <td className="py-3 px-4 align-middle border-l border-gray-100">
-                          <div className="bg-amber-50/40 border border-amber-200/80 rounded-xl p-2 text-[11px] space-y-1 min-w-[200px] max-w-xs">
-                            {/* الهوية */}
-                            <div className="flex items-center justify-between gap-1 border-b border-amber-100/80 pb-0.5">
-                              <span className="text-gray-500 font-medium">الهوية:</span>
-                              <div className="flex items-center gap-1">
-                                <span className="font-mono font-bold text-gray-900" dir="ltr">
-                                  {r.hostNationalId || "-"}
-                                </span>
-                                {r.hostNationalId && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => copyText(r.hostNationalId!, `d-hostId-${r.id}`, e)}
-                                    className="text-gray-400 hover:text-amber-700 p-0.5 cursor-pointer"
-                                    title="نسخ رقم الهوية"
-                                  >
-                                    {copiedKey === `d-hostId-${r.id}` ? (
-                                      <Check className="w-3 h-3 text-emerald-600" />
-                                    ) : (
-                                      <Copy className="w-3.5 h-3.5" />
-                                    )}
-                                  </button>
-                                )}
-                              </div>
+                          {role === "Sender" ? (
+                            <div className="bg-purple-50/40 border border-purple-200/80 rounded-xl p-2.5 min-w-[200px] max-w-xs space-y-2 max-h-44 overflow-y-auto">
+                              {reqTravelers.map((t, idx) => (
+                                <div key={t.id || idx} className="flex items-center gap-2.5 min-w-0">
+                                  {t.photoUrl ? (
+                                    <img
+                                      src={t.photoUrl}
+                                      alt={t.fullName}
+                                      onClick={(e) => handleViewDoc(undefined, t.photoUrl, `صورة المسافر - ${t.fullName}`, e)}
+                                      className="w-9 h-9 rounded-full object-cover border border-purple-300 shrink-0 shadow-2xs cursor-pointer hover:opacity-80 transition-opacity"
+                                      title="معاينة الصورة"
+                                    />
+                                  ) : (
+                                    <div className="w-9 h-9 rounded-full bg-purple-100 text-purple-700 border border-purple-200 flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
+                                      {t.fullName && t.fullName.trim() ? (
+                                        t.fullName.trim().charAt(0)
+                                      ) : (
+                                        <User className="w-4 h-4 text-purple-600" />
+                                      )}
+                                    </div>
+                                  )}
+                                  <div className="min-w-0 flex-1">
+                                    <span
+                                      className="text-xs font-bold text-gray-900 block truncate leading-tight"
+                                      title={t.fullName}
+                                    >
+                                      {t.fullName}
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
                             </div>
+                          ) : (
+                            <div className="bg-amber-50/40 border border-amber-200/80 rounded-xl p-2 text-[11px] space-y-1 min-w-[200px] max-w-xs">
+                              {/* الهوية */}
+                              <div className="flex items-center justify-between gap-1 border-b border-amber-100/80 pb-0.5">
+                                <span className="text-gray-500 font-medium">الهوية:</span>
+                                <div className="flex items-center gap-1">
+                                  <span className="font-mono font-bold text-gray-900" dir="ltr">
+                                    {r.hostNationalId || "-"}
+                                  </span>
+                                  {r.hostNationalId && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => copyText(r.hostNationalId!, `d-hostId-${r.id}`, e)}
+                                      className="text-gray-400 hover:text-amber-700 p-0.5 cursor-pointer"
+                                      title="نسخ رقم الهوية"
+                                    >
+                                      {copiedKey === `d-hostId-${r.id}` ? (
+                                        <Check className="w-3 h-3 text-emerald-600" />
+                                      ) : (
+                                        <Copy className="w-3 h-3" />
+                                      )}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
 
-                            {/* تاريخ الميلاد */}
-                            <div className="flex items-center justify-between gap-1 border-b border-amber-100/80 pb-0.5">
-                              <span className="text-gray-500 font-medium">الميلاد:</span>
-                              <div className="flex items-center gap-1">
-                                <span className="font-mono font-bold text-gray-900" dir="ltr">
-                                  {r.hostBirthDate || "-"}
-                                </span>
-                                {r.hostBirthDate && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => copyText(r.hostBirthDate!, `d-hostBirth-${r.id}`, e)}
-                                    className="text-gray-400 hover:text-amber-700 p-0.5 cursor-pointer"
-                                    title="نسخ تاريخ الميلاد"
-                                  >
-                                    {copiedKey === `d-hostBirth-${r.id}` ? (
-                                      <Check className="w-3 h-3 text-emerald-600" />
-                                    ) : (
-                                      <Copy className="w-3.5 h-3.5" />
-                                    )}
-                                  </button>
-                                )}
+                              {/* تاريخ الميلاد */}
+                              <div className="flex items-center justify-between gap-1 border-b border-amber-100/80 pb-0.5">
+                                <span className="text-gray-500 font-medium">الميلاد:</span>
+                                <div className="flex items-center gap-1">
+                                  <span className="font-mono font-bold text-gray-900" dir="ltr">
+                                    {r.hostBirthDate || "-"}
+                                  </span>
+                                  {r.hostBirthDate && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => copyText(r.hostBirthDate!, `d-hostBirth-${r.id}`, e)}
+                                      className="text-gray-400 hover:text-amber-700 p-0.5 cursor-pointer"
+                                      title="نسخ تاريخ الميلاد"
+                                    >
+                                      {copiedKey === `d-hostBirth-${r.id}` ? (
+                                        <Check className="w-3 h-3 text-emerald-600" />
+                                      ) : (
+                                        <Copy className="w-3 h-3" />
+                                      )}
+                                    </button>
+                                  )}
+                                </div>
                               </div>
-                            </div>
 
-                            {/* هاتف المستضيف */}
-                            <div className="flex items-center justify-between gap-1 border-b border-amber-100/80 pb-0.5">
-                              <span className="text-gray-500 font-medium">الهاتف:</span>
-                              <div className="flex items-center gap-1">
-                                <span className="font-mono font-bold text-gray-900" dir="ltr">
-                                  {r.hostPhone || (r.hasHosting ? r.contactPhone : "-")}
-                                </span>
-                                {(r.hostPhone || (r.hasHosting && r.contactPhone)) && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => copyText(r.hostPhone || r.contactPhone, `d-hostPhone-${r.id}`, e)}
-                                    className="text-gray-400 hover:text-amber-700 p-0.5 cursor-pointer"
-                                    title="نسخ رقم الهاتف"
-                                  >
-                                    {copiedKey === `d-hostPhone-${r.id}` ? (
-                                      <Check className="w-3 h-3 text-emerald-600" />
-                                    ) : (
-                                      <Copy className="w-3.5 h-3.5" />
-                                    )}
-                                  </button>
-                                )}
+                              {/* هاتف المستضيف */}
+                              <div className="flex items-center justify-between gap-1 border-b border-amber-100/80 pb-0.5">
+                                <span className="text-gray-500 font-medium">الهاتف:</span>
+                                <div className="flex items-center gap-1">
+                                  <span className="font-mono font-bold text-gray-900" dir="ltr">
+                                    {r.hostPhone || (r.hasHosting ? r.contactPhone : "-")}
+                                  </span>
+                                  {(r.hostPhone || (r.hasHosting && r.contactPhone)) && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => copyText(r.hostPhone || r.contactPhone, `d-hostPhone-${r.id}`, e)}
+                                      className="text-gray-400 hover:text-amber-700 p-0.5 cursor-pointer"
+                                      title="نسخ رقم الهاتف"
+                                    >
+                                      {copiedKey === `d-hostPhone-${r.id}` ? (
+                                        <Check className="w-3 h-3 text-emerald-600" />
+                                      ) : (
+                                        <Copy className="w-3 h-3" />
+                                      )}
+                                    </button>
+                                  )}
+                                </div>
                               </div>
-                            </div>
 
-                            {/* اسم المستضيف */}
-                            <div className="flex items-center justify-between gap-1">
-                              <span className="text-gray-500 font-medium">الاسم:</span>
-                              <div className="flex items-center gap-1">
-                                <span className="font-bold text-gray-900 truncate max-w-[130px]" title={r.hostName}>
-                                  {r.hostName || "-"}
-                                </span>
-                                {r.hostName && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => copyText(r.hostName!, `d-hostName-${r.id}`, e)}
-                                    className="text-gray-400 hover:text-amber-700 p-0.5 cursor-pointer"
-                                    title="نسخ اسم المستضيف"
-                                  >
-                                    {copiedKey === `d-hostName-${r.id}` ? (
-                                      <Check className="w-3 h-3 text-emerald-600" />
-                                    ) : (
-                                      <Copy className="w-3.5 h-3.5" />
-                                    )}
-                                  </button>
-                                )}
+                              {/* اسم المستضيف */}
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="text-gray-500 font-medium">الاسم:</span>
+                                <div className="flex items-center gap-1">
+                                  <span className="font-bold text-gray-900 truncate max-w-[130px]" title={r.hostName}>
+                                    {r.hostName || "-"}
+                                  </span>
+                                  {r.hostName && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => copyText(r.hostName!, `d-hostName-${r.id}`, e)}
+                                      className="text-gray-400 hover:text-amber-700 p-0.5 cursor-pointer"
+                                      title="نسخ اسم المستضيف"
+                                    >
+                                      {copiedKey === `d-hostName-${r.id}` ? (
+                                        <Check className="w-3 h-3 text-emerald-600" />
+                                      ) : (
+                                        <Copy className="w-3.5 h-3.5" />
+                                      )}
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          </div>
+                          )}
                         </td>
 
                         {/* 6. المستندات والإجراء: تذكرة جنبها الهوية جنبها الأزرار */}
