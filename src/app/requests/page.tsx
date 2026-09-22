@@ -159,6 +159,7 @@ export default function RequestsListPage() {
   const [activeTab, setActiveTab] = useState<string>("ALL");
   const [copiedNusuk, setCopiedNusuk] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [mobileCardTab, setMobileCardTab] = useState<Record<string, "host" | "travelers">>({});
   const [docPreviewModal, setDocPreviewModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -1181,7 +1182,7 @@ ${travelersLines}
                       </div>
                     </div>
 
-                    {/* الجزء الأيسر: بيانات المسافرين لمرسل المعاملات، أو بيانات المستضيف لباقي الحسابات */}
+                    {/* الجزء الأيسر: بيانات المسافرين لمرسل المعاملات، أو بيانات المستضيف للوكيل السعودي، أو كلاهما عبر تبديل سريع للأدمن وموظف صفا */}
                     {role === "Sender" ? (
                       <div className="bg-purple-50/40 border border-purple-200/80 rounded-xl p-2.5 flex flex-col justify-center text-xs overflow-hidden">
                         <div className="space-y-2 max-h-36 overflow-y-auto pr-0.5">
@@ -1216,7 +1217,7 @@ ${travelersLines}
                           ))}
                         </div>
                       </div>
-                    ) : (
+                    ) : role === "SaudiAgent" ? (
                       <div className="bg-amber-50/30 border border-amber-200/80 rounded-xl p-2.5 flex flex-col justify-between text-xs space-y-1.5">
                         {/* 1. رقم الهوية + نسخ */}
                         <div className="flex items-center justify-between gap-1 border-b border-amber-100 pb-1">
@@ -1313,6 +1314,173 @@ ${travelersLines}
                             </button>
                           )}
                         </div>
+                      </div>
+                    ) : (
+                      /* موظف صفا والأدمن: تبديل بين المستضيف والمسافرين للحفاظ تماماً على نفس أبعاد الصندوق على الموبايل */
+                      <div className="bg-amber-50/20 border border-amber-200/80 rounded-xl p-2 flex flex-col justify-between text-xs overflow-hidden">
+                        {/* التبديل العلوي */}
+                        <div className="flex items-center bg-gray-100/90 p-0.5 rounded-lg mb-1.5 shrink-0 text-[10px] font-bold">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setMobileCardTab((prev) => ({ ...prev, [r.id]: "host" }));
+                            }}
+                            className={`flex-1 py-0.5 text-center rounded-md transition-all cursor-pointer ${
+                              (mobileCardTab[r.id] || "host") === "host"
+                                ? "bg-white text-amber-900 shadow-2xs font-extrabold"
+                                : "text-gray-500 hover:text-gray-800"
+                            }`}
+                          >
+                            المستضيف
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setMobileCardTab((prev) => ({ ...prev, [r.id]: "travelers" }));
+                            }}
+                            className={`flex-1 py-0.5 text-center rounded-md transition-all cursor-pointer ${
+                              (mobileCardTab[r.id] || "host") === "travelers"
+                                ? "bg-purple-600 text-white shadow-2xs font-extrabold"
+                                : "text-gray-500 hover:text-gray-800"
+                            }`}
+                          >
+                            المسافرين ({reqTravelers.length})
+                          </button>
+                        </div>
+
+                        {(mobileCardTab[r.id] || "host") === "travelers" ? (
+                          <div className="space-y-1.5 max-h-32 overflow-y-auto pr-0.5 flex-1">
+                            {reqTravelers.map((t, idx) => (
+                              <div key={t.id || idx} className="flex items-center gap-1.5 min-w-0">
+                                {t.photoUrl ? (
+                                  <img
+                                    src={t.photoUrl}
+                                    alt={t.fullName}
+                                    onClick={(e) => handleViewDoc(undefined, t.photoUrl, `صورة المسافر - ${t.fullName}`, e)}
+                                    className="w-7 h-7 rounded-full object-cover border border-purple-300 shrink-0 shadow-2xs cursor-pointer hover:opacity-80 transition-opacity"
+                                    title="معاينة الصورة"
+                                  />
+                                ) : (
+                                  <div className="w-7 h-7 rounded-full bg-purple-100 text-purple-700 border border-purple-200 flex items-center justify-center font-bold text-[10px] shrink-0 shadow-2xs">
+                                    {t.fullName && t.fullName.trim() ? (
+                                      t.fullName.trim().charAt(0)
+                                    ) : (
+                                      <User className="w-3.5 h-3.5 text-purple-600" />
+                                    )}
+                                  </div>
+                                )}
+                                <div className="min-w-0 flex-1">
+                                  <span
+                                    className="text-[11px] font-bold text-gray-900 block truncate leading-tight"
+                                    title={t.fullName}
+                                  >
+                                    {t.fullName}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="space-y-1 flex-1 flex flex-col justify-between">
+                            {/* 1. رقم الهوية + نسخ */}
+                            <div className="flex items-center justify-between gap-1 border-b border-amber-100/70 pb-0.5">
+                              <div className="min-w-0 flex-1">
+                                <span className="text-[9px] text-gray-500 block leading-tight">الهوية:</span>
+                                <span className="font-mono font-bold text-gray-900 text-[10.5px] truncate block" dir="ltr">
+                                  {r.hostNationalId || "-"}
+                                </span>
+                              </div>
+                              {r.hostNationalId && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => copyText(r.hostNationalId!, `m-hostId-${r.id}`, e)}
+                                  className="text-gray-400 hover:text-amber-700 p-0.5 cursor-pointer shrink-0"
+                                  title="نسخ رقم الهوية"
+                                >
+                                  {copiedKey === `m-hostId-${r.id}` ? (
+                                    <Check className="w-3 h-3 text-emerald-600" />
+                                  ) : (
+                                    <Copy className="w-3 h-3" />
+                                  )}
+                                </button>
+                              )}
+                            </div>
+
+                            {/* 2. تاريخ ميلاد المستضيف + نسخ */}
+                            <div className="flex items-center justify-between gap-1 border-b border-amber-100/70 pb-0.5">
+                              <div className="min-w-0 flex-1">
+                                <span className="text-[9px] text-gray-500 block leading-tight">الميلاد:</span>
+                                <span className="font-mono font-bold text-gray-900 text-[10.5px] truncate block" dir="ltr">
+                                  {r.hostBirthDate || "-"}
+                                </span>
+                              </div>
+                              {r.hostBirthDate && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => copyText(r.hostBirthDate!, `m-hostBirth-${r.id}`, e)}
+                                  className="text-gray-400 hover:text-amber-700 p-0.5 cursor-pointer shrink-0"
+                                  title="نسخ تاريخ الميلاد"
+                                >
+                                  {copiedKey === `m-hostBirth-${r.id}` ? (
+                                    <Check className="w-3 h-3 text-emerald-600" />
+                                  ) : (
+                                    <Copy className="w-3 h-3" />
+                                  )}
+                                </button>
+                              )}
+                            </div>
+
+                            {/* 3. تليفون المستضيف + نسخ */}
+                            <div className="flex items-center justify-between gap-1 border-b border-amber-100/70 pb-0.5">
+                              <div className="min-w-0 flex-1">
+                                <span className="text-[9px] text-gray-500 block leading-tight">الهاتف:</span>
+                                <span className="font-mono font-bold text-gray-900 text-[10.5px] truncate block" dir="ltr">
+                                  {r.hostPhone || (r.hasHosting ? r.contactPhone : "-")}
+                                </span>
+                              </div>
+                              {(r.hostPhone || (r.hasHosting && r.contactPhone)) && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => copyText(r.hostPhone || r.contactPhone, `m-hostPhone-${r.id}`, e)}
+                                  className="text-gray-400 hover:text-amber-700 p-0.5 cursor-pointer shrink-0"
+                                  title="نسخ رقم الهاتف"
+                                >
+                                  {copiedKey === `m-hostPhone-${r.id}` ? (
+                                    <Check className="w-3 h-3 text-emerald-600" />
+                                  ) : (
+                                    <Copy className="w-3 h-3" />
+                                  )}
+                                </button>
+                              )}
+                            </div>
+
+                            {/* 4. اسم المستضيف + نسخ */}
+                            <div className="flex items-center justify-between gap-1">
+                              <div className="min-w-0 flex-1">
+                                <span className="text-[9px] text-gray-500 block leading-tight">الاسم:</span>
+                                <span className="font-bold text-gray-900 text-[10.5px] truncate block">
+                                  {r.hostName || "-"}
+                                </span>
+                              </div>
+                              {r.hostName && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => copyText(r.hostName!, `m-hostName-${r.id}`, e)}
+                                  className="text-gray-400 hover:text-amber-700 p-0.5 cursor-pointer shrink-0"
+                                  title="نسخ اسم المستضيف"
+                                >
+                                  {copiedKey === `m-hostName-${r.id}` ? (
+                                    <Check className="w-3 h-3 text-emerald-600" />
+                                  ) : (
+                                    <Copy className="w-3.5 h-3.5" />
+                                  )}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1469,7 +1637,12 @@ ${travelersLines}
                     )}
                     <th className="py-3 px-3">رحلة الذهاب</th>
                     <th className="py-3 px-3">رحلة العودة</th>
-                    <th className="py-3 px-3">{role === "Sender" ? "بيانات المسافرين" : "بيانات المستضيف"}</th>
+                    {(role === "Sender" || role === "SafaEmployee" || role === "Admin") && (
+                      <th className="py-3 px-3">بيانات المسافرين</th>
+                    )}
+                    {(role === "SaudiAgent" || role === "SafaEmployee" || role === "Admin") && (
+                      <th className="py-3 px-3">بيانات المستضيف</th>
+                    )}
                     <th className="py-3 px-3 text-center">المستندات والإجراء</th>
                   </tr>
                 </thead>
@@ -1607,9 +1780,9 @@ ${travelersLines}
                           </div>
                         </td>
 
-                        {/* 5. بيانات المستضيف أو بيانات المسافرين لمرسل المعاملات */}
-                        <td className="py-2.5 px-3 align-middle border-l border-gray-100">
-                          {role === "Sender" ? (
+                        {/* 5. عمود بيانات المسافرين (للمرسل ولموظف صفا وللأدمن) */}
+                        {(role === "Sender" || role === "SafaEmployee" || role === "Admin") && (
+                          <td className="py-2.5 px-3 align-middle border-l border-gray-100">
                             <div className="bg-purple-50/40 border border-purple-200/80 rounded-xl p-2 min-w-[170px] max-w-xs space-y-1.5 max-h-44 overflow-y-auto">
                               {reqTravelers.map((t, idx) => (
                                 <div key={t.id || idx} className="flex items-center gap-2.5 min-w-0">
@@ -1641,7 +1814,12 @@ ${travelersLines}
                                 </div>
                               ))}
                             </div>
-                          ) : (
+                          </td>
+                        )}
+
+                        {/* 6. عمود بيانات المستضيف (للوكيل السعودي ولموظف صفا وللأدمن) */}
+                        {(role === "SaudiAgent" || role === "SafaEmployee" || role === "Admin") && (
+                          <td className="py-2.5 px-3 align-middle border-l border-gray-100">
                             <div className="bg-amber-50/40 border border-amber-200/80 rounded-xl p-2 text-[11px] space-y-1 min-w-[170px] max-w-xs">
                               {/* الهوية */}
                               <div className="flex items-center justify-between gap-1 border-b border-amber-100/80 pb-0.5">
@@ -1739,8 +1917,8 @@ ${travelersLines}
                                 </div>
                               </div>
                             </div>
-                          )}
-                        </td>
+                          </td>
+                        )}
 
                         {/* 6. المستندات والإجراء: تذكرة جنبها الهوية جنبها الأزرار */}
                         <td className="py-2.5 px-3 align-middle text-center">
