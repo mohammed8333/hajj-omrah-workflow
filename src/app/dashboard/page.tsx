@@ -498,6 +498,7 @@ ${travelersLines}
       (r.nusukGroupNumber && r.nusukGroupNumber.toLowerCase().includes(term)) ||
       (r.hostName && r.hostName.toLowerCase().includes(term)) ||
       (r.hostPhone && r.hostPhone.includes(term)) ||
+      (r.senderName && r.senderName.toLowerCase().includes(term)) ||
       r.contactPhone.includes(term);
 
     if (!matchesSearch) return false;
@@ -1177,6 +1178,25 @@ ${travelersLines}
                     </div>
                   </div>
 
+                  {/* شريط المرسل لموظف صفا والأدمن فقط */}
+                  {(role === "SafaEmployee" || role === "Admin") && (
+                    <div className="flex items-center justify-between gap-2 bg-blue-50/50 border border-blue-200/70 px-2.5 py-1 rounded-xl text-xs">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="text-[11px] text-blue-600 font-bold shrink-0">المرسل:</span>
+                        <span className="font-bold text-gray-900 text-xs truncate" title={r.senderName || "غير محدد"}>
+                          {r.senderName || "غير محدد"}
+                        </span>
+                      </div>
+                      <div className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 border border-blue-200 flex items-center justify-center font-bold text-[10px] shrink-0">
+                        {r.senderName && r.senderName.trim() ? (
+                          r.senderName.trim().charAt(0)
+                        ) : (
+                          <User className="w-3 h-3 text-blue-600" />
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {/* عمودين: الجزء الأيمن مربعين تحت بعض للرحلة، الجزء الأيسر بيانات المستضيف الـ 4 مع النسخ */}
                   <div className="grid grid-cols-2 gap-2.5 items-stretch">
                     {/* الجزء الأيمن: مربعين تحت بعض لبيانات الرحلة */}
@@ -1517,6 +1537,9 @@ ${travelersLines}
                   <tr>
                     <th className="py-3.5 px-4">رقم مجموعة نسك</th>
                     <th className="py-3.5 px-4 text-center">الحالة</th>
+                    {(role === "SafaEmployee" || role === "Admin") && (
+                      <th className="py-3.5 px-4 text-center">المرسل</th>
+                    )}
                     <th className="py-3.5 px-4">رحلة الذهاب</th>
                     <th className="py-3.5 px-4">رحلة العودة</th>
                     <th className="py-3.5 px-4">{role === "Sender" ? "بيانات المسافرين" : "بيانات المستضيف"}</th>
@@ -1589,6 +1612,27 @@ ${travelersLines}
                             <RequestStatusBadge status={r.status} />
                           )}
                         </td>
+
+                        {/* 2.5 المرسل (لموظف صفا والأدمن فقط) */}
+                        {(role === "SafaEmployee" || role === "Admin") && (
+                          <td className="py-3.5 px-4 align-middle text-center border-l border-gray-100">
+                            <div className="inline-flex items-center gap-1.5 bg-blue-50/60 border border-blue-200/80 px-2.5 py-1.5 rounded-xl shadow-2xs max-w-[170px]">
+                              <div className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 border border-blue-200 flex items-center justify-center font-bold text-[10px] shrink-0">
+                                {r.senderName && r.senderName.trim() ? (
+                                  r.senderName.trim().charAt(0)
+                                ) : (
+                                  <User className="w-3 h-3 text-blue-600" />
+                                )}
+                              </div>
+                              <span
+                                className="font-bold text-blue-950 text-xs truncate block"
+                                title={r.senderName || "غير محدد"}
+                              >
+                                {r.senderName || "غير محدد"}
+                              </span>
+                            </div>
+                          </td>
+                        )}
 
                         {/* 3. رحلة الذهاب */}
                         <td className="py-3.5 px-4 align-middle border-l border-gray-100">
