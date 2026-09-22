@@ -33,7 +33,6 @@ import {
   Download,
   Eye,
   MessageCircle,
-  UserCheck,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -41,7 +40,6 @@ import { RequestLifecycleTimer } from "@/components/ui/RequestLifecycleTimer";
 import { useDialog } from "@/lib/dialog-context";
 import { getWhatsAppUrl } from "@/lib/phoneUtils";
 import { WhatsAppModal } from "@/components/ui/WhatsAppModal";
-import { AssignEmployeeModal } from "@/components/ui/AssignEmployeeModal";
 import { notificationsService } from "@/lib/notificationsService";
 
 // اقتطاع الاسم الثلاثي فقط (3 مقاطع كحد أقصى)
@@ -167,12 +165,10 @@ export default function DashboardPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [nusukFilter, setNusukFilter] = useState<"ALL" | "WITH_NUSUK" | "WITHOUT_NUSUK">("ALL");
-  const [assignedFilter, setAssignedFilter] = useState<"ALL" | "MINE" | "UNASSIGNED">("ALL");
   const [copiedNusuk, setCopiedNusuk] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [mobileCardTab, setMobileCardTab] = useState<Record<string, "host" | "travelers">>({});
   const [whatsAppModalRequest, setWhatsAppModalRequest] = useState<GroupRequestSummary | null>(null);
-  const [assignModalRequest, setAssignModalRequest] = useState<GroupRequestSummary | null>(null);
   const [docPreviewModal, setDocPreviewModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -530,16 +526,6 @@ ${travelersLines}
     if (nusukFilter === "WITH_NUSUK" && !r.nusukGroupNumber) return false;
     if (nusukFilter === "WITHOUT_NUSUK" && r.nusukGroupNumber) return false;
 
-    if (assignedFilter === "MINE") {
-      const isMine =
-        (user?.id && (r.assignedSafaEmployeeId === user.id || r.assignedSaudiAgentId === user.id)) ||
-        (user?.fullName && (r.assignedSafaEmployeeName === user.fullName || r.assignedSaudiAgentName === user.fullName));
-      if (!isMine) return false;
-    }
-    if (assignedFilter === "UNASSIGNED") {
-      if (r.assignedSafaEmployeeId || r.assignedSaudiAgentId) return false;
-    }
-
     if (statusFilter && r.status !== statusFilter) return false;
 
     if (activeTab === "ALL") return true;
@@ -594,15 +580,6 @@ ${travelersLines}
 
   const countWithNusuk = roleRequests.filter((r) => Boolean(r.nusukGroupNumber)).length;
   const countWithoutNusuk = roleRequests.length - countWithNusuk;
-
-  const assignedMineCount = roleRequests.filter(
-    (r) =>
-      (user?.id && (r.assignedSafaEmployeeId === user.id || r.assignedSaudiAgentId === user.id)) ||
-      (user?.fullName && (r.assignedSafaEmployeeName === user.fullName || r.assignedSaudiAgentName === user.fullName))
-  ).length;
-  const unassignedCount = roleRequests.filter(
-    (r) => !r.assignedSafaEmployeeId && !r.assignedSaudiAgentId
-  ).length;
 
   const urgentUpcomingRequests = roleRequests.filter((r) => {
     if (r.status === "Completed" || r.status === "Archived" || r.status === "Cancelled") return false;
@@ -1184,49 +1161,6 @@ ${travelersLines}
             بدون رقم نسك ({countWithoutNusuk})
           </button>
         </div>
-
-        {/* Task Assignment Quick Filter (for Safa & Admin) */}
-        {(role === "SafaEmployee" || role === "Admin") && (
-          <div className="flex items-center gap-2 pt-2 border-t border-gray-100 overflow-x-auto text-xs">
-            <span className="text-gray-500 text-[11px] shrink-0 font-bold flex items-center gap-1">
-              <UserCheck className="w-3.5 h-3.5 text-blue-600" />
-              <span>إسناد المهام:</span>
-            </span>
-            <button
-              type="button"
-              onClick={() => setAssignedFilter("ALL")}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                assignedFilter === "ALL"
-                  ? "bg-blue-600 text-white shadow-2xs"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              جميع المعاملات ({roleRequests.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setAssignedFilter("MINE")}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                assignedFilter === "MINE"
-                  ? "bg-blue-600 text-white shadow-2xs"
-                  : "bg-blue-50 text-blue-800 hover:bg-blue-100 border border-blue-200"
-              }`}
-            >
-              معاملاتي المسندة إليّ ({assignedMineCount})
-            </button>
-            <button
-              type="button"
-              onClick={() => setAssignedFilter("UNASSIGNED")}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                assignedFilter === "UNASSIGNED"
-                  ? "bg-amber-600 text-white shadow-2xs"
-                  : "bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200"
-              }`}
-            >
-              غير مسندة لموظف ({unassignedCount})
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Requests List Cards / Table */}
@@ -1320,12 +1254,6 @@ ${travelersLines}
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
-                        {r.assignedSafaEmployeeName && (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-sky-800 bg-white border border-sky-200 px-1.5 py-0.5 rounded-md">
-                            <UserCheck className="w-2.5 h-2.5 text-sky-600 shrink-0" />
-                            <span>مسند: {r.assignedSafaEmployeeName}</span>
-                          </span>
-                        )}
                         <div className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 border border-blue-200 flex items-center justify-center font-bold text-[10px] shrink-0">
                           {r.senderName && r.senderName.trim() ? (
                             r.senderName.trim().charAt(0)
@@ -1819,22 +1747,6 @@ ${travelersLines}
                         <span>واتساب</span>
                       </button>
 
-                      {/* زر إسناد المعاملة (للإدارة وموظفي صفا) */}
-                      {(role === "Admin" || role === "SafaEmployee") && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setAssignModalRequest(r);
-                          }}
-                          className="px-2.5 py-1 text-xs font-bold text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 border border-blue-300 rounded-xl transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
-                          title="إسناد المعاملة لموظف صفا"
-                        >
-                          <UserCheck className="w-3.5 h-3.5 text-blue-600" />
-                          <span>إسناد</span>
-                        </button>
-                      )}
-
                       <button
                         type="button"
                         onClick={(e) => {
@@ -1943,7 +1855,7 @@ ${travelersLines}
                           )}
                         </td>
 
-                        {/* 2.5 المرسل والإسناد (لموظف صفا والأدمن فقط) */}
+                        {/* 2.5 المرسل (لموظف صفا والأدمن فقط) */}
                         {(role === "SafaEmployee" || role === "Admin") && (
                           <td className="py-2.5 px-2 align-middle text-center border-l border-gray-100">
                             <div className="flex flex-col items-center gap-1 max-w-[140px] mx-auto">
@@ -1962,15 +1874,6 @@ ${travelersLines}
                                   {r.senderName || "غير محدد"}
                                 </span>
                               </div>
-                              {r.assignedSafaEmployeeName && (
-                                <span
-                                  className="inline-flex items-center gap-1 text-[10px] font-bold text-sky-800 bg-sky-50 border border-sky-200 px-1.5 py-0.5 rounded-md truncate max-w-full shadow-2xs"
-                                  title={`مسند إلى: ${r.assignedSafaEmployeeName}`}
-                                >
-                                  <UserCheck className="w-2.5 h-2.5 text-sky-600 shrink-0" />
-                                  <span className="truncate">{r.assignedSafaEmployeeName}</span>
-                                </span>
-                              )}
                             </div>
                           </td>
                         )}
@@ -2283,22 +2186,6 @@ ${travelersLines}
                               <span>واتساب</span>
                             </button>
 
-                            {/* زر إسناد المعاملة (للإدارة وموظفي صفا) */}
-                            {(role === "Admin" || role === "SafaEmployee") && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setAssignModalRequest(r);
-                                }}
-                                className="inline-flex items-center gap-1 text-xs font-bold text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 border border-blue-300 px-2.5 py-1.5 rounded-lg transition-colors shadow-2xs cursor-pointer"
-                                title="إسناد المعاملة لموظف صفا"
-                              >
-                                <UserCheck className="w-3.5 h-3.5 text-blue-600" />
-                                <span>إسناد</span>
-                              </button>
-                            )}
-
                             {/* زر فتح/عرض المعاملة */}
                             <Link
                               href={`/requests/${r.id}`}
@@ -2414,23 +2301,6 @@ ${travelersLines}
           isOpen={!!whatsAppModalRequest}
           onClose={() => setWhatsAppModalRequest(null)}
           request={whatsAppModalRequest}
-        />
-      )}
-
-      {/* Task Assignment Modal (Admin / Safa Employee) */}
-      {assignModalRequest && (
-        <AssignEmployeeModal
-          isOpen={!!assignModalRequest}
-          onClose={() => setAssignModalRequest(null)}
-          requestId={assignModalRequest.id}
-          requestNumber={assignModalRequest.requestNumber}
-          groupName={assignModalRequest.groupName}
-          currentSafaEmployeeId={assignModalRequest.assignedSafaEmployeeId}
-          currentSaudiAgentId={assignModalRequest.assignedSaudiAgentId}
-          onAssigned={async () => {
-            const reqs = await api.requests.getAll();
-            setRequests(reqs);
-          }}
         />
       )}
     </div>

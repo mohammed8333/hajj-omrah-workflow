@@ -56,7 +56,6 @@ import {
   Ticket,
   MessageSquare,
   MessageCircle,
-  UserCheck,
 } from "lucide-react";
 import { scanPassportMRZ, translateEnglishNameToArabic } from "@/lib/mrzScanner";
 import { scanHostId } from "@/lib/hostIdScanner";
@@ -66,7 +65,6 @@ import { useDialog } from "@/lib/dialog-context";
 import { FileDropArea } from "@/components/ui/FileDropArea";
 import { getWhatsAppUrl, getTelUrl, normalizePhone, validateHostPhone, validateTravelerPhone } from "@/lib/phoneUtils";
 import { WhatsAppModal } from "@/components/ui/WhatsAppModal";
-import { AssignEmployeeModal } from "@/components/ui/AssignEmployeeModal";
 import { checkPassportValidity } from "@/lib/passportValidation";
 
 export default function RequestDetailPage({
@@ -147,9 +145,8 @@ export default function RequestDetailPage({
   const [isMrzScanningTravelerId, setIsMrzScanningTravelerId] = useState<string | null>(null);
   const [isScanningHostIdDoc, setIsScanningHostIdDoc] = useState(false);
 
-  // WhatsApp & Assignment Modals State
+  // WhatsApp Modal State
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
-  const [showAssignModal, setShowAssignModal] = useState(false);
 
   // Host Info Edit State
   const [editingHostInfo, setEditingHostInfo] = useState(false);
@@ -1645,15 +1642,6 @@ export default function RequestDetailPage({
                 </span>
               </>
             )}
-            {request.assignedSafaEmployeeName && (
-              <>
-                <span>•</span>
-                <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-800 font-bold px-2 py-0.5 rounded border border-blue-200">
-                  <UserCheck className="w-3 h-3 text-blue-600" />
-                  <span>مسند إلى: {request.assignedSafaEmployeeName}</span>
-                </span>
-              </>
-            )}
           </div>
         </div>
 
@@ -2016,19 +2004,6 @@ export default function RequestDetailPage({
               <MessageCircle className="w-3.5 h-3.5" />
               <span>إرسال واتساب</span>
             </button>
-
-            {/* Task Assignment Trigger for Admins & Safa Employees */}
-            {(isAdmin || isSafaEmployee) && (
-              <button
-                type="button"
-                onClick={() => setShowAssignModal(true)}
-                className="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-300 text-xs font-bold px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
-                title="إسناد المعاملة لموظف صفا"
-              >
-                <UserCheck className="w-3.5 h-3.5 text-blue-600" />
-                <span>إسناد المعاملة</span>
-              </button>
-            )}
           </div>
         </div>
       </div>
@@ -4129,20 +4104,6 @@ export default function RequestDetailPage({
           isOpen={showWhatsAppModal}
           onClose={() => setShowWhatsAppModal(false)}
           request={request}
-        />
-      )}
-
-      {/* --- MODAL 8: Assign Task to Safa Employee / Saudi Agent --- */}
-      {showAssignModal && request && (
-        <AssignEmployeeModal
-          isOpen={showAssignModal}
-          onClose={() => setShowAssignModal(false)}
-          requestId={request.id}
-          requestNumber={request.requestNumber}
-          groupName={request.groupName}
-          currentSafaEmployeeId={request.assignedSafaEmployeeId}
-          currentSaudiAgentId={request.assignedSaudiAgentId}
-          onAssigned={() => loadRequest(false)}
         />
       )}
     </div>
