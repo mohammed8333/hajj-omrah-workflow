@@ -323,13 +323,17 @@ export const supabaseService = {
     getAll: async (
       statusFilter?: string,
       nusukNumber?: string,
-      search?: string
+      search?: string,
+      senderId?: string
     ): Promise<GroupRequestSummary[]> => {
       const client = getClient();
       let query = client.from("group_requests").select("*").order("created_at", { ascending: false });
 
       if (statusFilter && statusFilter !== "All") {
         query = query.eq("status", statusFilter);
+      }
+      if (senderId && senderId.trim()) {
+        query = query.eq("sender_id", senderId.trim());
       }
       if (nusukNumber && nusukNumber.trim()) {
         query = query.ilike("nusuk_group_number", `%${nusukNumber.trim()}%`);

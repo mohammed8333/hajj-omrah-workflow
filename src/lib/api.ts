@@ -108,13 +108,14 @@ export const api = {
     getAll: async (
       statusFilter?: string,
       nusukNumber?: string,
-      search?: string
+      search?: string,
+      senderId?: string
     ): Promise<GroupRequestSummary[]> => {
       if (isSupabaseConfigured()) {
-        return await supabaseService.requests.getAll(statusFilter, nusukNumber, search);
+        return await supabaseService.requests.getAll(statusFilter, nusukNumber, search, senderId);
       }
       await delay();
-      return localDB.getRequests(statusFilter, nusukNumber, search);
+      return localDB.getRequests(statusFilter, nusukNumber, search, senderId);
     },
 
     getById: async (id: string): Promise<GroupRequestDetail> => {

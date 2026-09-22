@@ -483,9 +483,22 @@ ${travelersLines}
     "Archived",
   ];
 
+  const isRequestOwnedBySender = (r: GroupRequestSummary) => {
+    if (!user) return false;
+    if (r.senderId && r.senderId === user.id) return true;
+    if (r.senderName) {
+      const sName = r.senderName.trim().toLowerCase();
+      if (user.fullName && sName === user.fullName.trim().toLowerCase()) return true;
+      if (user.username && sName === user.username.trim().toLowerCase()) return true;
+    }
+    return false;
+  };
+
   const roleRequests =
     role === "SaudiAgent"
       ? requests.filter((r) => agentEligibleStatuses.includes(r.status))
+      : role === "Sender"
+      ? requests.filter(isRequestOwnedBySender)
       : requests;
 
   // Filter requests based on active tab, search term and nusuk filter
@@ -593,20 +606,20 @@ ${travelersLines}
       r.status === "DocumentsCompleted"
   ).length;
 
-  const senderNewCount = requests.filter((r) => r.status === "Submitted" || r.status === "Draft").length;
-  const senderHostingCount = requests.filter(
+  const senderNewCount = roleRequests.filter((r) => r.status === "Submitted" || r.status === "Draft").length;
+  const senderHostingCount = roleRequests.filter(
     (r) =>
       r.status === "HostingAcceptanceRequested" ||
       r.status === "HostingAcceptedBySender" ||
       r.status === "HostingConfirmed"
   ).length;
-  const senderIssuesCount = requests.filter(
+  const senderIssuesCount = roleRequests.filter(
     (r) =>
       r.status === "CorrectionRequired" ||
       r.status === "MissingDocuments" ||
       r.status === "SaudiAgentCorrectionRequired"
   ).length;
-  const senderCompletedCount = requests.filter((r) => r.status === "Completed").length;
+  const senderCompletedCount = roleRequests.filter((r) => r.status === "Completed").length;
 
   const adminNewCount = requests.filter((r) => r.status === "Submitted" || r.status === "Draft").length;
   const adminProcessingCount = requests.filter((r) =>
@@ -845,7 +858,7 @@ ${travelersLines}
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
-                الكل ({requests.length})
+                الكل ({roleRequests.length})
               </button>
               <button
                 type="button"

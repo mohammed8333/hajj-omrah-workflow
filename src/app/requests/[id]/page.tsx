@@ -1534,8 +1534,35 @@ export default function RequestDetailPage({
     );
   }
 
+  const isOwnerSender =
+    !isSender ||
+    (Boolean(request.senderId) && request.senderId === user?.id) ||
+    (Boolean(request.senderName) && Boolean(user?.fullName) && request.senderName!.trim().toLowerCase() === user!.fullName.trim().toLowerCase()) ||
+    (Boolean(request.senderName) && Boolean(user?.username) && request.senderName!.trim().toLowerCase() === user!.username.trim().toLowerCase());
+
+  if (isSender && !isOwnerSender) {
+    return (
+      <div className="w-full my-16 p-8 bg-white rounded-2xl border border-rose-200 shadow-sm text-center space-y-4 max-w-2xl mx-auto">
+        <div className="w-14 h-14 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto border border-rose-200">
+          <AlertTriangle className="w-7 h-7" />
+        </div>
+        <h2 className="text-xl font-bold text-gray-900">غير مصرح لك بعرض هذه المعاملة</h2>
+        <p className="text-sm text-gray-600 max-w-md mx-auto leading-relaxed">
+          هذه المعاملة تم إرسالها من حساب مرسل آخر، وتظهر فقط للمرسل صاحب المعاملة وموظفي صفا وإدارة النظام.
+        </p>
+        <button
+          onClick={() => router.push("/dashboard")}
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-xs"
+        >
+          <ArrowRight className="w-4 h-4 rotate-180" />
+          <span>العودة إلى لوحة التحكم</span>
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
+    <div className="space-y-6 w-full">
       {/* Top Breadcrumb & Status Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl border border-gray-200 shadow-xs">
         <div>

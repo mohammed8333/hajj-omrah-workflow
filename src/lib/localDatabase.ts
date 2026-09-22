@@ -948,7 +948,8 @@ class LocalDatabaseEngine {
   public getRequests(
     statusFilter?: string,
     nusukNumber?: string,
-    search?: string
+    search?: string,
+    senderId?: string
   ): GroupRequestSummary[] {
     this.applyAutoMaintenance();
     let list = this.requests.map((r) => {
@@ -1040,6 +1041,9 @@ class LocalDatabaseEngine {
           r.nusukGroupNumber &&
           r.nusukGroupNumber.toLowerCase().includes(nusukNumber.toLowerCase())
       );
+    }
+    if (senderId && senderId.trim()) {
+      list = list.filter((r) => r.senderId === senderId.trim());
     }
     if (search) {
       const q = search.toLowerCase();
