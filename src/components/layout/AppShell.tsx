@@ -30,9 +30,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen flex flex-col bg-gray-50/50">
       <Navbar onToggleSidebar={() => setSidebarOpen(true)} />
 
-      <div className="flex-1 flex max-w-7xl w-full mx-auto pb-16 md:pb-0">
+      <div className="flex-1 flex w-full pb-16 md:pb-0">
         <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0">{children}</main>
+        <main className="flex-1 p-3 sm:p-5 lg:p-6 min-w-0 w-full">{children}</main>
       </div>
 
       <MobileNav onOpenMenu={() => setSidebarOpen(true)} />

@@ -1535,15 +1535,15 @@ ${travelersLines}
               <table className="w-full text-right text-xs border-collapse">
                 <thead className="bg-gray-50/90 border-b border-gray-200 text-gray-700 font-bold">
                   <tr>
-                    <th className="py-3.5 px-4">رقم مجموعة نسك</th>
-                    <th className="py-3.5 px-4 text-center">الحالة</th>
+                    <th className="py-3 px-3">رقم مجموعة نسك</th>
+                    <th className="py-3 px-2 text-center">الحالة</th>
                     {(role === "SafaEmployee" || role === "Admin") && (
-                      <th className="py-3.5 px-4 text-center">المرسل</th>
+                      <th className="py-3 px-2 text-center">المرسل</th>
                     )}
-                    <th className="py-3.5 px-4">رحلة الذهاب</th>
-                    <th className="py-3.5 px-4">رحلة العودة</th>
-                    <th className="py-3.5 px-4">{role === "Sender" ? "بيانات المسافرين" : "بيانات المستضيف"}</th>
-                    <th className="py-3.5 px-4 text-center">المستندات والإجراء</th>
+                    <th className="py-3 px-3">رحلة الذهاب</th>
+                    <th className="py-3 px-3">رحلة العودة</th>
+                    <th className="py-3 px-3">{role === "Sender" ? "بيانات المسافرين" : "بيانات المستضيف"}</th>
+                    <th className="py-3 px-3 text-center">المستندات والإجراء</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -1566,7 +1566,7 @@ ${travelersLines}
                         } hover:bg-sky-50/30`}
                       >
                         {/* 1. رقم مجموعة نسك */}
-                        <td className="py-3.5 px-4 align-middle border-l border-gray-100 font-mono">
+                        <td className="py-2.5 px-3 align-middle border-l border-gray-100 font-mono">
                           {r.nusukGroupNumber ? (
                             <div className="inline-flex items-center gap-1.5">
                               <span
@@ -1597,7 +1597,7 @@ ${travelersLines}
                         </td>
 
                         {/* 2. الحالة: تم الاستلام أو (تم) أو شارة الحالة */}
-                        <td className="py-3.5 px-4 align-middle text-center border-l border-gray-100">
+                        <td className="py-2.5 px-2 align-middle text-center border-l border-gray-100">
                           {isCompleted ? (
                             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-300 shadow-2xs">
                               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
@@ -1615,8 +1615,8 @@ ${travelersLines}
 
                         {/* 2.5 المرسل (لموظف صفا والأدمن فقط) */}
                         {(role === "SafaEmployee" || role === "Admin") && (
-                          <td className="py-3.5 px-4 align-middle text-center border-l border-gray-100">
-                            <div className="inline-flex items-center gap-1.5 bg-blue-50/60 border border-blue-200/80 px-2.5 py-1.5 rounded-xl shadow-2xs max-w-[170px]">
+                          <td className="py-2.5 px-2 align-middle text-center border-l border-gray-100">
+                            <div className="inline-flex items-center gap-1.5 bg-blue-50/60 border border-blue-200/80 px-2.5 py-1.5 rounded-xl shadow-2xs max-w-[140px]">
                               <div className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 border border-blue-200 flex items-center justify-center font-bold text-[10px] shrink-0">
                                 {r.senderName && r.senderName.trim() ? (
                                   r.senderName.trim().charAt(0)
@@ -1635,7 +1635,7 @@ ${travelersLines}
                         )}
 
                         {/* 3. رحلة الذهاب */}
-                        <td className="py-3.5 px-4 align-middle border-l border-gray-100">
+                        <td className="py-2.5 px-3 align-middle border-l border-gray-100">
                           <div className="space-y-1">
                             <div className="font-mono font-bold text-gray-900 flex items-center gap-1.5 text-xs">
                               <Plane className="w-3.5 h-3.5 text-sky-600 shrink-0" />
@@ -1658,7 +1658,7 @@ ${travelersLines}
                         </td>
 
                         {/* 4. رحلة العودة */}
-                        <td className="py-3.5 px-4 align-middle border-l border-gray-100">
+                        <td className="py-2.5 px-3 align-middle border-l border-gray-100">
                           <div className="space-y-1">
                             <div className="font-mono font-bold text-gray-900 flex items-center gap-1.5 text-xs">
                               <Plane className="w-3.5 h-3.5 text-indigo-600 -scale-x-100 shrink-0" />
@@ -1681,9 +1681,9 @@ ${travelersLines}
                         </td>
 
                         {/* 5. بيانات المستضيف أو بيانات المسافرين لمرسل المعاملات */}
-                        <td className="py-3 px-4 align-middle border-l border-gray-100">
+                        <td className="py-2.5 px-3 align-middle border-l border-gray-100">
                           {role === "Sender" ? (
-                            <div className="bg-purple-50/40 border border-purple-200/80 rounded-xl p-2.5 min-w-[200px] max-w-xs space-y-2 max-h-44 overflow-y-auto">
+                            <div className="bg-purple-50/40 border border-purple-200/80 rounded-xl p-2 min-w-[170px] max-w-xs space-y-1.5 max-h-44 overflow-y-auto">
                               {reqTravelers.map((t, idx) => (
                                 <div key={t.id || idx} className="flex items-center gap-2.5 min-w-0">
                                   {t.photoUrl ? (
@@ -1715,7 +1715,7 @@ ${travelersLines}
                               ))}
                             </div>
                           ) : (
-                            <div className="bg-amber-50/40 border border-amber-200/80 rounded-xl p-2 text-[11px] space-y-1 min-w-[200px] max-w-xs">
+                            <div className="bg-amber-50/40 border border-amber-200/80 rounded-xl p-2 text-[11px] space-y-1 min-w-[170px] max-w-xs">
                               {/* الهوية */}
                               <div className="flex items-center justify-between gap-1 border-b border-amber-100/80 pb-0.5">
                                 <span className="text-gray-500 font-medium">الهوية:</span>
@@ -1816,7 +1816,7 @@ ${travelersLines}
                         </td>
 
                         {/* 6. المستندات والإجراء: تذكرة جنبها الهوية جنبها الأزرار */}
-                        <td className="py-3 px-4 align-middle text-center">
+                        <td className="py-2.5 px-3 align-middle text-center">
                           <div className="inline-flex items-center justify-center gap-2 flex-wrap">
                             {/* تذكرة الطيران */}
                             <div className="flex items-center gap-1 bg-sky-50 border border-sky-200 px-2 py-1 rounded-lg shadow-2xs">
