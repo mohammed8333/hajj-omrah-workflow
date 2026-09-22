@@ -459,7 +459,10 @@ export const SaudiAgentView: React.FC<SaudiAgentViewProps> = ({
                   <td className="p-3 font-bold text-gray-400">{idx + 1}</td>
                   <td className="p-3 font-bold text-gray-900">{traveler.fullName}</td>
                   <td className="p-3 font-mono font-semibold text-gray-700">
-                    {traveler.passportNumber || "—"}
+                    <div>{traveler.passportNumber || "—"}</div>
+                    {traveler.expiryDate && (
+                      <div className="text-[10px] text-gray-400 font-normal">ينتهي: {traveler.expiryDate}</div>
+                    )}
                   </td>
                   <td className="p-3">
                     {traveler.phoneNumber ? (

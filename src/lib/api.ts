@@ -398,6 +398,7 @@ export const api = {
         phoneNumber?: string;
         nationality?: string;
         dateOfBirth?: string;
+        expiryDate?: string;
         notes?: string;
       }
     ): Promise<Traveler> => {
@@ -417,6 +418,7 @@ export const api = {
         phoneNumber?: string;
         nationality?: string;
         dateOfBirth?: string;
+        expiryDate?: string;
         notes?: string;
       }
     ): Promise<Traveler> => {

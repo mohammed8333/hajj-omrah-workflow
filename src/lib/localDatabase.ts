@@ -1811,6 +1811,7 @@ class LocalDatabaseEngine {
       phoneNumber?: string;
       nationality?: string;
       dateOfBirth?: string;
+      expiryDate?: string;
       notes?: string;
     },
     currentUser?: User
@@ -1826,6 +1827,7 @@ class LocalDatabaseEngine {
       phoneNumber: data.phoneNumber,
       nationality: data.nationality || "سعودي",
       dateOfBirth: data.dateOfBirth,
+      expiryDate: data.expiryDate,
       status: "Pending",
       notes: data.notes,
       createdAt: new Date().toISOString(),
@@ -1852,6 +1854,7 @@ class LocalDatabaseEngine {
       phoneNumber?: string;
       nationality?: string;
       dateOfBirth?: string;
+      expiryDate?: string;
       notes?: string;
     },
     currentUser?: User
@@ -1864,6 +1867,7 @@ class LocalDatabaseEngine {
         if (data.phoneNumber !== undefined) trv.phoneNumber = data.phoneNumber;
         trv.nationality = data.nationality;
         trv.dateOfBirth = data.dateOfBirth;
+        if (data.expiryDate !== undefined) trv.expiryDate = data.expiryDate;
         trv.notes = data.notes;
         req.updatedAt = new Date().toISOString();
         this.persistRequests();

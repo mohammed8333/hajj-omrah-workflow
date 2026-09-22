@@ -81,6 +81,7 @@ export interface Traveler {
   phoneNumber?: string;
   nationality?: string;
   dateOfBirth?: string;
+  expiryDate?: string;
   status: TravelerStatus;
   notes?: string;
   createdAt: string;
@@ -147,6 +148,7 @@ export interface TravelerSummaryItem {
   id: string;
   fullName: string;
   passportNumber?: string;
+  expiryDate?: string;
   photoUrl?: string;
 }
 
@@ -266,4 +268,18 @@ export interface AuditLogItem {
   ipAddress?: string;
   metadataJson?: string;
   createdAt: string;
+}
+
+export interface AppNotification {
+  id: string;
+  title: string;
+  message: string;
+  type: "info" | "success" | "warning" | "urgent";
+  requestId?: string;
+  requestNumber?: string;
+  targetRole?: UserRole | "All";
+  targetUserId?: string;
+  isRead: boolean;
+  createdAt: string;
+  linkUrl?: string;
 }

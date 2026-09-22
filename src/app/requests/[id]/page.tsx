@@ -55,6 +55,8 @@ import {
   Upload,
   Ticket,
   MessageSquare,
+  MessageCircle,
+  UserCheck,
 } from "lucide-react";
 import { scanPassportMRZ, translateEnglishNameToArabic } from "@/lib/mrzScanner";
 import { scanHostId } from "@/lib/hostIdScanner";
@@ -63,6 +65,9 @@ import { getGeminiApiKey, setGeminiApiKey } from "@/lib/geminiVision";
 import { useDialog } from "@/lib/dialog-context";
 import { FileDropArea } from "@/components/ui/FileDropArea";
 import { getWhatsAppUrl, getTelUrl, normalizePhone, validateHostPhone, validateTravelerPhone } from "@/lib/phoneUtils";
+import { WhatsAppModal } from "@/components/ui/WhatsAppModal";
+import { AssignEmployeeModal } from "@/components/ui/AssignEmployeeModal";
+import { checkPassportValidity } from "@/lib/passportValidation";
 
 export default function RequestDetailPage({
   requestId: propRequestId,
@@ -138,8 +143,13 @@ export default function RequestDetailPage({
   const [editTravelerPhone, setEditTravelerPhone] = useState("");
   const [editTravelerNationality, setEditTravelerNationality] = useState("");
   const [editTravelerBirthDate, setEditTravelerBirthDate] = useState("");
+  const [editTravelerExpiryDate, setEditTravelerExpiryDate] = useState("");
   const [isMrzScanningTravelerId, setIsMrzScanningTravelerId] = useState<string | null>(null);
   const [isScanningHostIdDoc, setIsScanningHostIdDoc] = useState(false);
+
+  // WhatsApp & Assignment Modals State
+  const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
 
   // Host Info Edit State
   const [editingHostInfo, setEditingHostInfo] = useState(false);
@@ -409,7 +419,8 @@ export default function RequestDetailPage({
     passportNumber?: string,
     phoneNumber?: string,
     nationality?: string,
-    dateOfBirth?: string
+    dateOfBirth?: string,
+    expiryDate?: string
   ) => {
     if (!fullName.trim()) {
       setError("يرجى كتابة اسم المسافر.");
@@ -438,6 +449,7 @@ export default function RequestDetailPage({
         phoneNumber: phoneNumber !== undefined ? formattedPhone : current?.phoneNumber,
         nationality: nationality?.trim() || current?.nationality,
         dateOfBirth: dateOfBirth?.trim() || current?.dateOfBirth,
+        expiryDate: expiryDate !== undefined ? expiryDate?.trim() : current?.expiryDate,
         notes: current?.notes,
       });
       setSuccess("تم تحديث بيانات المسافر بنجاح.");
@@ -544,6 +556,7 @@ export default function RequestDetailPage({
           passportNumber: scanResult.passportNumber || traveler.passportNumber,
           nationality: scanResult.nationality || traveler.nationality,
           dateOfBirth: scanResult.dateOfBirth || traveler.dateOfBirth,
+          expiryDate: scanResult.expiryDate || traveler.expiryDate,
         });
         const hasGemini = !!getGeminiApiKey();
         setSuccess(
@@ -1632,6 +1645,15 @@ export default function RequestDetailPage({
                 </span>
               </>
             )}
+            {request.assignedSafaEmployeeName && (
+              <>
+                <span>•</span>
+                <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-800 font-bold px-2 py-0.5 rounded border border-blue-200">
+                  <UserCheck className="w-3 h-3 text-blue-600" />
+                  <span>مسند إلى: {request.assignedSafaEmployeeName}</span>
+                </span>
+              </>
+            )}
           </div>
         </div>
 
@@ -1982,6 +2004,30 @@ export default function RequestDetailPage({
                   <span>مسح المعاملة</span>
                 </button>
               </div>
+            )}
+
+            {/* Direct WhatsApp Messaging Trigger */}
+            <button
+              type="button"
+              onClick={() => setShowWhatsAppModal(true)}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+              title="إرسال رسالة واتساب بنماذج جاهزة ذكية"
+            >
+              <MessageCircle className="w-3.5 h-3.5" />
+              <span>إرسال واتساب</span>
+            </button>
+
+            {/* Task Assignment Trigger for Admins & Safa Employees */}
+            {(isAdmin || isSafaEmployee) && (
+              <button
+                type="button"
+                onClick={() => setShowAssignModal(true)}
+                className="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-300 text-xs font-bold px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                title="إسناد المعاملة لموظف صفا"
+              >
+                <UserCheck className="w-3.5 h-3.5 text-blue-600" />
+                <span>إسناد المعاملة</span>
+              </button>
             )}
           </div>
         </div>
@@ -3097,6 +3143,14 @@ export default function RequestDetailPage({
                       className="text-xs px-2.5 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono bg-white w-36"
                     />
 
+                    <input
+                      type="text"
+                      value={editTravelerExpiryDate}
+                      onChange={(e) => setEditTravelerExpiryDate(e.target.value)}
+                      placeholder="انتهاء الجواز (YYYY-MM-DD)"
+                      className="text-xs px-2.5 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono bg-white w-36"
+                    />
+
                     <div className="flex items-center gap-1.5">
                       <button
                         type="button"
@@ -3107,7 +3161,8 @@ export default function RequestDetailPage({
                             editTravelerPassport,
                             editTravelerPhone,
                             editTravelerNationality,
-                            editTravelerBirthDate
+                            editTravelerBirthDate,
+                            editTravelerExpiryDate
                           )
                         }
                         disabled={actionLoading || !editTravelerName.trim()}
@@ -3142,6 +3197,7 @@ export default function RequestDetailPage({
                             setEditTravelerPhone(traveler.phoneNumber || "");
                             setEditTravelerNationality(traveler.nationality || "");
                             setEditTravelerBirthDate(traveler.dateOfBirth || "");
+                            setEditTravelerExpiryDate(traveler.expiryDate || "");
                           }}
                           className="text-gray-400 hover:text-blue-600 p-1 rounded hover:bg-blue-50 transition-colors cursor-pointer"
                           title="تعديل بيانات المسافر ورقم الهاتف"
@@ -3189,6 +3245,7 @@ export default function RequestDetailPage({
                               setEditTravelerPhone("");
                               setEditTravelerNationality(traveler.nationality || "");
                               setEditTravelerBirthDate(traveler.dateOfBirth || "");
+                              setEditTravelerExpiryDate(traveler.expiryDate || "");
                             }}
                             className="inline-flex items-center gap-1 text-sky-700 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 px-2 py-0.5 rounded-md border border-sky-200 transition-colors cursor-pointer font-medium text-[11px]"
                             title="إضافة رقم هاتف المسافر (يمكن إدخاله بواسطة المرسل، المدير، الوكيل، أو موظف صفا)"
@@ -3204,6 +3261,21 @@ export default function RequestDetailPage({
                       {traveler.dateOfBirth && (
                         <span>• الميلاد: {traveler.dateOfBirth}</span>
                       )}
+                      {traveler.expiryDate && (
+                        <span className="font-mono">• انتهاء الجواز: {traveler.expiryDate}</span>
+                      )}
+                      {(() => {
+                        const validity = checkPassportValidity(traveler.expiryDate, request.travelDate);
+                        if (validity.warning) {
+                          return (
+                            <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-900 border border-amber-300 text-[11px] font-bold px-2 py-0.5 rounded shadow-2xs">
+                              <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
+                              <span>{validity.warning}</span>
+                            </span>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
                   </div>
                 )}
@@ -4049,6 +4121,29 @@ export default function RequestDetailPage({
             </form>
           </div>
         </div>
+      )}
+
+      {/* --- MODAL 7: Smart WhatsApp Integration Modal --- */}
+      {showWhatsAppModal && request && (
+        <WhatsAppModal
+          isOpen={showWhatsAppModal}
+          onClose={() => setShowWhatsAppModal(false)}
+          request={request}
+        />
+      )}
+
+      {/* --- MODAL 8: Assign Task to Safa Employee / Saudi Agent --- */}
+      {showAssignModal && request && (
+        <AssignEmployeeModal
+          isOpen={showAssignModal}
+          onClose={() => setShowAssignModal(false)}
+          requestId={request.id}
+          requestNumber={request.requestNumber}
+          groupName={request.groupName}
+          currentSafaEmployeeId={request.assignedSafaEmployeeId}
+          currentSaudiAgentId={request.assignedSaudiAgentId}
+          onAssigned={() => loadRequest(false)}
+        />
       )}
     </div>
   );

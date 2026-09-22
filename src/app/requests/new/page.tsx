@@ -38,6 +38,7 @@ import { scanFlightTicket, calculateAirportArrivalTime } from "@/lib/flightTicke
 import { useDialog } from "@/lib/dialog-context";
 import { FileDropArea } from "@/components/ui/FileDropArea";
 import { validateHostPhone, validateTravelerPhone } from "@/lib/phoneUtils";
+import { checkPassportValidity, findDuplicatePassportOrId } from "@/lib/passportValidation";
 
 interface TravelerDraft {
   id: string;
@@ -47,6 +48,9 @@ interface TravelerDraft {
   phoneNumber?: string;
   nationality?: string;
   dateOfBirth?: string;
+  expiryDate?: string;
+  expiryWarning?: string;
+  duplicateWarning?: string;
   passportFile: File | null;
   passportPreview?: string;
   photoFile: File | null;
@@ -274,14 +278,48 @@ export default function UnifiedNewRequestPage() {
     setTravelers((prev) => prev.filter((t) => t.id !== id));
   };
 
-  // Update specific traveler field (name, passport number, phone, etc.)
-  const updateTravelerField = (
+  // Update specific traveler field (name, passport number, phone, expiryDate, etc.)
+  const updateTravelerField = async (
     travelerId: string,
-    field: "fullName" | "passportNumber" | "nationality" | "dateOfBirth" | "phoneNumber",
+    field: "fullName" | "passportNumber" | "nationality" | "dateOfBirth" | "phoneNumber" | "expiryDate",
     value: string
   ) => {
+    let expiryWarning: string | undefined = undefined;
+    let duplicateWarning: string | undefined = undefined;
+
+    if (field === "expiryDate") {
+      const validity = checkPassportValidity(value, departureDate);
+      if (validity.isExpiringSoon || validity.isExpired) {
+        expiryWarning = validity.message;
+      }
+    } else if (field === "passportNumber") {
+      const cleanVal = value.trim().toUpperCase();
+      // Check duplicate within currently added travelers
+      const dupInCurrent = travelers.some(
+        (t) => t.id !== travelerId && t.passportNumber && t.passportNumber.trim().toUpperCase() === cleanVal
+      );
+      if (dupInCurrent) {
+        duplicateWarning = "⚠️ رقم الجواز مكرر مع مسافر آخر في نفس المعاملة!";
+      } else if (cleanVal.length >= 6) {
+        const found = await findDuplicatePassportOrId(cleanVal, "passport");
+        if (found && found.isDuplicate) {
+          duplicateWarning = `⚠️ تنبيه: رقم الجواز مسجل مسبقاً في المعاملة (${found.requestNumber} - ${found.matchedName})`;
+        }
+      }
+    }
+
     setTravelers((prev) =>
-      prev.map((t) => (t.id === travelerId ? { ...t, [field]: value } : t))
+      prev.map((t) => {
+        if (t.id !== travelerId) return t;
+        const updated = { ...t, [field]: value };
+        if (field === "expiryDate") {
+          updated.expiryWarning = expiryWarning;
+        }
+        if (field === "passportNumber") {
+          updated.duplicateWarning = duplicateWarning;
+        }
+        return updated;
+      })
     );
   };
 
@@ -309,11 +347,38 @@ export default function UnifiedNewRequestPage() {
         );
       });
 
-      setTravelers((prev) =>
-        prev.map((t) => {
-          if (t.id !== travelerId) return t;
-          if (result && result.fullNameArabic) {
-            setHostName((current) => current || result.fullNameArabic);
+      if (result && result.fullNameArabic) {
+        setHostName((current) => current || result.fullNameArabic);
+
+        // Check passport validity (< 6 months)
+        let expiryWarning: string | undefined = undefined;
+        if (result.expiryDate) {
+          const validity = checkPassportValidity(result.expiryDate, departureDate);
+          if (validity.isExpiringSoon || validity.isExpired) {
+            expiryWarning = validity.message;
+          }
+        }
+
+        // Check duplicate passport
+        let duplicateWarning: string | undefined = undefined;
+        if (result.passportNumber) {
+          const cleanP = result.passportNumber.trim().toUpperCase();
+          const dupInCurrent = travelers.some(
+            (t) => t.id !== travelerId && t.passportNumber && t.passportNumber.trim().toUpperCase() === cleanP
+          );
+          if (dupInCurrent) {
+            duplicateWarning = "⚠️ رقم الجواز مكرر مع مسافر آخر في نفس المعاملة!";
+          } else {
+            const found = await findDuplicatePassportOrId(cleanP, "passport");
+            if (found && found.isDuplicate) {
+              duplicateWarning = `⚠️ تنبيه: رقم الجواز مسجل مسبقاً في المعاملة (${found.requestNumber} - ${found.matchedName})`;
+            }
+          }
+        }
+
+        setTravelers((prev) =>
+          prev.map((t) => {
+            if (t.id !== travelerId) return t;
             return {
               ...t,
               fullName: result.fullNameArabic,
@@ -321,20 +386,29 @@ export default function UnifiedNewRequestPage() {
               passportNumber: result.passportNumber || t.passportNumber,
               nationality: result.nationality || t.nationality,
               dateOfBirth: result.dateOfBirth || t.dateOfBirth,
+              expiryDate: result.expiryDate || t.expiryDate,
+              expiryWarning,
+              duplicateWarning,
               isScanning: false,
               scanSuccess: true,
               scanMessage: `تم التعرف بنجاح على: ${result.fullNameArabic}`,
             };
-          } else {
-            return {
-              ...t,
-              isScanning: false,
-              scanSuccess: false,
-              scanMessage: "لم يتم التقاط شريط MRZ بوضوح، يمكنك إدخال الاسم يدوياً.",
-            };
-          }
-        })
-      );
+          })
+        );
+      } else {
+        setTravelers((prev) =>
+          prev.map((t) =>
+            t.id === travelerId
+              ? {
+                  ...t,
+                  isScanning: false,
+                  scanSuccess: false,
+                  scanMessage: "لم يتم التقاط شريط MRZ بوضوح، يمكنك إدخال الاسم يدوياً.",
+                }
+              : t
+          )
+        );
+      }
     } catch {
       setTravelers((prev) =>
         prev.map((t) =>
@@ -550,6 +624,7 @@ export default function UnifiedNewRequestPage() {
           phoneNumber: formattedPhone,
           nationality: t.nationality?.trim() || undefined,
           dateOfBirth: t.dateOfBirth?.trim() || undefined,
+          expiryDate: t.expiryDate?.trim() || undefined,
         });
 
         // Upload Passport
@@ -916,18 +991,55 @@ export default function UnifiedNewRequestPage() {
                 </FileDropArea>
               </div>
 
-              {/* الصف 5: رقم التليفون للمسافر */}
-              <div className="relative">
-                <input
-                  type="tel"
-                  dir="ltr"
-                  required
-                  value={traveler.phoneNumber || ""}
-                  onChange={(e) => updateTravelerField(traveler.id, "phoneNumber", e.target.value)}
-                  placeholder="اكتب رقم المسافر"
-                  className="w-full text-sm sm:text-base py-3 sm:py-3.5 px-4 bg-white border border-gray-300 focus:border-blue-500 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-mono font-bold text-right transition-all shadow-2xs"
-                />
-                <Phone className="w-5 h-5 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              {/* تنبيه صلاحية الجواز أقل من 6 أشهر */}
+              {traveler.expiryWarning && (
+                <div className="bg-amber-50 border border-amber-300 text-amber-900 rounded-xl p-2.5 text-xs flex items-center gap-2 animate-in fade-in">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span className="font-bold leading-relaxed">{traveler.expiryWarning}</span>
+                </div>
+              )}
+
+              {/* تنبيه تكرار رقم الجواز */}
+              {traveler.duplicateWarning && (
+                <div className="bg-rose-50 border border-rose-300 text-rose-900 rounded-xl p-2.5 text-xs flex items-center gap-2 animate-in fade-in">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span className="font-bold leading-relaxed">{traveler.duplicateWarning}</span>
+                </div>
+              )}
+
+              {/* الصف 5: تاريخ انتهاء الجواز ورقم التليفون للمسافر */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {/* تاريخ انتهاء الجواز */}
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                    تاريخ انتهاء الجواز (اختياري / يُستخرج آلياً):
+                  </label>
+                  <input
+                    type="date"
+                    value={traveler.expiryDate || ""}
+                    onChange={(e) => updateTravelerField(traveler.id, "expiryDate", e.target.value)}
+                    className="w-full text-xs py-2.5 px-3 bg-white border border-gray-300 focus:border-blue-500 rounded-xl font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 shadow-2xs"
+                  />
+                </div>
+
+                {/* رقم التليفون */}
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                    رقم هاتف المسافر:
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="tel"
+                      dir="ltr"
+                      required
+                      value={traveler.phoneNumber || ""}
+                      onChange={(e) => updateTravelerField(traveler.id, "phoneNumber", e.target.value)}
+                      placeholder="اكتب رقم المسافر"
+                      className="w-full text-xs py-2.5 px-3 bg-white border border-gray-300 focus:border-blue-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-mono font-bold text-right shadow-2xs"
+                    />
+                    <Phone className="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                </div>
               </div>
             </div>
           ))}

@@ -20,6 +20,7 @@ import {
 import { DocumentItem, DocumentReviewStatus, GroupRequestDetail } from "@/types";
 import { DocumentStatusBadge } from "@/components/ui/StatusBadge";
 import { getWhatsAppUrl, getTelUrl, normalizePhone } from "@/lib/phoneUtils";
+import { checkPassportValidity } from "@/lib/passportValidation";
 
 interface SafaEmployeeViewProps {
   request: GroupRequestDetail;
@@ -41,7 +42,8 @@ interface SafaEmployeeViewProps {
     passportNumber?: string,
     phoneNumber?: string,
     nationality?: string,
-    dateOfBirth?: string
+    dateOfBirth?: string,
+    expiryDate?: string
   ) => Promise<void>;
   onRequestCorrection: (target: {
     travelerId?: string;
@@ -71,6 +73,7 @@ export const SafaEmployeeView: React.FC<SafaEmployeeViewProps> = ({
   const [editTravelerPhone, setEditTravelerPhone] = useState("");
   const [editTravelerNationality, setEditTravelerNationality] = useState("");
   const [editTravelerBirthDate, setEditTravelerBirthDate] = useState("");
+  const [editTravelerExpiryDate, setEditTravelerExpiryDate] = useState("");
 
   const handleStartEditTraveler = (t: any) => {
     setEditingTravelerId(t.id);
@@ -79,6 +82,7 @@ export const SafaEmployeeView: React.FC<SafaEmployeeViewProps> = ({
     setEditTravelerPhone(t.phoneNumber || "");
     setEditTravelerNationality(t.nationality || "");
     setEditTravelerBirthDate(t.dateOfBirth || "");
+    setEditTravelerExpiryDate(t.expiryDate || "");
   };
 
   const handleSaveTraveler = async () => {
@@ -89,7 +93,8 @@ export const SafaEmployeeView: React.FC<SafaEmployeeViewProps> = ({
       editTravelerPassport,
       editTravelerPhone,
       editTravelerNationality,
-      editTravelerBirthDate
+      editTravelerBirthDate,
+      editTravelerExpiryDate
     );
     setEditingTravelerId(null);
   };
@@ -383,6 +388,23 @@ export const SafaEmployeeView: React.FC<SafaEmployeeViewProps> = ({
                       ({traveler.nationality})
                     </span>
                   )}
+                  {traveler.expiryDate && (
+                    <span className="text-xs font-mono bg-gray-100 text-gray-700 px-2 py-0.5 rounded">
+                      انتهاء: {traveler.expiryDate}
+                    </span>
+                  )}
+                  {(() => {
+                    const validity = checkPassportValidity(traveler.expiryDate, request.travelDate);
+                    if (validity.warning) {
+                      return (
+                        <span className="text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded flex items-center gap-1 shadow-2xs">
+                          <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
+                          <span>{validity.warning}</span>
+                        </span>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -415,7 +437,7 @@ export const SafaEmployeeView: React.FC<SafaEmployeeViewProps> = ({
               {/* Inline Editor if Safa employee edits traveler */}
               {editingTravelerId === traveler.id && (
                 <div className="p-3 bg-emerald-50/50 rounded-xl border border-emerald-200 space-y-2 text-xs">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
                     <div>
                       <label className="block text-gray-600 mb-0.5">اسم المسافر:</label>
                       <input
@@ -431,6 +453,16 @@ export const SafaEmployeeView: React.FC<SafaEmployeeViewProps> = ({
                         type="text"
                         value={editTravelerPassport}
                         onChange={(e) => setEditTravelerPassport(e.target.value.toUpperCase())}
+                        className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg bg-white font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-gray-600 mb-0.5">انتهاء الجواز:</label>
+                      <input
+                        type="text"
+                        value={editTravelerExpiryDate}
+                        onChange={(e) => setEditTravelerExpiryDate(e.target.value)}
+                        placeholder="YYYY-MM-DD"
                         className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg bg-white font-mono"
                       />
                     </div>

@@ -7,6 +7,7 @@ import { LogOut, User as UserIcon, Shield, Menu, Cloud, CloudOff } from "lucide-
 import Link from "next/link";
 import { isSupabaseConfigured } from "@/lib/supabaseClient";
 import { CloudSettingsModal } from "@/components/ui/CloudSettingsModal";
+import { NotificationsBell } from "@/components/layout/NotificationsBell";
 
 export function Navbar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
   const { user, role, logout } = useAuth();
@@ -75,6 +76,9 @@ export function Navbar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
                   )}
                 </button>
               )}
+
+              {/* Live Notifications Bell */}
+              {user && <NotificationsBell />}
 
               {user ? (
                 <>
