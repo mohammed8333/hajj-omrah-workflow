@@ -259,11 +259,11 @@ export const SaudiAgentView: React.FC<SaudiAgentViewProps> = ({
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-gray-500">مطار الوصول:</span>
-                <span className="font-bold text-sky-800">{request.arrivalAirport || "مطار جدة"}</span>
+                <span className="font-bold text-sky-800">{request.arrivalAirport || "غير محدد"}</span>
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-gray-500">وقت الوصول للسعودية:</span>
-                <span className="font-mono font-bold text-sky-900" dir="ltr">{request.saudiArrivalTime || "16:05"}</span>
+                <span className="font-mono font-bold text-sky-900" dir="ltr">{request.saudiArrivalTime || "غير محدد"}</span>
               </div>
             </div>
           </div>
@@ -276,15 +276,15 @@ export const SaudiAgentView: React.FC<SaudiAgentViewProps> = ({
             <div className="space-y-1 mt-1">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-gray-500">رقم رحلة العودة:</span>
-                <span className="font-mono font-bold text-gray-900">{request.returnFlightNumber || request.flightNumber || "رحلة العودة"}</span>
+                <span className="font-mono font-bold text-gray-900">{request.returnFlightNumber || request.flightNumber || "غير محدد"}</span>
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-gray-500">مطار الإقلاع:</span>
-                <span className="font-bold text-indigo-800">{request.returnDepartureAirport || (request.destination?.includes("المدينة") ? "مطار المدينة" : "مطار جدة")}</span>
+                <span className="font-bold text-indigo-800">{request.returnDepartureAirport || "غير محدد"}</span>
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-gray-500">وقت الإقلاع من السعودية:</span>
-                <span className="font-mono font-bold text-indigo-900" dir="ltr">{request.returnFlightDepartureTime || "12:20"}</span>
+                <span className="font-mono font-bold text-indigo-900" dir="ltr">{request.returnFlightDepartureTime || "غير محدد"}</span>
               </div>
             </div>
           </div>

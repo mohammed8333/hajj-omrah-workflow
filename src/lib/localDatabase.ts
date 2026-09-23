@@ -1019,9 +1019,9 @@ class LocalDatabaseEngine {
         returnFlightNumber: r.returnFlightNumber || (isSV314 ? "SV317" : undefined),
         destination: r.destination,
         arrivalAirport: r.arrivalAirport || (isSV314 ? "مطار المدينة" : (r.destination?.includes("المدينة") && !r.destination?.includes("مكة") ? "مطار المدينة" : "مطار جدة")),
-        saudiArrivalTime: r.saudiArrivalTime || (isSV314 ? "18:35" : "16:05"),
+        saudiArrivalTime: r.saudiArrivalTime || (isSV314 ? "18:35" : undefined),
         returnDepartureAirport: r.returnDepartureAirport || (isSV314 ? "مطار المدينة" : (r.destination?.includes("المدينة") ? "مطار المدينة" : "مطار جدة")),
-        returnFlightDepartureTime: r.returnFlightDepartureTime || (isSV314 ? "07:25" : "12:20"),
+        returnFlightDepartureTime: r.returnFlightDepartureTime || (isSV314 ? "07:25" : undefined),
         travelersCount: r.travelers.length,
         travelersList: reqTravelers,
         documentsCount: docCount,
@@ -1118,17 +1118,11 @@ class LocalDatabaseEngine {
       req.airportArrivalTime = req.airportArrivalTime || "13:40";
     }
 
-    if (!req.arrivalAirport) {
+    if (!req.arrivalAirport && req.destination) {
       req.arrivalAirport = (req.destination?.includes("المدينة") && !req.destination?.includes("مكة")) ? "مطار المدينة" : "مطار جدة";
     }
-    if (!req.saudiArrivalTime) {
-      req.saudiArrivalTime = "16:05";
-    }
-    if (!req.returnDepartureAirport) {
+    if (!req.returnDepartureAirport && req.destination) {
       req.returnDepartureAirport = req.destination?.includes("المدينة") ? "مطار المدينة" : "مطار جدة";
-    }
-    if (!req.returnFlightDepartureTime) {
-      req.returnFlightDepartureTime = "12:20";
     }
 
     return JSON.parse(JSON.stringify(req));

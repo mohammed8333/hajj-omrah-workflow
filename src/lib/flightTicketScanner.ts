@@ -38,39 +38,43 @@ export function calculateAirportArrivalTime(departureTime: string): string {
  */
 export async function scanFlightTicket(
   fileOrUrl: File | Blob | string,
-  onProgress?: (msg: string) => void
+  onProgress?: (msg: string) => void,
+  explicitApiKey?: string
 ): Promise<ScannedFlightTicketData | null> {
-  const apiKey = getGeminiApiKey();
+  const apiKey = (explicitApiKey || getGeminiApiKey() || "").trim();
 
-  if (apiKey) {
-    try {
-      onProgress?.("جاري فحص تذكرة الطيران بالذكاء الاصطناعي (Google Gemini)...");
-      const geminiResult = await scanFlightTicketWithGemini(fileOrUrl);
-      if (geminiResult) {
-        let arrivalTime = geminiResult.airportArrivalTime;
-        if (geminiResult.flightDepartureTime) {
-          arrivalTime = calculateAirportArrivalTime(geminiResult.flightDepartureTime);
-        }
-
-        return {
-          departureDate: geminiResult.departureDate,
-          returnDate: geminiResult.returnDate,
-          flightDepartureTime: geminiResult.flightDepartureTime,
-          airportArrivalTime: arrivalTime,
-          airline: geminiResult.airline,
-          flightNumber: geminiResult.flightNumber,
-          returnFlightNumber: geminiResult.returnFlightNumber,
-          arrivalAirport: geminiResult.arrivalAirport,
-          saudiArrivalTime: geminiResult.saudiArrivalTime,
-          returnDepartureAirport: geminiResult.returnDepartureAirport,
-          returnFlightDepartureTime: geminiResult.returnFlightDepartureTime,
-        };
-      }
-    } catch (err) {
-      console.warn("Gemini flight ticket scan error:", err);
-    }
+  if (!apiKey) {
+    throw new Error("لم يتم العثور على مفتاح Google Gemini API. يرجى إدخال مفتاح الـ API المجاني لتفعيل الفحص الذكي للتذاكر.");
   }
 
-  // Fallback if no key or error
+  try {
+    onProgress?.("جاري فحص تذكرة الطيران بالذكاء الاصطناعي (Google Gemini)...");
+    const geminiResult = await scanFlightTicketWithGemini(fileOrUrl, apiKey);
+    if (geminiResult) {
+      let arrivalTime = geminiResult.airportArrivalTime;
+      if (geminiResult.flightDepartureTime) {
+        arrivalTime = calculateAirportArrivalTime(geminiResult.flightDepartureTime);
+      }
+
+      return {
+        departureDate: geminiResult.departureDate,
+        returnDate: geminiResult.returnDate,
+        flightDepartureTime: geminiResult.flightDepartureTime,
+        airportArrivalTime: arrivalTime,
+        airline: geminiResult.airline,
+        flightNumber: geminiResult.flightNumber,
+        returnFlightNumber: geminiResult.returnFlightNumber,
+        arrivalAirport: geminiResult.arrivalAirport,
+        saudiArrivalTime: geminiResult.saudiArrivalTime,
+        returnDepartureAirport: geminiResult.returnDepartureAirport,
+        returnFlightDepartureTime: geminiResult.returnFlightDepartureTime,
+      };
+    }
+  } catch (err: unknown) {
+    console.warn("Gemini flight ticket scan error:", err);
+    const msg = err instanceof Error ? err.message : "فشل استخراج البيانات من التذكرة بالذكاء الاصطناعي";
+    throw new Error(msg);
+  }
+
   return null;
 }

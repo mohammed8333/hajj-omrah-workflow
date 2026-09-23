@@ -120,8 +120,8 @@ ${customNote ? `\nملاحظة: ${customNote}\n` : ""}
 • عدد المسافرين: ${travelersCount}
 • رحلة الذهاب: ${request.flightNumber || "-"}
 • تاريخ الإقلاع: ${request.departureDate || request.travelDate || "-"}
-• موعد الإقلاع: ${request.flightDepartureTime || "19:05"}
-• ⚠️ *موعد الحضور للمطار:* ${request.airportArrivalTime || "16:05"} (قبل الإقلاع بـ 3 ساعات)
+• موعد الإقلاع: ${request.flightDepartureTime || "-"}
+• ⚠️ *موعد الحضور للمطار:* ${request.airportArrivalTime || (request.flightDepartureTime ? "قبل الإقلاع بـ 3 ساعات" : "-")} (قبل الإقلاع بـ 3 ساعات)
 • رحلة العودة: ${request.returnFlightNumber || request.flightNumber || "-"}
 • تاريخ العودة: ${request.returnDate || "-"}
 ${customNote ? `\nملاحظة: ${customNote}\n` : ""}
@@ -148,10 +148,10 @@ ${customNote ? `\nملاحظة: ${customNote}\n` : ""}
 
 ✈️ *بيانات الرحلة:*
 • رقم الرحلة: ${request.flightNumber || "-"}
-• شركة الطيران: ${request.airline || "طيران النيل"}
+• شركة الطيران: ${request.airline || "-"}
 • تاريخ السفر: ${request.departureDate || request.travelDate || "-"}
-• موعد إقلاع الطائرة: ${request.flightDepartureTime || "19:05"}
-• 🚨 *موعد التواجد الإلزامي بصالة المطار:* ${request.airportArrivalTime || "16:05"} (قبل الإقلاع بـ 3 ساعات لتفادي إغلاق الكاونتر).
+• موعد إقلاع الطائرة: ${request.flightDepartureTime || "-"}
+• 🚨 *موعد التواجد الإلزامي بصالة المطار:* ${request.airportArrivalTime || (request.flightDepartureTime ? "قبل الإقلاع بـ 3 ساعات" : "-")} (لتفادي إغلاق الكاونتر).
 • رقم مجموعة نسك: ${request.nusukGroupNumber || "-"}
 ${customNote ? `\nملاحظة: ${customNote}\n` : ""}
 رافقتكم السلامة وتقبل الله منكم!

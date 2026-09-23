@@ -35,6 +35,7 @@ import {
 import { scanPassportMRZ, translateEnglishNameToArabic } from "@/lib/mrzScanner";
 import { scanHostId } from "@/lib/hostIdScanner";
 import { scanFlightTicket, calculateAirportArrivalTime } from "@/lib/flightTicketScanner";
+import { getGeminiApiKey, setGeminiApiKey } from "@/lib/geminiVision";
 import { useDialog } from "@/lib/dialog-context";
 import { FileDropArea } from "@/components/ui/FileDropArea";
 import { validateHostPhone, validateTravelerPhone } from "@/lib/phoneUtils";
@@ -63,7 +64,7 @@ interface TravelerDraft {
 export default function UnifiedNewRequestPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const { confirm, alert } = useDialog();
+  const { confirm, prompt, alert } = useDialog();
 
   // Hosting
   const [hasHosting, setHasHosting] = useState(false);
@@ -156,6 +157,22 @@ export default function UnifiedNewRequestPage() {
 
   // Run AI scan on flight ticket file (Gemini Vision)
   const runTicketScan = async (file: File) => {
+    const currentKey = getGeminiApiKey();
+    if (!currentKey) {
+      const enteredKey = await prompt({
+        title: "تفعيل فحص تذكرة الطيران بالذكاء الاصطناعي (Google Gemini AI)",
+        message:
+          "لاستخراج مواعيد الرحلات وأرقام الطيران والمطارات آلياً من التذكرة (PDF أو صورة)، الصق مفتاح Google Gemini المجاني هنا (أو اضغط إلغاء للإدخال اليدوي):",
+        placeholder: "AIzaSy...",
+        confirmText: "فحص بالذكاء الاصطناعي ✨",
+        cancelText: "إدخال يدوي",
+        variant: "primary",
+      });
+      if (enteredKey && enteredKey.trim()) {
+        setGeminiApiKey(enteredKey.trim());
+      }
+    }
+
     setIsScanningTicket(true);
     setTicketScanSuccess(false);
     setTicketScanMessage("جاري فحص تذكرة الطيران بالذكاء الاصطناعي (Google Gemini)...");
@@ -199,9 +216,14 @@ export default function UnifiedNewRequestPage() {
         setTicketScanSuccess(false);
         setTicketScanMessage("لم يتم استخراج بيانات التذكرة بوضوح، يمكنك إدخال المواعيد يدوياً.");
       }
-    } catch {
+    } catch (err: any) {
       setTicketScanSuccess(false);
-      setTicketScanMessage("تعذر فحص التذكرة بالذكاء الاصطناعي، يرجى كتابة البيانات يدوياً.");
+      const isMissingKey = !getGeminiApiKey();
+      setTicketScanMessage(
+        isMissingKey
+          ? "تنبيه: يلزم تفعيل مفتاح Google Gemini للفحص الذكي للتذاكر، يمكنك كتابة المواعيد يدوياً."
+          : (err?.message || "تعذر فحص التذكرة بالذكاء الاصطناعي، يرجى كتابة البيانات يدوياً.")
+      );
     } finally {
       setIsScanningTicket(false);
     }

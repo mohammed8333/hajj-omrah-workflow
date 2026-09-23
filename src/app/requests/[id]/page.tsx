@@ -805,6 +805,24 @@ export default function RequestDetailPage({
   };
 
   const handleScanExistingFlightTicket = async (ticketDoc: DocumentItem) => {
+    const currentKey = getGeminiApiKey();
+    if (!currentKey) {
+      const enteredKey = await prompt({
+        title: "تفعيل فحص تذكرة الطيران بالذكاء الاصطناعي (Google Gemini AI)",
+        message:
+          "لاستخراج مواعيد الرحلات وأرقام الطيران والمطارات آلياً من التذكرة (PDF أو صورة)، الصق مفتاح Google Gemini المجاني هنا:",
+        placeholder: "AIzaSy...",
+        confirmText: "فحص بالذكاء الاصطناعي ✨",
+        cancelText: "إلغاء",
+        variant: "primary",
+      });
+      if (enteredKey && enteredKey.trim()) {
+        setGeminiApiKey(enteredKey.trim());
+      } else {
+        return;
+      }
+    }
+
     try {
       setIsScanningFlightTicketDoc(true);
       setError(null);
@@ -2657,7 +2675,7 @@ export default function RequestDetailPage({
             <span className="text-xs bg-sky-50 text-sky-800 font-semibold px-2.5 py-1 rounded-md border border-sky-200">
               مشتركة لجميع المسافرين
             </span>
-            {(canEditDocs || role === "Admin") && (
+            {(canEditDocs || role === "Admin" || role === "SafaEmployee") && (
               <button
                 type="button"
                 onClick={() => {
@@ -2665,9 +2683,9 @@ export default function RequestDetailPage({
                   setEditFlightNumber(request.flightNumber || "");
                   setEditReturnFlightNumber(request.returnFlightNumber || "");
                   setEditArrivalAirport(request.arrivalAirport || (request.destination?.includes("المدينة") && !request.destination?.includes("مكة") ? "مطار المدينة" : "مطار جدة"));
-                  setEditSaudiArrivalTime(request.saudiArrivalTime || request.flightDepartureTime || "16:05");
+                  setEditSaudiArrivalTime(request.saudiArrivalTime || request.flightDepartureTime || "");
                   setEditReturnDepartureAirport(request.returnDepartureAirport || (request.destination?.includes("المدينة") ? "مطار المدينة" : "مطار جدة"));
-                  setEditReturnFlightDepartureTime(request.returnFlightDepartureTime || "12:20");
+                  setEditReturnFlightDepartureTime(request.returnFlightDepartureTime || "");
                   setEditDepartureDate(request.departureDate || request.travelDate || "");
                   setEditReturnDate(request.returnDate || "");
                   setEditFlightDepartureTime(request.flightDepartureTime || "");
@@ -2748,7 +2766,7 @@ export default function RequestDetailPage({
               <span>وقت وصول الطائرة للسعودية:</span>
             </div>
             <span className="font-bold text-sky-950 text-sm font-mono" dir="ltr">
-              {request.saudiArrivalTime || request.flightDepartureTime || "16:05"}
+              {request.saudiArrivalTime || request.flightDepartureTime || "غير محدد"}
             </span>
           </div>
 
@@ -2794,7 +2812,7 @@ export default function RequestDetailPage({
               <span>وقت إقلاع رحلة العودة:</span>
             </div>
             <span className="font-bold text-indigo-950 text-sm font-mono" dir="ltr">
-              {request.returnFlightDepartureTime || "12:20"}
+              {request.returnFlightDepartureTime || "غير محدد"}
             </span>
           </div>
 

@@ -1199,7 +1199,7 @@ ${travelersLines}
                           </div>
                           <div className="font-mono font-bold text-gray-700 text-[10px] flex items-center gap-0.5" dir="ltr">
                             <Clock className="w-2.5 h-2.5 text-sky-600 shrink-0" />
-                            <span>{r.saudiArrivalTime || "16:05"}</span>
+                            <span>{r.saudiArrivalTime || "--:--"}</span>
                           </div>
                         </div>
                         <div className="text-[10px] font-bold text-gray-800 flex items-center gap-1">
@@ -1225,7 +1225,7 @@ ${travelersLines}
                           </div>
                           <div className="font-mono font-bold text-gray-700 text-[10px] flex items-center gap-0.5" dir="ltr">
                             <Clock className="w-2.5 h-2.5 text-indigo-600 shrink-0" />
-                            <span>{r.returnFlightDepartureTime || "12:20"}</span>
+                            <span>{r.returnFlightDepartureTime || "--:--"}</span>
                           </div>
                         </div>
                         <div className="text-[10px] font-bold text-gray-800 flex items-center gap-1">
@@ -1808,7 +1808,7 @@ ${travelersLines}
                               </span>
                               <span className="flex items-center gap-1 font-mono text-gray-600 font-bold" dir="ltr">
                                 <Clock className="w-3 h-3 text-sky-600 shrink-0" />
-                                {r.saudiArrivalTime || "16:05"}
+                                {r.saudiArrivalTime || "--:--"}
                               </span>
                             </div>
                           </div>
@@ -1831,7 +1831,7 @@ ${travelersLines}
                               </span>
                               <span className="flex items-center gap-1 font-mono text-gray-600 font-bold" dir="ltr">
                                 <Clock className="w-3 h-3 text-indigo-600 shrink-0" />
-                                {r.returnFlightDepartureTime || "12:20"}
+                                {r.returnFlightDepartureTime || "--:--"}
                               </span>
                             </div>
                           </div>

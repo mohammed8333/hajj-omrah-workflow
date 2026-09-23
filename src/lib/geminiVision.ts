@@ -355,6 +355,20 @@ async function callGeminiVision(
   return textOutput;
 }
 
+/**
+ * Strips markdown code fences (```json ... ```) and extracts valid JSON substring.
+ */
+export function cleanJsonString(str: string): string {
+  let cleaned = str.trim();
+  cleaned = cleaned.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
+  const firstBrace = cleaned.indexOf("{");
+  const lastBrace = cleaned.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+  }
+  return cleaned;
+}
+
 // 5. Intelligent Passport Scanner
 export async function scanPassportWithGemini(
   fileOrUrl: File | Blob | string,
@@ -392,7 +406,7 @@ Return strictly a JSON object with this structure:
 
   const rawJson = await callGeminiVision(prompt, fileOrUrl, apiKey);
   try {
-    const parsed = JSON.parse(rawJson);
+    const parsed = JSON.parse(cleanJsonString(rawJson));
     return {
       fullNameArabic: parsed.fullNameArabic?.trim(),
       fullNameEnglish: parsed.fullNameEnglish?.trim(),
@@ -439,7 +453,7 @@ Return strictly a JSON object with this structure:
 
   const rawJson = await callGeminiVision(prompt, fileOrUrl, apiKey);
   try {
-    const parsed = JSON.parse(rawJson);
+    const parsed = JSON.parse(cleanJsonString(rawJson));
     return {
       hostName: parsed.hostName?.trim(),
       hostBirthDate: parsed.hostBirthDate?.trim(),
@@ -496,7 +510,7 @@ Return strictly a valid JSON object matching this structure:
 
   const rawJson = await callGeminiVision(prompt, fileOrUrl, apiKey);
   try {
-    const parsed = JSON.parse(rawJson);
+    const parsed = JSON.parse(cleanJsonString(rawJson));
 
     // Normalize airport names to clean standard Arabic labels
     const normalizeAirport = (airport?: string) => {
