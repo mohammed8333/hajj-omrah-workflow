@@ -569,7 +569,7 @@ ${travelersLines}
     if (activeTab === "COMPLETED")
       return (
         r.status === "Completed" ||
-        (role === "SafaEmployee" &&
+        ((role === "SafaEmployee" || role === "Admin") &&
           (r.status === "SafaRegistrationCompleted" ||
             r.status === "DocumentsCompleted"))
       );
@@ -994,6 +994,28 @@ ${travelersLines}
                 }`}
               >
                 قيد المعالجة والمراجعة ({adminProcessingCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("READY_AGENT")}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                  activeTab === "READY_AGENT"
+                    ? "bg-indigo-600 text-white shadow-xs"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                جاهزة للوكيل ({safaReadyAgentCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("HOSTING")}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                  activeTab === "HOSTING"
+                    ? "bg-amber-700 text-white shadow-xs"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                طلبات الاستضافة ({senderHostingCount})
               </button>
               <button
                 type="button"

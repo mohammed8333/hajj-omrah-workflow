@@ -222,7 +222,15 @@ export default function RequestDetailPage({
         "Completed",
         "Archived",
       ].includes(data.status);
-      setAdminViewMode(isAgentEligibleStatus ? "agent" : "safa");
+      if (isInitial) {
+        if (data.status === "Draft") {
+          setAdminViewMode("full");
+        } else if (isAgentEligibleStatus) {
+          setAdminViewMode("agent");
+        } else {
+          setAdminViewMode("safa");
+        }
+      }
 
       // If URL contains docId (e.g. clicked from Excel export), auto-open preview modal
       if (typeof window !== "undefined") {
@@ -1703,8 +1711,8 @@ export default function RequestDetailPage({
 
           {/* Action buttons by Role */}
           <div className="flex flex-wrap items-center gap-2 mt-2">
-            {/* Sender Actions */}
-            {role === "Sender" && request.status === "Draft" && (
+            {/* Sender & Admin Actions: تقديم الطلب للاعتماد */}
+            {(role === "Sender" || role === "Admin") && request.status === "Draft" && (
               <button
                 type="button"
                 onClick={(e) => {
@@ -1719,7 +1727,7 @@ export default function RequestDetailPage({
               </button>
             )}
 
-            {/* Safa Employee Actions */}
+            {/* Safa Employee & Admin Actions: بدء التدقيق والمراجعة */}
             {isSafaReviewer && request.status === "Submitted" && (
               <button
                 type="button"
@@ -1782,19 +1790,6 @@ export default function RequestDetailPage({
                     </span>
                   </button>
 
-                  {/* زر إرسال حزمة المعاملة لمجموعة الواتساب */}
-                  <WhatsAppGroupSendButton
-                    request={request}
-                    ticketDoc={
-                      request.groupDocuments?.find((d) => d.documentType === "FlightTicket") ||
-                      request.travelers?.[0]?.documents?.find((d) => d.documentType === "FlightTicket")
-                    }
-                    hostDoc={
-                      request.hostingInfo?.hostIdDocument ||
-                      request.groupDocuments?.find((d) => d.documentType === "HostId")
-                    }
-                  />
-
                   <button
                     type="button"
                     onClick={(e) => {
@@ -1832,8 +1827,23 @@ export default function RequestDetailPage({
                 </>
               )}
 
-            {/* Saudi Agent Actions: زر "تم" فقط */}
-            {isSaudiAgent && (
+            {/* زر إرسال حزمة المعاملة لمجموعة الواتساب (متاح لموظف الصفا والأدمن في كل المراحل بعد المسودة) */}
+            {isSafaReviewer && request.status !== "Draft" && request.status !== "Submitted" && (
+              <WhatsAppGroupSendButton
+                request={request}
+                ticketDoc={
+                  request.groupDocuments?.find((d) => d.documentType === "FlightTicket") ||
+                  request.travelers?.[0]?.documents?.find((d) => d.documentType === "FlightTicket")
+                }
+                hostDoc={
+                  request.hostingInfo?.hostIdDocument ||
+                  request.groupDocuments?.find((d) => d.documentType === "HostId")
+                }
+              />
+            )}
+
+            {/* Saudi Agent & Admin Direct Action: زر "تم" للوكيل السعودي وللأدمن */}
+            {(isSaudiAgent || (isAdmin && isAgentEligible)) && (
               request.status === "Archived" ? (
                 <div className="flex items-center gap-1.5 bg-purple-50 text-purple-700 border border-purple-200 px-4 py-2 rounded-xl text-xs font-black shadow-xs">
                   <Archive className="w-4 h-4 text-purple-600" />
@@ -1935,8 +1945,8 @@ export default function RequestDetailPage({
               )
             )}
 
-            {/* Step 3: Sender when HostingAcceptanceRequested sees "تم قبول طلب الاستضافة" */}
-            {isSender && request.status === "HostingAcceptanceRequested" && (
+            {/* Step 3: Sender / Admin when HostingAcceptanceRequested sees "تم قبول طلب الاستضافة" */}
+            {(isSender || isAdmin) && request.status === "HostingAcceptanceRequested" && (
               <button
                 type="button"
                 onClick={(e) => {
@@ -1951,8 +1961,8 @@ export default function RequestDetailPage({
               </button>
             )}
 
-            {/* Step 4: Sender when HostingAcceptedBySender sees "تأكيد الاستضافة للوكيل" */}
-            {isSender && request.status === "HostingAcceptedBySender" && (
+            {/* Step 4: Sender / Admin when HostingAcceptedBySender sees "تأكيد الاستضافة للوكيل" */}
+            {(isSender || isAdmin) && request.status === "HostingAcceptedBySender" && (
               <button
                 type="button"
                 onClick={(e) => {
@@ -2177,7 +2187,7 @@ export default function RequestDetailPage({
         <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs sm:text-sm flex items-center gap-3">
           <Home className="w-5 h-5 shrink-0 text-amber-600" />
           <span>
-            {isSender ? (
+            {isSender || isAdmin ? (
               <>
                 <strong>طلب قبول الاستضافة:</strong> أرسل الوكيل السعودي طلباً لقبول الاستضافة لهذه المجموعة. يرجى الضغط على <strong>&quot;تم قبول طلب الاستضافة&quot;</strong> للمتابعة.
               </>
@@ -2194,7 +2204,7 @@ export default function RequestDetailPage({
         <div className="p-4 rounded-xl bg-sky-50 border border-sky-200 text-sky-800 text-xs sm:text-sm flex items-center gap-3">
           <CheckCircle className="w-5 h-5 shrink-0 text-sky-600" />
           <span>
-            {isSender ? (
+            {isSender || isAdmin ? (
               <>
                 <strong>تم قبول الاستضافة:</strong> يرجى الآن الضغط على زر <strong>&quot;تأكيد الاستضافة للوكيل&quot;</strong> لإعادتها للوكيل للاعتماد النهائي.
               </>
@@ -2262,7 +2272,7 @@ export default function RequestDetailPage({
                     </div>
                   </div>
 
-                  {role === "Sender" && (
+                  {(role === "Sender" || role === "Admin") && (
                     <button
                       type="button"
                       onClick={(e) => {
