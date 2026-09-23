@@ -68,6 +68,7 @@ export const SafaEmployeeView: React.FC<SafaEmployeeViewProps> = ({
   actionLoading,
 }) => {
   const [editingTravelerId, setEditingTravelerId] = useState<string | null>(null);
+  const [editingReviewDocId, setEditingReviewDocId] = useState<string | null>(null);
   const [editTravelerName, setEditTravelerName] = useState("");
   const [editTravelerPassport, setEditTravelerPassport] = useState("");
   const [editTravelerPhone, setEditTravelerPhone] = useState("");
@@ -170,57 +171,88 @@ export const SafaEmployeeView: React.FC<SafaEmployeeViewProps> = ({
                 </button>
               </div>
 
-              {/* Quick Review Buttons for Safa Employee */}
-              <div className="flex items-center gap-1">
+              {/* Quick Review Buttons for Safa Employee: Hidden when document is already accepted */}
+              {doc.reviewStatus !== "Accepted" || editingReviewDocId === doc.id ? (
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setEditingReviewDocId(null);
+                      onQuickReview(doc.id, "Accepted");
+                    }}
+                    disabled={actionLoading}
+                    className={`p-1.5 rounded-lg transition-colors cursor-pointer shadow-2xs ${
+                      doc.reviewStatus === "Accepted"
+                        ? "bg-emerald-700 text-white ring-2 ring-emerald-400"
+                        : "bg-emerald-600 hover:bg-emerald-700 text-white"
+                    }`}
+                    title="قبول المستند (صح)"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setEditingReviewDocId(null);
+                      onQuickReview(doc.id, "NeedsCorrection");
+                    }}
+                    disabled={actionLoading}
+                    className={`p-1.5 rounded-lg transition-colors cursor-pointer shadow-2xs ${
+                      doc.reviewStatus === "NeedsCorrection"
+                        ? "bg-amber-600 text-white ring-2 ring-amber-400"
+                        : "bg-amber-500 hover:bg-amber-600 text-white"
+                    }`}
+                    title="طلب تصحيح للمستند (مثلث)"
+                  >
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setEditingReviewDocId(null);
+                      onQuickReview(doc.id, "Rejected");
+                    }}
+                    disabled={actionLoading}
+                    className={`p-1.5 rounded-lg transition-colors cursor-pointer shadow-2xs ${
+                      doc.reviewStatus === "Rejected"
+                        ? "bg-rose-700 text-white ring-2 ring-rose-400"
+                        : "bg-rose-600 hover:bg-rose-700 text-white"
+                    }`}
+                    title="رفض المستند (إكس)"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                  {editingReviewDocId === doc.id && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setEditingReviewDocId(null);
+                      }}
+                      className="text-[10px] text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 px-1.5 py-1 rounded transition-colors cursor-pointer"
+                      title="إلغاء التعديل"
+                    >
+                      إلغاء
+                    </button>
+                  )}
+                </div>
+              ) : (
                 <button
                   type="button"
                   onClick={(e) => {
                     e.preventDefault();
-                    onQuickReview(doc.id, "Accepted");
+                    setEditingReviewDocId(doc.id);
                   }}
-                  disabled={actionLoading}
-                  className={`p-1.5 rounded-lg transition-colors cursor-pointer shadow-2xs ${
-                    doc.reviewStatus === "Accepted"
-                      ? "bg-emerald-700 text-white ring-2 ring-emerald-400"
-                      : "bg-emerald-600 hover:bg-emerald-700 text-white"
-                  }`}
-                  title="قبول المستند (صح)"
+                  className="text-[10px] text-gray-400 hover:text-gray-700 hover:bg-gray-200/80 px-2 py-1 rounded-md transition-colors flex items-center gap-1 cursor-pointer font-medium"
+                  title="تعديل حالة التدقيق لهذا المستند"
                 >
-                  <Check className="w-3.5 h-3.5" />
+                  <Edit2 className="w-2.5 h-2.5" />
+                  <span>تعديل القرار</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    onQuickReview(doc.id, "NeedsCorrection");
-                  }}
-                  disabled={actionLoading}
-                  className={`p-1.5 rounded-lg transition-colors cursor-pointer shadow-2xs ${
-                    doc.reviewStatus === "NeedsCorrection"
-                      ? "bg-amber-600 text-white ring-2 ring-amber-400"
-                      : "bg-amber-500 hover:bg-amber-600 text-white"
-                  }`}
-                  title="طلب تصحيح للمستند (مثلث)"
-                >
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    onQuickReview(doc.id, "Rejected");
-                  }}
-                  disabled={actionLoading}
-                  className={`p-1.5 rounded-lg transition-colors cursor-pointer shadow-2xs ${
-                    doc.reviewStatus === "Rejected"
-                      ? "bg-rose-700 text-white ring-2 ring-rose-400"
-                      : "bg-rose-600 hover:bg-rose-700 text-white"
-                  }`}
-                  title="رفض المستند (إكس)"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
+              )}
             </div>
           </div>
         ) : (
