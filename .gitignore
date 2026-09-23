@@ -7,3 +7,5 @@ yarn-debug.log*
 yarn-error.log*
 .env
 *.traineddata
+auth_info/
+whatsapp-bridge/auth_info/

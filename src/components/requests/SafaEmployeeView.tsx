@@ -21,6 +21,7 @@ import { DocumentItem, DocumentReviewStatus, GroupRequestDetail } from "@/types"
 import { DocumentStatusBadge } from "@/components/ui/StatusBadge";
 import { getWhatsAppUrl, getTelUrl, normalizePhone } from "@/lib/phoneUtils";
 import { checkPassportValidity } from "@/lib/passportValidation";
+import { WhatsAppGroupSendButton } from "./WhatsAppGroupSendButton";
 
 interface SafaEmployeeViewProps {
   request: GroupRequestDetail;
@@ -278,22 +279,30 @@ export const SafaEmployeeView: React.FC<SafaEmployeeViewProps> = ({
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={onDownloadAllDocs}
-          disabled={isDownloadingAll || totalDocsCount === 0}
-          className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs sm:text-sm font-bold px-4 py-2.5 rounded-xl shadow-xs flex items-center gap-2 cursor-pointer transition-all shrink-0"
-        >
-          {isDownloadingAll ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <Download className="w-4 h-4" />
-          )}
-          <span>تحميل كافة المستندات (ملف مضغوط ZIP)</span>
-          <span className="bg-emerald-800 text-emerald-100 text-[11px] px-2 py-0.5 rounded-full font-bold">
-            {totalDocsCount} مستند
-          </span>
-        </button>
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <WhatsAppGroupSendButton
+            request={request}
+            ticketDoc={ticketDoc}
+            hostDoc={hostDoc}
+          />
+
+          <button
+            type="button"
+            onClick={onDownloadAllDocs}
+            disabled={isDownloadingAll || totalDocsCount === 0}
+            className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs sm:text-sm font-bold px-4 py-2.5 rounded-xl shadow-xs flex items-center gap-2 cursor-pointer transition-all shrink-0"
+          >
+            {isDownloadingAll ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Download className="w-4 h-4" />
+            )}
+            <span>تحميل كافة المستندات (ملف مضغوط ZIP)</span>
+            <span className="bg-emerald-800 text-emerald-100 text-[11px] px-2 py-0.5 rounded-full font-bold">
+              {totalDocsCount} مستند
+            </span>
+          </button>
+        </div>
       </div>
 
       {/* Compact Flight Schedule Reference Bar for Safa */}

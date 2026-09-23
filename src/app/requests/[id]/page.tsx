@@ -67,6 +67,7 @@ import { getWhatsAppUrl, getTelUrl, normalizePhone, validateHostPhone, validateT
 import { WhatsAppModal } from "@/components/ui/WhatsAppModal";
 import { checkPassportValidity } from "@/lib/passportValidation";
 import { formatOfficialGroupName, resolveSenderCode } from "@/lib/groupNaming";
+import { WhatsAppGroupSendButton } from "@/components/requests/WhatsAppGroupSendButton";
 
 export default function RequestDetailPage({
   requestId: propRequestId,
@@ -1780,6 +1781,19 @@ export default function RequestDetailPage({
                         : "إدخال رقم نسك وإكمال صفا"}
                     </span>
                   </button>
+
+                  {/* زر إرسال حزمة المعاملة لمجموعة الواتساب */}
+                  <WhatsAppGroupSendButton
+                    request={request}
+                    ticketDoc={
+                      request.groupDocuments?.find((d) => d.documentType === "FlightTicket") ||
+                      request.travelers?.[0]?.documents?.find((d) => d.documentType === "FlightTicket")
+                    }
+                    hostDoc={
+                      request.hostingInfo?.hostIdDocument ||
+                      request.groupDocuments?.find((d) => d.documentType === "HostId")
+                    }
+                  />
 
                   <button
                     type="button"
