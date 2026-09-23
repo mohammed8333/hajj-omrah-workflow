@@ -13,6 +13,7 @@ create table if not exists public.app_users (
     full_name text not null,
     role text not null check (role in ('Sender', 'SafaEmployee', 'SaudiAgent', 'Admin')),
     phone text,
+    sender_code text,
     is_active boolean not null default true,
     created_at timestamptz not null default now(),
     last_login_at timestamptz
@@ -25,6 +26,7 @@ create table if not exists public.group_requests (
     group_name text not null,
     sender_id text,
     sender_name text,
+    sender_code text,
     assigned_safa_employee_id text,
     assigned_safa_employee_name text,
     assigned_saudi_agent_id text,
@@ -192,3 +194,9 @@ values
   ('usr-agent-1', 'agent1', 'agent123', 'شركة الهدى (وكيل سعودي)', 'SaudiAgent', '0500000003', true),
   ('usr-sender-1', 'sender1', 'sender123', 'أحمد المحمدي (مرسل)', 'Sender', '0500000004', true)
 on conflict (username) do nothing;
+
+-- ====================================================================
+-- 13. ترقية الجداول القائمة تلقائياً (Migrations)
+-- ====================================================================
+alter table if exists public.app_users add column if not exists sender_code text;
+alter table if exists public.group_requests add column if not exists sender_code text;

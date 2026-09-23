@@ -234,21 +234,37 @@ export const supabaseService = {
     ): Promise<User> => {
       const client = getClient();
       const id = `usr-${Date.now()}`;
-      const { data, error } = await client
+      const payload: any = {
+        id,
+        full_name: userData.fullName.trim(),
+        username: userData.username.trim(),
+        password: userData.password,
+        role: userData.role,
+        phone: userData.phone?.trim() || null,
+        is_active: true,
+        created_at: new Date().toISOString(),
+      };
+      if (userData.senderCode?.trim()) {
+        payload.sender_code = userData.senderCode.trim().toUpperCase();
+      }
+
+      let { data, error } = await client
         .from("app_users")
-        .insert({
-          id,
-          full_name: userData.fullName.trim(),
-          username: userData.username.trim(),
-          password: userData.password,
-          role: userData.role,
-          phone: userData.phone?.trim() || null,
-          sender_code: userData.senderCode?.trim().toUpperCase() || null,
-          is_active: true,
-          created_at: new Date().toISOString(),
-        })
+        .insert(payload)
         .select()
         .single();
+
+      // Graceful fallback if sender_code column is not yet added in Supabase schema
+      if (error && (error.message?.includes("sender_code") || error.code === "PGRST204")) {
+        delete payload.sender_code;
+        const retry = await client
+          .from("app_users")
+          .insert(payload)
+          .select()
+          .single();
+        data = retry.data;
+        error = retry.error;
+      }
 
       if (error) {
         if (error.code === "23505") {
@@ -286,12 +302,25 @@ export const supabaseService = {
       }
       if (userData.isActive !== undefined) updatePayload.is_active = userData.isActive;
 
-      const { data, error } = await client
+      let { data, error } = await client
         .from("app_users")
         .update(updatePayload)
         .eq("id", id)
         .select()
         .single();
+
+      // Graceful fallback if sender_code column is not yet added in Supabase schema
+      if (error && (error.message?.includes("sender_code") || error.code === "PGRST204")) {
+        delete updatePayload.sender_code;
+        const retry = await client
+          .from("app_users")
+          .update(updatePayload)
+          .eq("id", id)
+          .select()
+          .single();
+        data = retry.data;
+        error = retry.error;
+      }
 
       if (error) throw new Error(error.message);
       return mapUser(data);
@@ -597,7 +626,7 @@ export const supabaseService = {
       const requestNumber = `REQ-${year}-${rand}`;
       const now = new Date().toISOString();
 
-      const { error: reqErr } = await client.from("group_requests").insert({
+      const reqPayload: any = {
         id: requestId,
         request_number: requestNumber,
         group_name: data.groupName,
@@ -623,7 +652,16 @@ export const supabaseService = {
         notes: data.notes || null,
         created_at: now,
         updated_at: now,
-      });
+      };
+
+      let { error: reqErr } = await client.from("group_requests").insert(reqPayload);
+
+      // Graceful fallback if sender_code column is not yet added in Supabase schema
+      if (reqErr && (reqErr.message?.includes("sender_code") || reqErr.code === "PGRST204")) {
+        delete reqPayload.sender_code;
+        const retry = await client.from("group_requests").insert(reqPayload);
+        reqErr = retry.error;
+      }
 
       if (reqErr) throw new Error(reqErr.message);
 
