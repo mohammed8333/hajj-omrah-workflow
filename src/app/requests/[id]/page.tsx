@@ -178,9 +178,6 @@ export default function RequestDetailPage({
   const [newTravelerExpiryDate, setNewTravelerExpiryDate] = useState("");
   const [isTranslatingNewName, setIsTranslatingNewName] = useState(false);
 
-  // Admin View Switching State
-  const [adminViewMode, setAdminViewMode] = useState<"agent" | "safa" | "full">("agent");
-
   useEffect(() => {
     let isMounted = true;
     if (previewDoc) {
@@ -221,27 +218,6 @@ export default function RequestDetailPage({
       }
       if (data.groupName) {
         setNusukGroupName(data.groupName);
-      }
-      const isAgentEligibleStatus = [
-        "ReadyForSaudiAgent",
-        "ReceivedBySaudiAgent",
-        "SaudiAgentProcessing",
-        "SaudiAgentCorrectionRequired",
-        "ProgramLinked",
-        "HostingAcceptanceRequested",
-        "HostingAcceptedBySender",
-        "HostingConfirmed",
-        "Completed",
-        "Archived",
-      ].includes(data.status);
-      if (isInitial) {
-        if (data.status === "Draft") {
-          setAdminViewMode("full");
-        } else if (isAgentEligibleStatus) {
-          setAdminViewMode("agent");
-        } else {
-          setAdminViewMode("safa");
-        }
       }
 
       // If URL contains docId (e.g. clicked from Excel export), auto-open preview modal
@@ -1952,7 +1928,7 @@ export default function RequestDetailPage({
             )}
 
             {/* Saudi Agent & Admin Direct Action: زر "تم" للوكيل السعودي وللأدمن */}
-            {(isSaudiAgent || (isAdmin && isAgentEligible)) && (
+            {(isSaudiAgent || isAdmin) && (
               request.status === "Archived" ? (
                 <div className="flex items-center gap-1.5 bg-purple-50 text-purple-700 border border-purple-200 px-4 py-2 rounded-xl text-xs font-black shadow-xs">
                   <Archive className="w-4 h-4 text-purple-600" />
@@ -2187,53 +2163,6 @@ export default function RequestDetailPage({
         </div>
       </div>
 
-      {/* Admin View Mode Switcher */}
-      {isAdmin && (
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-gray-200 shadow-xs">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-bold text-gray-500">تقسيم الواجهة والعرض (خاص بالإدارة):</span>
-            <div className="inline-flex rounded-xl bg-gray-100 p-1">
-              <button
-                type="button"
-                onClick={() => setAdminViewMode("agent")}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  adminViewMode === "agent"
-                    ? "bg-sky-600 text-white shadow-xs"
-                    : "text-gray-600 hover:text-gray-900"
-                }`}
-              >
-                عرض الوكيل السعودي
-              </button>
-              <button
-                type="button"
-                onClick={() => setAdminViewMode("safa")}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  adminViewMode === "safa"
-                    ? "bg-sky-600 text-white shadow-xs"
-                    : "text-gray-600 hover:text-gray-900"
-                }`}
-              >
-                عرض مراجعة صفا
-              </button>
-              <button
-                type="button"
-                onClick={() => setAdminViewMode("full")}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  adminViewMode === "full"
-                    ? "bg-sky-600 text-white shadow-xs"
-                    : "text-gray-600 hover:text-gray-900"
-                }`}
-              >
-                النموذج الشامل (المرسل)
-              </button>
-            </div>
-          </div>
-          <div className="text-[11px] text-gray-400 font-medium">
-            عرض الواجهة الموحدة لكافة أطراف المعاملة
-          </div>
-        </div>
-      )}
-
       {/* Notifications / Alerts */}
       {error && (
         <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-center gap-3">
@@ -2401,7 +2330,7 @@ export default function RequestDetailPage({
       )}
 
       {/* Role-Customized Layouts */}
-      {isSaudiAgent || (isAdmin && adminViewMode === "agent") ? (
+      {!isAdmin && isSaudiAgent ? (
         <SaudiAgentView
           request={request}
           ticketDoc={ticketDoc}
@@ -2414,7 +2343,7 @@ export default function RequestDetailPage({
           onDoneRequest={handleAgentArchive}
           actionLoading={actionLoading}
         />
-      ) : isSafaEmployee || (isAdmin && adminViewMode === "safa") ? (
+      ) : !isAdmin && isSafaEmployee ? (
         <SafaEmployeeView
           request={request}
           ticketDoc={ticketDoc}
@@ -2434,8 +2363,8 @@ export default function RequestDetailPage({
         />
       ) : (
         <>
-          {/* Hosting Information Card */}
-          {request.hasHosting && (
+          {/* 1. بيانات ومستندات المستضيف (المستضيف ببياناته) */}
+          {request.hasHosting ? (
         <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-xs space-y-4">
           <div className="flex items-center justify-between border-b border-gray-100 pb-3">
             <div className="flex items-center gap-2">
@@ -2816,9 +2745,30 @@ export default function RequestDetailPage({
             })()}
           </div>
         </div>
+      ) : (
+        <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-gray-100 text-gray-500 flex items-center justify-center shrink-0">
+              <Home className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="font-bold text-sm text-gray-800">بيانات الاستضافة</div>
+              <div className="text-xs text-gray-500">معاملة سفر عادي (بدون مستضيف)</div>
+            </div>
+          </div>
+          {canEditAnyData && (
+            <button
+              type="button"
+              onClick={() => setShowEditGeneralModal(true)}
+              className="text-xs text-amber-800 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-300 px-3 py-1.5 rounded-xl font-bold transition-colors cursor-pointer"
+            >
+              إضافة مستضيف للمعاملة
+            </button>
+          )}
+        </div>
       )}
 
-      {/* Flight & Shared Ticket Information Card (مباشرة تحت بيانات الاستضافة) */}
+      {/* 2. بيانات وتذكرة الطيران (تحتيها التذكرة ببياناتها) */}
       <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">
           <div className="flex items-center gap-2">
@@ -3208,7 +3158,7 @@ export default function RequestDetailPage({
         />
       )}
 
-      {/* Travelers & Documents Section */}
+      {/* 3. بيانات ووثائق المسافرين (تحتيها المسافرين ببياناتهم) */}
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
