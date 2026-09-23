@@ -15,7 +15,7 @@
       // نظام الكشف الفوري عن التحديثات وتجاوز كاش المتصفح تلقائياً
       // =================================================================
       (function () {
-        var CURRENT_VERSION = "1790196850038";
+        var CURRENT_VERSION = "1790198737392";
         var isUpdating = false;
 
         // إلغاء أي Service Worker أو Cache قديم قد يعلق في كروم الموبايل
@@ -84,8 +84,8 @@
 
                 if (
                   serverVersion !== localVersion &&
-                  serverVersion !== '1790196850038' &&
-                  localVersion !== '1790196850038'
+                  serverVersion !== '1790198737392' &&
+                  localVersion !== '1790198737392'
                 ) {
                   console.log('[AutoUpdate] New version detected:', serverVersion, 'local:', localVersion);
                   triggerUpdate(serverVersion);
@@ -150,8 +150,8 @@
         }
       }, true);
     </script>
-    <script type="module" crossorigin src="./assets/index-D27IvLky.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-DoRuWZmd.css">
+    <script type="module" crossorigin src="./assets/index-Cb3GYoU9.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-lA5OMVvY.css">
   </head>
   <body class="min-h-full flex flex-col font-sans bg-gray-50 text-gray-900 selection:bg-sky-500 selection:text-white">
     <div id="root" class="min-h-full flex flex-col flex-1"></div>

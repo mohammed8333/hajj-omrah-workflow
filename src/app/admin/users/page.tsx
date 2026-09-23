@@ -37,6 +37,7 @@ export default function UsersManagementPage() {
   const [password, setPassword] = useState("");
   const [userRole, setUserRole] = useState<UserRole>("Sender");
   const [phone, setPhone] = useState("");
+  const [senderCode, setSenderCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   // Edit User Modal
@@ -47,6 +48,7 @@ export default function UsersManagementPage() {
   const [editPassword, setEditPassword] = useState("");
   const [editRole, setEditRole] = useState<UserRole>("Sender");
   const [editPhone, setEditPhone] = useState("");
+  const [editSenderCode, setEditSenderCode] = useState("");
   const [editIsActive, setEditIsActive] = useState(true);
 
   const loadUsers = async () => {
@@ -89,6 +91,7 @@ export default function UsersManagementPage() {
         password,
         role: userRole,
         phone: phone.trim() || undefined,
+        senderCode: senderCode.trim() ? senderCode.trim().toUpperCase() : undefined,
       });
 
       setSuccess("تم إنشاء المستخدم الجديد بنجاح.");
@@ -97,6 +100,7 @@ export default function UsersManagementPage() {
       setUsername("");
       setPassword("");
       setPhone("");
+      setSenderCode("");
       await loadUsers();
     } catch (err: unknown) {
       if (err instanceof Error) setError(err.message);
@@ -122,6 +126,7 @@ export default function UsersManagementPage() {
     setEditPassword("");
     setEditRole(u.role);
     setEditPhone(u.phone || "");
+    setEditSenderCode(u.senderCode || "");
     setEditIsActive(u.isActive);
     setShowEditModal(true);
   };
@@ -146,6 +151,7 @@ export default function UsersManagementPage() {
         password: editPassword ? editPassword : undefined,
         role: editRole,
         phone: editPhone.trim() || undefined,
+        senderCode: editSenderCode.trim() ? editSenderCode.trim().toUpperCase() : undefined,
         isActive: editIsActive,
       });
 
@@ -225,6 +231,7 @@ export default function UsersManagementPage() {
               <tr>
                 <th className="py-3.5 px-4">الاسم الكامل</th>
                 <th className="py-3.5 px-4">اسم الدخول</th>
+                <th className="py-3.5 px-4">كود الوكالة</th>
                 <th className="py-3.5 px-4">الدور الوظيفي</th>
                 <th className="py-3.5 px-4">الهاتف</th>
                 <th className="py-3.5 px-4">الحالة</th>
@@ -240,6 +247,15 @@ export default function UsersManagementPage() {
                   </td>
                   <td className="py-3.5 px-4 font-mono text-gray-600">
                     {u.username}
+                  </td>
+                  <td className="py-3.5 px-4">
+                    {u.senderCode ? (
+                      <span className="font-mono font-bold text-xs bg-purple-100 text-purple-800 border border-purple-200 px-2 py-0.5 rounded-md">
+                        {u.senderCode}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400 text-[11px]">-</span>
+                    )}
                   </td>
                   <td className="py-3.5 px-4">
                     <span
@@ -391,6 +407,23 @@ export default function UsersManagementPage() {
 
               <div>
                 <label className="block font-semibold text-gray-700 mb-1">
+                  كود الوكالة / المرسل (مثل OHD أو SAF)
+                </label>
+                <input
+                  type="text"
+                  value={senderCode}
+                  onChange={(e) => setSenderCode(e.target.value.toUpperCase())}
+                  placeholder="مثال: OHD"
+                  maxLength={6}
+                  className="w-full px-3 py-2 rounded-xl border border-gray-300 font-mono font-bold focus:outline-hidden focus:ring-2 focus:ring-purple-500 text-sm uppercase"
+                />
+                <p className="text-[10px] text-gray-400 mt-1">
+                  يُستخدم هذا الكود في التسمية التلقائية للمجموعات (مثل: OHD7oct26dec).
+                </p>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-gray-700 mb-1">
                   رقم الهاتف (اختياري)
                 </label>
                 <input
@@ -497,6 +530,23 @@ export default function UsersManagementPage() {
                   <option value="SaudiAgent">الوكيل السعودي (Saudi Agent)</option>
                   <option value="Admin">مدير النظام (Admin)</option>
                 </select>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-gray-700 mb-1">
+                  كود الوكالة / المرسل (مثل OHD أو SAF)
+                </label>
+                <input
+                  type="text"
+                  value={editSenderCode}
+                  onChange={(e) => setEditSenderCode(e.target.value.toUpperCase())}
+                  placeholder="مثال: OHD"
+                  maxLength={6}
+                  className="w-full px-3 py-2 rounded-xl border border-gray-300 font-mono font-bold focus:outline-hidden focus:ring-2 focus:ring-blue-500 text-sm uppercase"
+                />
+                <p className="text-[10px] text-gray-400 mt-1">
+                  يُستخدم هذا الكود في التسمية التلقائية للمجموعات (مثل: OHD7oct26dec).
+                </p>
               </div>
 
               <div>

@@ -18,6 +18,7 @@ import {
 } from "@/types";
 
 import { getFileFromIndexedDB } from "./localDatabase";
+import { resolveSenderCode } from "./groupNaming";
 
 const BUCKET_NAME = "hajj-documents";
 
@@ -80,6 +81,7 @@ function mapUser(row: any): User {
     username: row.username,
     role: row.role as UserRole,
     phone: row.phone || undefined,
+    senderCode: row.sender_code || undefined,
     isActive: Boolean(row.is_active),
     createdAt: row.created_at,
     lastLoginAt: row.last_login_at || undefined,
@@ -226,6 +228,7 @@ export const supabaseService = {
         password: string;
         role: UserRole;
         phone?: string;
+        senderCode?: string;
       },
       currentUserId?: string
     ): Promise<User> => {
@@ -240,6 +243,7 @@ export const supabaseService = {
           password: userData.password,
           role: userData.role,
           phone: userData.phone?.trim() || null,
+          sender_code: userData.senderCode?.trim().toUpperCase() || null,
           is_active: true,
           created_at: new Date().toISOString(),
         })
@@ -264,6 +268,7 @@ export const supabaseService = {
         password?: string;
         role?: UserRole;
         phone?: string;
+        senderCode?: string;
         isActive?: boolean;
       }
     ): Promise<User> => {
@@ -276,6 +281,9 @@ export const supabaseService = {
       }
       if (userData.role !== undefined) updatePayload.role = userData.role;
       if (userData.phone !== undefined) updatePayload.phone = userData.phone.trim();
+      if (userData.senderCode !== undefined) {
+        updatePayload.sender_code = userData.senderCode?.trim().toUpperCase() || null;
+      }
       if (userData.isActive !== undefined) updatePayload.is_active = userData.isActive;
 
       const { data, error } = await client
@@ -440,6 +448,7 @@ export const supabaseService = {
           groupName: r.group_name,
           senderId: r.sender_id || "",
           senderName: r.sender_name || "",
+          senderCode: r.sender_code || undefined,
           assignedSafaEmployeeId: r.assigned_safa_employee_id || undefined,
           assignedSafaEmployeeName: r.assigned_safa_employee_name || undefined,
           assignedSaudiAgentId: r.assigned_saudi_agent_id || undefined,
@@ -543,6 +552,7 @@ export const supabaseService = {
         groupName: req.group_name,
         senderId: req.sender_id || "",
         senderName: req.sender_name || "",
+        senderCode: req.sender_code || undefined,
         assignedSafaEmployeeId: req.assigned_safa_employee_id || undefined,
         assignedSafaEmployeeName: req.assigned_safa_employee_name || undefined,
         assignedSaudiAgentId: req.assigned_saudi_agent_id || undefined,
@@ -593,6 +603,7 @@ export const supabaseService = {
         group_name: data.groupName,
         sender_id: currentUser.id,
         sender_name: currentUser.fullName,
+        sender_code: currentUser.senderCode || resolveSenderCode(currentUser),
         status: "Draft",
         has_hosting: Boolean(data.hasHosting),
         contact_phone: data.contactPhone,

@@ -13,6 +13,7 @@ import {
   Traveler,
   User,
 } from "@/types";
+import { resolveSenderCode } from "./groupNaming";
 
 const DB_KEY_USERS = "hajj_db_users_v2";
 const DB_KEY_REQUESTS = "hajj_db_requests_v2";
@@ -114,6 +115,7 @@ export const DEFAULT_USERS: User[] = [
     password: "Sender@123456",
     role: "Sender",
     phone: "+966500000002",
+    senderCode: "OHD",
     isActive: true,
     createdAt: "2026-01-05T09:30:00.000Z",
   },
@@ -662,6 +664,7 @@ class LocalDatabaseEngine {
     password?: string;
     role: any;
     phone?: string;
+    senderCode?: string;
   }): User {
     const newUser: User = {
       id: "usr-" + Date.now(),
@@ -670,6 +673,7 @@ class LocalDatabaseEngine {
       password: userData.password || "123456",
       role: userData.role,
       phone: userData.phone,
+      senderCode: userData.senderCode && userData.senderCode.trim() ? userData.senderCode.trim().toUpperCase() : undefined,
       isActive: true,
       createdAt: new Date().toISOString(),
     };
@@ -687,6 +691,7 @@ class LocalDatabaseEngine {
       password?: string;
       role?: any;
       phone?: string;
+      senderCode?: string;
       isActive?: boolean;
     },
     currentUser?: User
@@ -704,6 +709,9 @@ class LocalDatabaseEngine {
     if (data.password && data.password.trim()) user.password = data.password.trim();
     if (data.role !== undefined) user.role = data.role;
     if (data.phone !== undefined) user.phone = data.phone.trim();
+    if (data.senderCode !== undefined) {
+      user.senderCode = data.senderCode.trim() ? data.senderCode.trim().toUpperCase() : undefined;
+    }
     if (data.isActive !== undefined) user.isActive = data.isActive;
     this.persistUsers();
     this.logAction(currentUser || null, `تحديث بيانات المستخدم: ${user.fullName} (${user.username})`, "User", user.id);
@@ -993,6 +1001,7 @@ class LocalDatabaseEngine {
         groupName: r.groupName,
         senderId: r.senderId,
         senderName: r.senderName,
+        senderCode: r.senderCode || (r.senderName ? resolveSenderCode({ fullName: r.senderName }) : "OHD"),
         assignedSafaEmployeeId: r.assignedSafaEmployeeId,
         assignedSafaEmployeeName: r.assignedSafaEmployeeName,
         assignedSaudiAgentId: r.assignedSaudiAgentId,
@@ -1177,6 +1186,7 @@ class LocalDatabaseEngine {
       groupName: gName,
       senderId: currentUser.id,
       senderName: currentUser.fullName,
+      senderCode: currentUser.senderCode || resolveSenderCode(currentUser),
       status: "Draft",
       hasHosting: data.hasHosting,
       contactPhone: cPhone,

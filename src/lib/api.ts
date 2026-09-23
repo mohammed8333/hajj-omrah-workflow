@@ -538,6 +538,7 @@ export const api = {
       password?: string;
       role: any;
       phone?: string;
+      senderCode?: string;
     }): Promise<User> => {
       const current = await api.auth.getMe();
       if (isSupabaseConfigured()) {
@@ -548,6 +549,7 @@ export const api = {
             password: data.password || "123456",
             role: data.role,
             phone: data.phone,
+            senderCode: data.senderCode,
           },
           current.id
         );
@@ -564,6 +566,7 @@ export const api = {
         password?: string;
         role?: any;
         phone?: string;
+        senderCode?: string;
         isActive?: boolean;
       }
     ): Promise<User> => {

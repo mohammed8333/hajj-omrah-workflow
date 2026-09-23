@@ -40,6 +40,7 @@ import { useDialog } from "@/lib/dialog-context";
 import { FileDropArea } from "@/components/ui/FileDropArea";
 import { validateHostPhone, validateTravelerPhone } from "@/lib/phoneUtils";
 import { checkPassportValidity, findDuplicatePassportOrId } from "@/lib/passportValidation";
+import { formatOfficialGroupName, resolveSenderCode } from "@/lib/groupNaming";
 
 interface TravelerDraft {
   id: string;
@@ -150,6 +151,8 @@ export default function UnifiedNewRequestPage() {
   const [returnDate, setReturnDate] = useState("");
   const [flightDepartureTime, setFlightDepartureTime] = useState("");
   const [airportArrivalTime, setAirportArrivalTime] = useState("");
+  const [groupName, setGroupName] = useState("");
+  const [isGroupNameCustom, setIsGroupNameCustom] = useState(false);
   const [flightTicketFile, setFlightTicketFile] = useState<File | null>(null);
   const [isScanningTicket, setIsScanningTicket] = useState(false);
   const [ticketScanSuccess, setTicketScanSuccess] = useState(false);
@@ -204,13 +207,22 @@ export default function UnifiedNewRequestPage() {
         } else if (result.airportArrivalTime) {
           setAirportArrivalTime(result.airportArrivalTime);
         }
+
+        // Auto-generate official group name (e.g. OHD7oct26dec)
+        const newDep = result.departureDate || departureDate;
+        const newRet = result.returnDate || returnDate;
+        const official = formatOfficialGroupName(resolveSenderCode(user), newDep, newRet);
+        if (official && !isGroupNameCustom) {
+          setGroupName(official);
+        }
+
         setTicketScanSuccess(true);
         setTicketScanMessage(
           `تم استخراج بيانات الرحلة بنجاح: ${result.airline || ""} ${
             result.flightNumber ? `(رحلة ${result.flightNumber})` : ""
           } ${result.departureDate ? `| الذهاب: ${result.departureDate}` : ""} ${
             result.flightDepartureTime ? `| الإقلاع: ${result.flightDepartureTime}` : ""
-          }`
+          }${official ? ` | التسمية المعتمدة: ${official}` : ""}`
         );
       } else {
         setTicketScanSuccess(false);
@@ -572,11 +584,12 @@ export default function UnifiedNewRequestPage() {
       setProgressPercent(10);
       setProgressStep("جاري إنشاء المعاملة الأساسية...");
 
-      // Auto-generate group name & contact phone
-      const groupName =
-        travelers[0]?.fullName?.trim()
-          ? `مجموعة ${travelers[0].fullName.trim()}`
-          : `طلب جديد ${new Date().toLocaleDateString("ar-SA")}`;
+      // Official group name resolution (e.g. OHD7oct26dec)
+      const officialCandidate = formatOfficialGroupName(resolveSenderCode(user), departureDate, returnDate);
+      const finalGroupName = groupName.trim()
+        ? groupName.trim()
+        : (officialCandidate || (travelers[0]?.fullName?.trim() ? `مجموعة ${travelers[0].fullName.trim()}` : `طلب جديد ${new Date().toLocaleDateString("ar-SA")}`));
+
       const contactPhone =
         formattedHostPhone ||
         (travelers[0]?.phoneNumber ? validateTravelerPhone(travelers[0].phoneNumber).formatted : "") ||
@@ -584,7 +597,7 @@ export default function UnifiedNewRequestPage() {
 
       // 1. Create Request
       const createdGroup = await api.requests.create({
-        groupName,
+        groupName: finalGroupName,
         contactPhone,
         hasHosting: isHostingActive,
         hostName: isHostingActive && hostName.trim() ? hostName.trim() : undefined,
@@ -848,6 +861,55 @@ export default function UnifiedNewRequestPage() {
             className="w-full text-sm sm:text-base py-3 sm:py-3.5 px-4 bg-gray-50/70 hover:bg-white focus:bg-white border border-gray-300 focus:border-amber-500 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 text-right font-mono font-bold transition-all shadow-2xs"
           />
           <Phone className="w-5 h-5 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+        </div>
+
+        {/* حقل اسم المجموعة (يُولّد تلقائياً بالصيغة المعتمدة مثل OHD7oct26dec) */}
+        <div className="bg-sky-50/40 border border-sky-200/80 rounded-2xl p-3 sm:p-3.5 space-y-1.5 transition-all">
+          <div className="flex items-center justify-between">
+            <label className="text-xs sm:text-sm font-bold text-gray-800 flex items-center gap-1.5">
+              <Sparkles className="w-4 h-4 text-sky-600" />
+              <span>اسم المجموعة / المعاملة:</span>
+            </label>
+            {groupName ? (
+              <span className="text-[11px] font-mono bg-sky-100 text-sky-800 px-2 py-0.5 rounded-full font-bold">
+                تسمية معتمدة 🪄
+              </span>
+            ) : null}
+          </div>
+          <div className="relative flex items-center gap-2">
+            <input
+              type="text"
+              value={groupName}
+              onChange={(e) => {
+                setGroupName(e.target.value);
+                setIsGroupNameCustom(true);
+              }}
+              placeholder="يُقترح تلقائياً بعد رفع تذكرة الطيران (مثل OHD7oct26dec)"
+              className="w-full text-xs sm:text-sm py-2.5 px-3 bg-white border border-gray-300 focus:border-sky-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500/20 font-bold text-gray-900 shadow-2xs"
+            />
+            {(departureDate || returnDate) && (
+              <button
+                type="button"
+                onClick={() => {
+                  const gen = formatOfficialGroupName(resolveSenderCode(user), departureDate, returnDate);
+                  if (gen) {
+                    setGroupName(gen);
+                    setIsGroupNameCustom(false);
+                  }
+                }}
+                className="shrink-0 px-3 py-2 text-xs font-bold bg-sky-600 hover:bg-sky-700 text-white rounded-xl transition-colors shadow-2xs flex items-center gap-1 cursor-pointer"
+                title="إعادة توليد الاسم المعتمد بناءً على تواريخ التذكرة وكود الوكالة"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">توليد الاسم المعتمد</span>
+              </button>
+            )}
+          </div>
+          {ticketScanMessage && (
+            <p className="text-[11px] text-gray-600 font-medium truncate" title={ticketScanMessage}>
+              {ticketScanMessage}
+            </p>
+          )}
         </div>
 
         {/* خط فاصل أنيق بين الاستضافة والمسافرين */}

@@ -44,6 +44,7 @@ export interface User {
   username: string;
   role: UserRole;
   phone?: string;
+  senderCode?: string;
   isActive: boolean;
   createdAt: string;
   lastLoginAt?: string;
@@ -55,6 +56,7 @@ export interface LoginResponse {
   fullName: string;
   username: string;
   role: UserRole;
+  senderCode?: string;
 }
 
 export interface DocumentItem {
@@ -158,6 +160,7 @@ export interface GroupRequestSummary {
   groupName: string;
   senderId: string;
   senderName: string;
+  senderCode?: string;
   assignedSafaEmployeeId?: string;
   assignedSafaEmployeeName?: string;
   assignedSaudiAgentId?: string;
@@ -201,6 +204,7 @@ export interface GroupRequestDetail {
   groupName: string;
   senderId: string;
   senderName: string;
+  senderCode?: string;
   assignedSafaEmployeeId?: string;
   assignedSafaEmployeeName?: string;
   assignedSaudiAgentId?: string;
