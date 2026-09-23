@@ -1,19 +1,19 @@
 @echo off
-chcp 65001 >nul
-title خادم إرسال الواتساب المحلي - WhatsApp Bridge
-echo ========================================================
-echo      جاري تشغيل خادم إرسال الواتساب المحلي (WhatsApp Bridge)
-echo ========================================================
+title WhatsApp Bridge Local Server
 cd /d "%~dp0"
 
+echo ========================================================
+echo        Starting WhatsApp Bridge Server...
+echo ========================================================
+
 if not exist node_modules (
-  echo [1/2] تثبيت الحزم المطلوبة لأول مرة فقط...
-  call npm install
+    echo [1/2] Installing dependencies...
+    call npm install
 )
 
-echo [2/2] تشغيل السيرفر على http://localhost:5055 ...
+echo [2/2] Running server on http://localhost:5055 ...
 echo ========================================================
-echo إذا ظهر كود QR، افتح واتساب في هاتفك وامسح الكود لمرة واحدة.
+echo If QR code appears, scan it from WhatsApp on your phone.
 echo ========================================================
 node server.js
 pause
