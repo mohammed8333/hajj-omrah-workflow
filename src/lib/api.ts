@@ -224,14 +224,15 @@ export const api = {
     safaComplete: async (
       id: string,
       nusukGroupNumber: string,
-      note?: string
+      note?: string,
+      groupName?: string
     ): Promise<{ message: string }> => {
       const current = await api.auth.getMe();
       if (isSupabaseConfigured()) {
-        return await supabaseService.requests.safaComplete(id, nusukGroupNumber, note, current);
+        return await supabaseService.requests.safaComplete(id, nusukGroupNumber, note, current, groupName);
       }
       await delay();
-      localDB.safaComplete(id, nusukGroupNumber, note, current);
+      localDB.safaComplete(id, nusukGroupNumber, note, current, groupName);
       return { message: "تم توثيق رقم نسك وإكمال صفا بنجاح" };
     },
 

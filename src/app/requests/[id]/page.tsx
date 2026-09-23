@@ -98,6 +98,7 @@ export default function RequestDetailPage({
   // Safa Complete Modal & Nusuk Number
   const [showNusukModal, setShowNusukModal] = useState(false);
   const [nusukInput, setNusukInput] = useState("");
+  const [nusukGroupName, setNusukGroupName] = useState("");
   const [nusukNote, setNusukNote] = useState("");
   const [editingNusuk, setEditingNusuk] = useState(false);
 
@@ -203,6 +204,9 @@ export default function RequestDetailPage({
       setRequest(data);
       if (data.nusukGroupNumber) {
         setNusukInput(data.nusukGroupNumber);
+      }
+      if (data.groupName) {
+        setNusukGroupName(data.groupName);
       }
       const isAgentEligibleStatus = [
         "ReadyForSaudiAgent",
@@ -1154,12 +1158,29 @@ export default function RequestDetailPage({
       });
       return;
     }
+    if (!nusukGroupName.trim()) {
+      await alert({
+        title: "تنبيه",
+        message: "يرجى إدخال اسم المجموعة لمتابعة الإجراء.",
+        variant: "warning",
+      });
+      return;
+    }
     try {
       setActionLoading(true);
       setError(null);
       setSuccess(null);
-      await api.requests.safaComplete(requestId, nusukInput.trim(), nusukNote.trim() || undefined);
-      setSuccess("تم اكتمال تسجيل صفا وتوثيق رقم نسك بنجاح.");
+      await api.requests.safaComplete(
+        requestId,
+        nusukInput.trim(),
+        nusukNote.trim() || undefined,
+        nusukGroupName.trim()
+      );
+      if (request) {
+        request.groupName = nusukGroupName.trim();
+        request.nusukGroupNumber = nusukInput.trim();
+      }
+      setSuccess("تم اكتمال تسجيل صفا وتوثيق رقم نسك وتحديث اسم المجموعة بنجاح.");
       setShowNusukModal(false);
       await loadRequest();
     } catch (err: unknown) {
@@ -1729,6 +1750,7 @@ export default function RequestDetailPage({
                         });
                         return;
                       }
+                      setNusukGroupName(request.groupName || "");
                       setShowNusukModal(true);
                     }}
                     disabled={actionLoading || !canCompleteSafa}
@@ -3733,6 +3755,23 @@ export default function RequestDetailPage({
 
             <div>
               <label className="block text-xs font-semibold text-gray-700 mb-1">
+                اسم المجموعة *
+              </label>
+              <input
+                type="text"
+                value={nusukGroupName}
+                onChange={(e) => setNusukGroupName(e.target.value)}
+                placeholder="أدخل اسم المجموعة المعتمد..."
+                className="w-full px-3 py-2 text-sm rounded-xl border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-teal-500 font-medium text-gray-900"
+                required
+              />
+              <p className="text-[11px] text-gray-400 mt-1">
+                سيتم استبدال وتحديث اسم المجموعة بهذا الاسم في كافة شاشات المنظومة.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">
                 ملاحظات إنهاء التسجيل (اختياري)
               </label>
               <textarea
@@ -3755,7 +3794,7 @@ export default function RequestDetailPage({
               <button
                 type="button"
                 onClick={handleCompleteSafa}
-                disabled={actionLoading || !nusukInput.trim() || !canCompleteSafa}
+                disabled={actionLoading || !nusukInput.trim() || !nusukGroupName.trim() || !canCompleteSafa}
                 className="px-4 py-2 text-xs font-bold bg-teal-600 hover:bg-teal-700 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed text-white rounded-xl shadow-xs cursor-pointer"
               >
                 اعتماد واكتمال صفا

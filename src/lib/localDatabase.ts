@@ -1386,7 +1386,8 @@ class LocalDatabaseEngine {
     id: string,
     nusukGroupNumber: string,
     note?: string,
-    currentUser?: User
+    currentUser?: User,
+    groupName?: string
   ) {
     const req = this.requests.find((r) => r.id === id);
     if (!req) throw new Error("المعاملة غير موجودة");
@@ -1439,6 +1440,9 @@ class LocalDatabaseEngine {
 
     const prev = req.status;
     req.nusukGroupNumber = nusukGroupNumber;
+    if (groupName && groupName.trim()) {
+      req.groupName = groupName.trim();
+    }
     req.status = "SafaRegistrationCompleted";
     req.updatedAt = new Date().toISOString();
 

@@ -751,19 +751,24 @@ export const supabaseService = {
       id: string,
       nusukGroupNumber: string,
       note?: string,
-      currentUser?: User
+      currentUser?: User,
+      groupName?: string
     ): Promise<{ message: string }> => {
       const client = getClient();
       const now = new Date().toISOString();
+      const updateData: Record<string, any> = {
+        nusuk_group_number: nusukGroupNumber,
+        status: "SafaRegistrationCompleted",
+        assigned_safa_employee_id: currentUser?.id,
+        assigned_safa_employee_name: currentUser?.fullName,
+        updated_at: now,
+      };
+      if (groupName && groupName.trim()) {
+        updateData.group_name = groupName.trim();
+      }
       await client
         .from("group_requests")
-        .update({
-          nusuk_group_number: nusukGroupNumber,
-          status: "SafaRegistrationCompleted",
-          assigned_safa_employee_id: currentUser?.id,
-          assigned_safa_employee_name: currentUser?.fullName,
-          updated_at: now,
-        })
+        .update(updateData)
         .eq("id", id);
 
       await client.from("status_histories").insert({
