@@ -165,6 +165,18 @@ export default function RequestDetailPage({
   const [editContactPhone, setEditContactPhone] = useState("");
   const [editDestination, setEditDestination] = useState("");
   const [editNotes, setEditNotes] = useState("");
+  const [editNusukGroupNumber, setEditNusukGroupNumber] = useState("");
+  const [editSenderCode, setEditSenderCode] = useState("");
+
+  // Add New Traveler Modal
+  const [showAddTravelerModal, setShowAddTravelerModal] = useState(false);
+  const [newTravelerName, setNewTravelerName] = useState("");
+  const [newTravelerPassport, setNewTravelerPassport] = useState("");
+  const [newTravelerPhone, setNewTravelerPhone] = useState("");
+  const [newTravelerNationality, setNewTravelerNationality] = useState("");
+  const [newTravelerBirthDate, setNewTravelerBirthDate] = useState("");
+  const [newTravelerExpiryDate, setNewTravelerExpiryDate] = useState("");
+  const [isTranslatingNewName, setIsTranslatingNewName] = useState(false);
 
   // Admin View Switching State
   const [adminViewMode, setAdminViewMode] = useState<"agent" | "safa" | "full">("agent");
@@ -521,13 +533,107 @@ export default function RequestDetailPage({
         contactPhone: editContactPhone.trim() || request.contactPhone,
         destination: editDestination.trim() || undefined,
         notes: editNotes.trim() || undefined,
+        nusukGroupNumber: editNusukGroupNumber.trim() || undefined,
+        senderCode: editSenderCode.trim().toUpperCase() || undefined,
       });
-      setSuccess("تم تحديث بيانات المعاملة الأساسية بنجاح.");
+      setSuccess("تم تحديث بيانات المعاملة بنجاح.");
       setShowEditGeneralModal(false);
       await loadRequest(false);
     } catch (err: unknown) {
       if (err instanceof Error) setError(err.message);
       else setError("فشل تحديث بيانات المعاملة.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleTranslateNewName = async () => {
+    if (!newTravelerName.trim()) return;
+    try {
+      setIsTranslatingNewName(true);
+      const translated = await translateEnglishNameToArabic(newTravelerName.trim());
+      if (translated) {
+        setNewTravelerName(translated);
+      }
+    } catch (e) {
+      console.warn("Translation failed:", e);
+    } finally {
+      setIsTranslatingNewName(false);
+    }
+  };
+
+  const handleAddTraveler = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTravelerName.trim()) {
+      await alert({
+        title: "تنبيه",
+        message: "يرجى كتابة اسم المسافر على الأقل.",
+        variant: "warning",
+      });
+      return;
+    }
+
+    let formattedPhone: string | undefined = undefined;
+    if (newTravelerPhone.trim()) {
+      const pVal = validateTravelerPhone(newTravelerPhone);
+      if (!pVal.isValid) {
+        await alert({
+          title: "تنبيه رقم الهاتف",
+          message: pVal.error || "رقم هاتف المسافر غير صحيح",
+          variant: "warning",
+        });
+        return;
+      }
+      formattedPhone = pVal.formatted;
+    }
+
+    try {
+      setActionLoading(true);
+      setError(null);
+      await api.travelers.add(requestId, {
+        fullName: newTravelerName.trim(),
+        passportNumber: newTravelerPassport.trim() || undefined,
+        phoneNumber: formattedPhone,
+        nationality: newTravelerNationality.trim() || undefined,
+        dateOfBirth: newTravelerBirthDate.trim() || undefined,
+        expiryDate: newTravelerExpiryDate.trim() || undefined,
+      });
+      setSuccess("تمت إضافة المسافر بنجاح إلى المعاملة.");
+      setShowAddTravelerModal(false);
+      setNewTravelerName("");
+      setNewTravelerPassport("");
+      setNewTravelerPhone("");
+      setNewTravelerNationality("");
+      setNewTravelerBirthDate("");
+      setNewTravelerExpiryDate("");
+      await loadRequest(false);
+    } catch (err: unknown) {
+      if (err instanceof Error) setError(err.message);
+      else setError("فشل إضافة المسافر.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteTraveler = async (travelerId: string, travelerName: string) => {
+    const isConfirmed = await confirm({
+      title: "تأكيد حذف المسافر",
+      message: `هل أنت متأكد من رغبتك في حذف المسافر "${travelerName}" وجميع مستنداته من هذه المعاملة نهائياً؟`,
+      confirmText: "نعم، حذف المسافر",
+      cancelText: "إلغاء",
+      variant: "danger",
+    });
+    if (!isConfirmed) return;
+
+    try {
+      setActionLoading(true);
+      setError(null);
+      await api.travelers.delete(travelerId);
+      setSuccess(`تم حذف المسافر (${travelerName}) بنجاح.`);
+      await loadRequest(false);
+    } catch (err: unknown) {
+      if (err instanceof Error) setError(err.message);
+      else setError("فشل حذف المسافر.");
     } finally {
       setActionLoading(false);
     }
@@ -1518,11 +1624,12 @@ export default function RequestDetailPage({
     request.groupDocuments?.some((d) => d.reviewStatus === "NeedsCorrection");
 
   const canEditDocs =
-    (role === "Sender" || role === "Admin") &&
-    (request.status === "Draft" ||
-      request.status === "CorrectionRequired" ||
-      request.status === "MissingDocuments" ||
-      hasItemsNeedingCorrection);
+    role === "Admin" ||
+    (role === "Sender" &&
+      (request.status === "Draft" ||
+        request.status === "CorrectionRequired" ||
+        request.status === "MissingDocuments" ||
+        hasItemsNeedingCorrection));
 
   const canEditAnyData =
     role === "Admin" ||
@@ -1651,10 +1758,12 @@ export default function RequestDetailPage({
                   setEditContactPhone(request.contactPhone);
                   setEditDestination(request.destination || "");
                   setEditNotes(request.notes || "");
+                  setEditNusukGroupNumber(request.nusukGroupNumber || "");
+                  setEditSenderCode(request.senderCode || "");
                   setShowEditGeneralModal(true);
                 }}
                 className="text-xs text-sky-700 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-                title="تعديل بيانات المعاملة (الاسم، الهاتف، الملاحظات)"
+                title="تعديل بيانات المعاملة (الاسم، الهاتف، الملاحظات، رقم نسك، الكود)"
               >
                 <Edit2 className="w-3.5 h-3.5" />
                 <span>تعديل المعاملة</span>
@@ -3107,19 +3216,32 @@ export default function RequestDetailPage({
             <span>بيانات ووثائق المسافرين ({request.travelers.length})</span>
           </h2>
 
-          <button
-            type="button"
-            onClick={handleDownloadAllDocs}
-            disabled={isDownloadingAll || totalDocsCount === 0}
-            className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-all self-start sm:self-auto"
-          >
-            {isDownloadingAll ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <Download className="w-3.5 h-3.5" />
+          <div className="flex items-center gap-2 flex-wrap">
+            {canEditAnyData && (
+              <button
+                type="button"
+                onClick={() => setShowAddTravelerModal(true)}
+                className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-all"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>إضافة مسافر للمجموعة +</span>
+              </button>
             )}
-            <span>تحميل كافة المستندات ({totalDocsCount}) ZIP</span>
-          </button>
+
+            <button
+              type="button"
+              onClick={handleDownloadAllDocs}
+              disabled={isDownloadingAll || totalDocsCount === 0}
+              className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-all"
+            >
+              {isDownloadingAll ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Download className="w-3.5 h-3.5" />
+              )}
+              <span>تحميل كافة المستندات ({totalDocsCount}) ZIP</span>
+            </button>
+          </div>
         </div>
 
         {request.travelers.map((traveler, tIndex) => (
@@ -3363,6 +3485,19 @@ export default function RequestDetailPage({
                     className="text-xs text-rose-600 hover:text-rose-800 bg-rose-50 px-2.5 py-1 rounded-md font-semibold cursor-pointer"
                   >
                     طلب تصحيح للمسافر
+                  </button>
+                )}
+
+                {canEditAnyData && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteTraveler(traveler.id, traveler.fullName)}
+                    disabled={actionLoading}
+                    className="text-xs text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 border border-red-200 px-2.5 py-1 rounded-md font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                    title="حذف المسافر من المعاملة"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">حذف المسافر</span>
                   </button>
                 )}
               </div>
@@ -4224,6 +4359,34 @@ export default function RequestDetailPage({
                     className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-sky-500 text-gray-800"
                   />
                 </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-gray-100">
+                  <div>
+                    <label className="block font-bold text-teal-800 mb-1 flex items-center gap-1">
+                      <Building className="w-3.5 h-3.5 text-teal-600" />
+                      <span>رقم مجموعة نسك</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={editNusukGroupNumber}
+                      onChange={(e) => setEditNusukGroupNumber(e.target.value)}
+                      placeholder="مثال: NUSUK-109283"
+                      className="w-full px-3 py-2 border border-teal-300 rounded-xl focus:ring-2 focus:ring-teal-500 text-teal-900 font-mono font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-gray-700 mb-1">
+                      كود الوكالة / المرسل
+                    </label>
+                    <input
+                      type="text"
+                      value={editSenderCode}
+                      onChange={(e) => setEditSenderCode(e.target.value.toUpperCase())}
+                      placeholder="مثال: OHD أو SAF"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-sky-500 text-gray-800 font-mono font-bold uppercase"
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
@@ -4254,6 +4417,141 @@ export default function RequestDetailPage({
           onClose={() => setShowWhatsAppModal(false)}
           request={request}
         />
+      )}
+
+      {/* --- MODAL 8: Add New Traveler to Group --- */}
+      {showAddTravelerModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="bg-white w-full max-w-lg rounded-2xl p-6 shadow-xl space-y-4">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+              <h3 className="font-bold text-base text-gray-900 flex items-center gap-2">
+                <Users className="w-5 h-5 text-emerald-600" />
+                <span>إضافة مسافر جديد للمعاملة</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowAddTravelerModal(false)}
+                className="p-1 text-gray-400 hover:bg-gray-100 rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddTraveler} className="space-y-4 text-xs">
+              <div className="space-y-3">
+                <div>
+                  <div className="flex items-center justify-between mb-1 gap-2">
+                    <label className="block font-bold text-gray-700">
+                      اسم المسافر بالعربية *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleTranslateNewName}
+                      disabled={isTranslatingNewName || !newTravelerName.trim()}
+                      className="text-[11px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2 py-0.5 rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
+                      title="ترجمة الاسم بالذكاء الاصطناعي وجوجل"
+                    >
+                      <Languages className="w-3.5 h-3.5 text-blue-600" />
+                      <span>{isTranslatingNewName ? "جاري الترجمة..." : "ترجمة جوجل"}</span>
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    value={newTravelerName}
+                    onChange={(e) => setNewTravelerName(e.target.value)}
+                    placeholder="الاسم الرباعي للمسافر"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 text-gray-800 font-bold"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-gray-700 mb-1">
+                      رقم الجواز
+                    </label>
+                    <input
+                      type="text"
+                      value={newTravelerPassport}
+                      onChange={(e) => setNewTravelerPassport(e.target.value.toUpperCase())}
+                      placeholder="A12345678"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 text-gray-800 font-mono font-bold uppercase"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-gray-700 mb-1">
+                      رقم الهاتف
+                    </label>
+                    <input
+                      type="tel"
+                      dir="ltr"
+                      value={newTravelerPhone}
+                      onChange={(e) => setNewTravelerPhone(e.target.value)}
+                      placeholder="05xxxxxxxx أو 010xxxxxxxx"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 text-gray-800 text-left font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-gray-700 mb-1">
+                      الجنسية
+                    </label>
+                    <input
+                      type="text"
+                      value={newTravelerNationality}
+                      onChange={(e) => setNewTravelerNationality(e.target.value)}
+                      placeholder="مثال: مصري / سعودي"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 text-gray-800 font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-gray-700 mb-1">
+                      تاريخ الميلاد
+                    </label>
+                    <input
+                      type="date"
+                      value={newTravelerBirthDate}
+                      onChange={(e) => setNewTravelerBirthDate(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 text-gray-800 font-mono"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block font-bold text-gray-700 mb-1">
+                      تاريخ انتهاء الجواز
+                    </label>
+                    <input
+                      type="date"
+                      value={newTravelerExpiryDate}
+                      onChange={(e) => setNewTravelerExpiryDate(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 text-gray-800 font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setShowAddTravelerModal(false)}
+                  className="px-4 py-2 font-semibold text-gray-600 hover:bg-gray-100 rounded-xl cursor-pointer"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionLoading || !newTravelerName.trim()}
+                  className="px-5 py-2 font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs cursor-pointer flex items-center gap-1.5"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>إضافة المسافر الآن</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );
