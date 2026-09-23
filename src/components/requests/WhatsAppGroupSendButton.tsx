@@ -287,33 +287,48 @@ export const WhatsAppGroupSendButton: React.FC<WhatsAppGroupSendButtonProps> = (
 
   return (
     <>
-      {/* The Main Action Button for Safa Employee */}
-      <button
-        type="button"
-        disabled={isSending}
-        onClick={() => {
-          if (!targetGroup.trim() && !groupLink.trim()) {
+      {/* The Main Action Button for Safa Employee with Settings Gear */}
+      <div className={`inline-flex items-stretch rounded-xl shadow-xs ${className}`}>
+        <button
+          type="button"
+          disabled={isSending}
+          onClick={() => {
+            if (!targetGroup.trim() && !groupLink.trim()) {
+              checkBridgeStatus();
+              setShowModal(true);
+            } else {
+              executeAutomatedSend();
+            }
+          }}
+          className="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-bold px-3.5 py-2 rounded-r-xl flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+          title="إرسال حزمة المعاملة بالكامل للواتساب (النص + التذكرة + الهوية)"
+        >
+          {isSending ? (
+            <>
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              <span>جاري الإرسال للمجموعة...</span>
+            </>
+          ) : (
+            <>
+              <MessageCircle className="w-3.5 h-3.5" />
+              <span>إرسال لمجموعة الواتساب 📲</span>
+            </>
+          )}
+        </button>
+
+        {/* زر الترس لفتح وتعديل إعدادات المجموعة في أي وقت */}
+        <button
+          type="button"
+          onClick={() => {
             checkBridgeStatus();
             setShowModal(true);
-          } else {
-            executeAutomatedSend();
-          }
-        }}
-        className={`bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 transition-all cursor-pointer ${className}`}
-        title="إرسال حزمة المعاملة بالكامل للواتساب (النص + التذكرة + الهوية)"
-      >
-        {isSending ? (
-          <>
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            <span>جاري الإرسال للمجموعة...</span>
-          </>
-        ) : (
-          <>
-            <MessageCircle className="w-3.5 h-3.5" />
-            <span>إرسال لمجموعة الواتساب 📲</span>
-          </>
-        )}
-      </button>
+          }}
+          className="bg-emerald-700 hover:bg-emerald-800 text-emerald-100 hover:text-white px-2.5 py-2 rounded-l-xl border-r border-emerald-500/50 transition-colors cursor-pointer flex items-center justify-center"
+          title="تغيير وضبط إعدادات مجموعة الواتساب المستهدفة ⚙️"
+        >
+          <Settings className="w-3.5 h-3.5" />
+        </button>
+      </div>
 
       {/* Control & Configuration Modal */}
       {showModal && (

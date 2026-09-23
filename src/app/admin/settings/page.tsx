@@ -34,6 +34,7 @@ import {
   Cloud,
   CloudOff,
   UploadCloud,
+  MessageCircle,
 } from "lucide-react";
 import {
   getGeminiApiKey,
@@ -67,13 +68,34 @@ export default function AdminSettingsPage() {
     message: string;
   } | null>(null);
 
+  // WhatsApp Group Settings State
+  const [waGroup, setWaGroup] = useState("");
+  const [waLink, setWaLink] = useState("");
+  const [waBridgeConnected, setWaBridgeConnected] = useState<boolean | null>(null);
+
   useEffect(() => {
     setIsCloud(isSupabaseConfigured());
     const saved = getGeminiApiKey();
     if (saved) {
       setGeminiKey(saved);
     }
+    if (typeof window !== "undefined") {
+      setWaGroup(localStorage.getItem("safa_whatsapp_target_group") || "");
+      setWaLink(localStorage.getItem("safa_whatsapp_target_link") || "");
+      fetch("http://localhost:5055/status")
+        .then((r) => r.json())
+        .then((d) => setWaBridgeConnected(Boolean(d.connected)))
+        .catch(() => setWaBridgeConnected(false));
+    }
   }, []);
+
+  const handleSaveWaSettings = () => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("safa_whatsapp_target_group", waGroup.trim());
+      localStorage.setItem("safa_whatsapp_target_link", waLink.trim());
+      setSuccess("تم حفظ إعدادات مجموعة الواتساب المستهدفة بنجاح!");
+    }
+  };
 
   const handleSaveGeminiKey = () => {
     if (!geminiKey.trim()) {
@@ -575,6 +597,92 @@ export default function AdminSettingsPage() {
               <span><strong>حصري ومجاني:</strong> يعطيك 1,500 عملية فحص مجانية يومياً من جوجل وبدون دفع أي رسوم.</span>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* WhatsApp Group & Bridge Settings */}
+      <div className="bg-white rounded-2xl border border-emerald-200 p-6 shadow-xs relative overflow-hidden space-y-4">
+        <div className="absolute top-0 right-0 left-0 h-1.5 bg-gradient-to-r from-emerald-500 to-teal-600" />
+
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="p-3 rounded-xl bg-emerald-50 text-emerald-700">
+              <MessageCircle className="w-6 h-6" />
+            </div>
+            <div>
+              <h2 className="text-base sm:text-lg font-bold text-gray-900 flex items-center gap-2">
+                <span>إعدادات مجموعة الواتساب لموظف الصفا</span>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">
+                  إرسال الحزم الآلي
+                </span>
+              </h2>
+              <p className="text-xs text-gray-500 mt-0.5">
+                تحديد المجموعة ورابطها المباشر الذي يتم إرسال حزم المعاملات إليها بنقرة واحدة
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs font-bold">
+            <span
+              className={`w-2.5 h-2.5 rounded-full ${
+                waBridgeConnected === true
+                  ? "bg-emerald-500 animate-pulse"
+                  : waBridgeConnected === false
+                  ? "bg-amber-500"
+                  : "bg-gray-300"
+              }`}
+            />
+            <span className="text-gray-700">
+              {waBridgeConnected === true
+                ? "خادم الواتساب (Bridge) متصل ✓"
+                : waBridgeConnected === false
+                ? "خادم الواتساب غير مشغل (افتح start.bat)"
+                : "جاري فحص الاتصال..."}
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1">
+              اسم أو معرّف مجموعة الواتساب المستهدفة:
+            </label>
+            <input
+              type="text"
+              value={waGroup}
+              onChange={(e) => setWaGroup(e.target.value)}
+              placeholder="مثال: مجموعة التسكين والإعاشة أو معرف المجموعة"
+              className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 font-bold text-gray-800"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1">
+              رابط الدعوة المباشر للمجموعة (لفتحها فوراً للتأكيد):
+            </label>
+            <input
+              type="text"
+              dir="ltr"
+              value={waLink}
+              onChange={(e) => setWaLink(e.target.value)}
+              placeholder="https://chat.whatsapp.com/..."
+              className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 text-left font-mono"
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between pt-2 border-t border-gray-100 flex-wrap gap-2">
+          <p className="text-[11px] text-gray-400">
+            يمكنك أيضاً تعديل هذه الإعدادات مباشرة من أي معاملة عبر الضغط على أيقونة الترس ⚙️ بجانب زر الواتساب.
+          </p>
+          <button
+            type="button"
+            onClick={handleSaveWaSettings}
+            className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+          >
+            <Check className="w-3.5 h-3.5" />
+            <span>حفظ إعدادات المجموعة</span>
+          </button>
         </div>
       </div>
 
