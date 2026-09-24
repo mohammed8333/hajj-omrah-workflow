@@ -57,6 +57,8 @@ import {
   MessageSquare,
   MessageCircle,
   Plus,
+  UserPlus,
+  UserMinus,
 } from "lucide-react";
 import { scanPassportMRZ, translateEnglishNameToArabic } from "@/lib/mrzScanner";
 import { scanHostId } from "@/lib/hostIdScanner";
@@ -159,6 +161,17 @@ export default function RequestDetailPage({
   const [editHostNationality, setEditHostNationality] = useState("");
   const [editHostPhone, setEditHostPhone] = useState("");
   const [editHostNationalId, setEditHostNationalId] = useState("");
+
+  // Dedicated Add / Edit Host Modal State
+  const [showAddHostModal, setShowAddHostModal] = useState(false);
+  const [hostModalName, setHostModalName] = useState("");
+  const [hostModalPhone, setHostModalPhone] = useState("");
+  const [hostModalNationalId, setHostModalNationalId] = useState("");
+  const [hostModalNationality, setHostModalNationality] = useState("سعودي");
+  const [hostModalBirthDate, setHostModalBirthDate] = useState("");
+  const [hostModalFile, setHostModalFile] = useState<File | null>(null);
+  const [hostModalFilePreview, setHostModalFilePreview] = useState<string | null>(null);
+  const [isScanningHostModalFile, setIsScanningHostModalFile] = useState(false);
 
   // General Transaction Info Edit Modal
   const [showEditGeneralModal, setShowEditGeneralModal] = useState(false);
@@ -494,6 +507,88 @@ export default function RequestDetailPage({
     } catch (err: unknown) {
       if (err instanceof Error) setError(err.message);
       else setError("فشل تحديث بيانات المستضيف.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const openHostModal = () => {
+    setHostModalName(request?.hostingInfo?.hostName || "");
+    setHostModalNationality(request?.hostingInfo?.hostNationality || "سعودي");
+    setHostModalBirthDate(request?.hostingInfo?.hostBirthDate || "");
+    setHostModalPhone(request?.hostingInfo?.hostPhone || request?.contactPhone || "");
+    setHostModalNationalId(request?.hostingInfo?.hostNationalId || request?.hostingInfo?.hostAddress || "");
+    setHostModalFile(null);
+    setHostModalFilePreview(null);
+    setShowAddHostModal(true);
+  };
+
+  const handleHostModalFileChange = async (file: File) => {
+    setHostModalFile(file);
+    if (file.type.startsWith("image/")) {
+      const url = URL.createObjectURL(file);
+      setHostModalFilePreview(url);
+      try {
+        setIsScanningHostModalFile(true);
+        const scanResult = await scanHostId(file);
+        if (scanResult) {
+          if (scanResult.hostName && !hostModalName) setHostModalName(scanResult.hostName);
+          if (scanResult.idNumber && !hostModalNationalId) setHostModalNationalId(scanResult.idNumber);
+          if (scanResult.hostNationality) setHostModalNationality(scanResult.hostNationality);
+          if (scanResult.hostBirthDate && !hostModalBirthDate) setHostModalBirthDate(scanResult.hostBirthDate);
+        }
+      } catch (err) {
+        console.warn("Host ID modal scan error:", err);
+      } finally {
+        setIsScanningHostModalFile(false);
+      }
+    } else {
+      setHostModalFilePreview(null);
+    }
+  };
+
+  const handleSaveHostModal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!request) return;
+
+    if (!hostModalPhone.trim()) {
+      setError("يرجى إدخال رقم هاتف المستضيف.");
+      return;
+    }
+
+    const hVal = validateHostPhone(hostModalPhone);
+    if (!hVal.isValid) {
+      setError(hVal.error || "رقم المستضيف غير صحيح");
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      setError(null);
+
+      // 1. Update request with hosting data
+      await api.requests.update(requestId, {
+        hasHosting: true,
+        hostName: hostModalName.trim() || "مستضيف داخل المملكة",
+        hostPhone: hVal.formatted || hostModalPhone.trim(),
+        hostNationalId: hostModalNationalId.trim() || undefined,
+        hostNationality: hostModalNationality.trim() || "سعودي",
+        hostBirthDate: hostModalBirthDate.trim() || undefined,
+      });
+
+      // 2. Upload file if selected
+      if (hostModalFile) {
+        await api.documents.upload(requestId, hostModalFile, "HostId");
+      }
+
+      setSuccess("تمت إضافة بيانات ومستند المستضيف للمعاملة بنجاح 🕋");
+      setShowAddHostModal(false);
+      setHostModalFile(null);
+      setHostModalFilePreview(null);
+      await loadRequest(false);
+    } catch (err: unknown) {
+      if (err instanceof Error) setError(err.message);
+      else setError("فشل حفظ بيانات المستضيف.");
     } finally {
       setActionLoading(false);
     }
@@ -2379,22 +2474,46 @@ export default function RequestDetailPage({
                 مشتركة لجميع المسافرين
               </span>
               {canEditAnyData && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditHostName(request.hostingInfo?.hostName || "");
-                    setEditHostNationality(request.hostingInfo?.hostNationality || "");
-                    setEditHostBirthDate(request.hostingInfo?.hostBirthDate || "");
-                    setEditHostPhone(request.hostingInfo?.hostPhone || request.contactPhone || "");
-                    setEditHostNationalId(request.hostingInfo?.hostNationalId || request.hostingInfo?.hostAddress || "");
-                    setEditingHostInfo(!editingHostInfo);
-                  }}
-                  className="text-xs text-amber-800 hover:text-amber-900 bg-amber-100/70 hover:bg-amber-100 border border-amber-300 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
-                  title="تعديل بيانات المستضيف"
-                >
-                  <Edit2 className="w-3.5 h-3.5" />
-                  <span>{editingHostInfo ? "إلغاء التعديل" : "تعديل بيانات المستضيف"}</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={openHostModal}
+                    className="text-xs text-amber-800 hover:text-amber-900 bg-amber-100/70 hover:bg-amber-100 border border-amber-300 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                    title="تعديل بيانات ومستند المستضيف"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                    <span>تعديل بيانات ومستند المستضيف</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const confirmed = await confirm({
+                        title: "تحويل المعاملة إلى سفر عادي (بدون مستضيف)",
+                        message: "هل أنت متأكد من إلغاء الاستضافة وتحويل المعاملة إلى سفر عادي بدون مستضيف؟",
+                        variant: "danger",
+                        confirmText: "نعم، تحويل لعادي",
+                        cancelText: "تراجع",
+                      });
+                      if (confirmed) {
+                        try {
+                          setActionLoading(true);
+                          await api.requests.update(requestId, { hasHosting: false });
+                          setSuccess("تم تحويل المعاملة إلى سفر عادي بدون مستضيف بنجاح.");
+                          await loadRequest(false);
+                        } catch (err: unknown) {
+                          if (err instanceof Error) setError(err.message);
+                        } finally {
+                          setActionLoading(false);
+                        }
+                      }
+                    }}
+                    className="text-xs text-rose-700 hover:text-rose-900 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                    title="تحويل لسفر عادي بدون مستضيف"
+                  >
+                    <UserMinus className="w-3.5 h-3.5 text-rose-600" />
+                    <span>إلغاء الاستضافة (تحويل لعادي)</span>
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -2760,10 +2879,11 @@ export default function RequestDetailPage({
           {canEditAnyData && (
             <button
               type="button"
-              onClick={() => setShowEditGeneralModal(true)}
-              className="text-xs text-amber-800 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-300 px-3 py-1.5 rounded-xl font-bold transition-colors cursor-pointer"
+              onClick={openHostModal}
+              className="text-xs text-amber-800 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-300 px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
             >
-              إضافة مستضيف للمعاملة
+              <UserPlus className="w-3.5 h-3.5 text-amber-600" />
+              <span>إضافة مستضيف للمعاملة</span>
             </button>
           )}
         </div>
@@ -4498,6 +4618,217 @@ export default function RequestDetailPage({
                 >
                   <Plus className="w-4 h-4" />
                   <span>إضافة المسافر الآن</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* --- MODAL 9: Add / Edit Host Modal (بيانات ومستند المستضيف) --- */}
+      {showAddHostModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-white w-full max-w-xl rounded-2xl p-6 shadow-xl space-y-4 my-8">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+              <h3 className="font-bold text-base text-gray-900 flex items-center gap-2">
+                <Home className="w-5 h-5 text-amber-600" />
+                <span>إضافة وتعديل بيانات ومستند المستضيف</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddHostModal(false);
+                  setHostModalFile(null);
+                  setHostModalFilePreview(null);
+                }}
+                className="p-1 text-gray-400 hover:bg-gray-100 rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveHostModal} className="space-y-4 text-xs">
+              {/* Host ID Document Upload Area */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="font-bold text-gray-800 flex items-center gap-1.5">
+                    <FileText className="w-4 h-4 text-amber-600" />
+                    <span>صورة / وثيقة هوية المستضيف (مطلوبة أو اختيارية)</span>
+                  </label>
+                  {isScanningHostModalFile && (
+                    <span className="text-[11px] text-indigo-600 font-bold flex items-center gap-1">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>جاري القراءة الذكية للبيانات...</span>
+                    </span>
+                  )}
+                </div>
+
+                {hostModalFile ? (
+                  <div className="p-3 bg-amber-50/60 border border-amber-200 rounded-xl flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 overflow-hidden">
+                      {hostModalFilePreview ? (
+                        <img
+                          src={hostModalFilePreview}
+                          alt="Host ID preview"
+                          className="w-12 h-12 object-cover rounded-lg border border-amber-300 shrink-0"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 font-bold">
+                          PDF
+                        </div>
+                      )}
+                      <div className="truncate">
+                        <div className="font-bold text-gray-800 truncate">{hostModalFile.name}</div>
+                        <div className="text-[10px] text-gray-500">
+                          {(hostModalFile.size / 1024).toFixed(1)} KB • جاهز للرفع عند الحفظ
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <label className="p-1.5 text-xs text-amber-800 hover:bg-amber-100 rounded-lg font-bold cursor-pointer">
+                        <span>تغيير</span>
+                        <input
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) handleHostModalFileChange(f);
+                          }}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setHostModalFile(null);
+                          setHostModalFilePreview(null);
+                        }}
+                        className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer"
+                        title="إزالة الملف"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <label className="border-2 border-dashed border-amber-300 hover:border-amber-400 bg-amber-50/30 hover:bg-amber-50/70 rounded-xl p-4 text-center cursor-pointer block transition-colors">
+                    <UploadCloud className="w-8 h-8 text-amber-500 mx-auto mb-1.5" />
+                    <p className="font-bold text-gray-800 text-xs">
+                      انقر لاختيار صورة هوية المستضيف أو اسحبها وأفلتها هنا
+                    </p>
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      يقبل ملفات الصور (JPG, PNG) أو مستند PDF (حد أقصى 10 ميجابايت)
+                    </p>
+                    <input
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) handleHostModalFileChange(f);
+                      }}
+                    />
+                  </label>
+                )}
+              </div>
+
+              {/* Host Phone Number (Main field) */}
+              <div>
+                <label className="block font-bold text-gray-800 mb-1">
+                  رقم هاتف المستضيف (في المملكة) *
+                </label>
+                <div className="relative">
+                  <input
+                    type="tel"
+                    required
+                    dir="ltr"
+                    value={hostModalPhone}
+                    onChange={(e) => setHostModalPhone(e.target.value)}
+                    placeholder="05xxxxxxxx أو +9665xxxxxxxx"
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 text-gray-900 font-mono font-bold text-sm text-left pl-10"
+                  />
+                  <Phone className="w-4 h-4 text-gray-400 absolute left-3 top-3 pointer-events-none" />
+                </div>
+                <p className="text-[10px] text-gray-500 mt-1">
+                  رقم جوال المستضيف المعتمد للتواصل والإشعارات ورسائل الواتساب.
+                </p>
+              </div>
+
+              {/* Grid of Other Host Details */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-gray-100">
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">اسم المستضيف رباعي</label>
+                  <input
+                    type="text"
+                    value={hostModalName}
+                    onChange={(e) => setHostModalName(e.target.value)}
+                    placeholder="مثال: عبد الله محمد الشريف"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 text-gray-800 font-medium"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">رقم الهوية أو الإقامة</label>
+                  <input
+                    type="text"
+                    value={hostModalNationalId}
+                    onChange={(e) => setHostModalNationalId(e.target.value)}
+                    placeholder="10xxxxxxxx أو 20xxxxxxxx"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 text-gray-800 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">الجنسية</label>
+                  <input
+                    type="text"
+                    value={hostModalNationality}
+                    onChange={(e) => setHostModalNationality(e.target.value)}
+                    placeholder="سعودي"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 text-gray-800"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">تاريخ ميلاد المستضيف</label>
+                  <input
+                    type="text"
+                    value={hostModalBirthDate}
+                    onChange={(e) => setHostModalBirthDate(e.target.value)}
+                    placeholder="YYYY/MM/DD"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 text-gray-800 font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAddHostModal(false);
+                    setHostModalFile(null);
+                    setHostModalFilePreview(null);
+                  }}
+                  className="px-4 py-2 font-semibold text-gray-600 hover:bg-gray-100 rounded-xl cursor-pointer"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionLoading || !hostModalPhone.trim()}
+                  className="px-5 py-2 font-bold bg-amber-600 hover:bg-amber-700 text-white rounded-xl shadow-xs flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {actionLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>جاري الحفظ...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>حفظ بيانات ومستند المستضيف</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>
