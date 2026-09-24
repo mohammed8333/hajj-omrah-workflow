@@ -1803,365 +1803,323 @@ export default function RequestDetailPage({
   }
 
   return (
-    <div className="space-y-6 w-full">
+    <div className="space-y-6 w-full max-w-full overflow-x-hidden">
       {/* Top Breadcrumb & Status Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl border border-gray-200 shadow-xs">
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <button
-              onClick={() => router.push("/dashboard")}
-              className="text-xs text-gray-500 hover:text-gray-900 flex items-center gap-1"
-            >
-              <ArrowRight className="w-3.5 h-3.5" />
-              <span>الرئيسية</span>
-            </button>
-            <span className="text-gray-300">/</span>
-            <span className="text-xs font-mono font-bold bg-gray-100 text-gray-800 px-2 py-0.5 rounded">
-              {request.requestNumber}
-            </span>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="text-xl sm:text-2xl font-black text-gray-900">
-              {request.groupName}
-            </h1>
-            {canEditAnyData && (
+      <div className="bg-white p-5 sm:p-6 rounded-2xl border border-gray-200 shadow-xs space-y-4 max-w-full overflow-hidden">
+        {/* Row 1: Breadcrumb + Group Name + Edit button on Right, Status Badge on Left */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="space-y-1.5 min-w-0">
+            <div className="flex items-center gap-2">
               <button
-                type="button"
-                onClick={() => {
-                  setEditGroupName(request.groupName);
-                  setEditContactPhone(request.contactPhone);
-                  setEditDestination(request.destination || "");
-                  setEditNotes(request.notes || "");
-                  setEditNusukGroupNumber(request.nusukGroupNumber || "");
-                  setEditSenderCode(request.senderCode || "");
-                  setShowEditGeneralModal(true);
-                }}
-                className="text-xs text-sky-700 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-                title="تعديل بيانات المعاملة (الاسم، الهاتف، الملاحظات، رقم نسك، الكود)"
+                onClick={() => router.push("/dashboard")}
+                className="text-xs text-gray-500 hover:text-gray-900 flex items-center gap-1 transition-colors cursor-pointer"
               >
-                <Edit2 className="w-3.5 h-3.5" />
-                <span>تعديل المعاملة</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+                <span>الرئيسية</span>
               </button>
-            )}
+              <span className="text-gray-300">/</span>
+              <span className="text-xs font-mono font-bold bg-gray-100 text-gray-800 px-2 py-0.5 rounded">
+                {request.requestNumber}
+              </span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight break-words">
+                {request.groupName}
+              </h1>
+              {canEditAnyData && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditGroupName(request.groupName);
+                    setEditContactPhone(request.contactPhone);
+                    setEditDestination(request.destination || "");
+                    setEditNotes(request.notes || "");
+                    setEditNusukGroupNumber(request.nusukGroupNumber || "");
+                    setEditSenderCode(request.senderCode || "");
+                    setShowEditGeneralModal(true);
+                  }}
+                  className="text-xs text-sky-700 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="تعديل بيانات المعاملة (الاسم، الهاتف، الملاحظات، رقم نسك، الكود)"
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                  <span>تعديل المعاملة</span>
+                </button>
+              )}
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 mt-2">
-            <span className="flex items-center gap-1">
-              <Phone className="w-3.5 h-3.5" />
-              <span dir="ltr">{request.contactPhone}</span>
-            </span>
-            <span>•</span>
-            <span className="flex items-center gap-1">
-              <Users className="w-3.5 h-3.5" />
-              <span>{request.travelers.length} مسافرين</span>
-            </span>
-            {request.travelDate && (
-              <>
-                <span>•</span>
-                <span className="flex items-center gap-1">
-                  <Calendar className="w-3.5 h-3.5" />
-                  <span>
-                    {new Date(request.travelDate).toLocaleDateString("ar-SA")}
-                  </span>
-                </span>
-              </>
-            )}
-            {request.nusukGroupNumber && (
-              <>
-                <span>•</span>
-                <span className="bg-emerald-50 text-emerald-800 font-bold px-2 py-0.5 rounded border border-emerald-200">
-                  رقم نسك: {request.nusukGroupNumber}
-                </span>
-              </>
+          {/* Status Badge in its own dedicated corner */}
+          <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
+            {request.status === "Completed" || request.status === "Archived" ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-300 shadow-2xs">
+                <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                <span>(تم)</span>
+              </span>
+            ) : isSaudiAgent ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-sky-50 text-sky-700 border border-sky-300 shadow-2xs">
+                <Check className="w-3.5 h-3.5 text-sky-600" />
+                <span>تم الاستلام</span>
+              </span>
+            ) : (
+              <RequestStatusBadge status={request.status} />
             )}
           </div>
         </div>
 
-        <div className="flex flex-col items-start md:items-end gap-2 shrink-0">
-          {request.status === "Completed" || request.status === "Archived" ? (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-300 shadow-2xs">
-              <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
-              <span>(تم)</span>
+        {/* Row 2: Metadata / Quick info */}
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-gray-600 pt-2 border-t border-gray-100">
+          <span className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1 rounded-lg border border-gray-150">
+            <Phone className="w-3.5 h-3.5 text-gray-400" />
+            <span dir="ltr" className="font-mono font-bold text-gray-700">{request.contactPhone}</span>
+          </span>
+          <span className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1 rounded-lg border border-gray-150">
+            <Users className="w-3.5 h-3.5 text-gray-400" />
+            <span className="font-bold text-gray-700">{request.travelers.length} مسافرين</span>
+          </span>
+          {request.travelDate && (
+            <span className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1 rounded-lg border border-gray-150">
+              <Calendar className="w-3.5 h-3.5 text-gray-400" />
+              <span className="text-gray-700 font-medium">
+                {new Date(request.travelDate).toLocaleDateString("ar-SA")}
+              </span>
             </span>
-          ) : isSaudiAgent ? (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-sky-50 text-sky-700 border border-sky-300 shadow-2xs">
-              <Check className="w-3.5 h-3.5 text-sky-600" />
-              <span>تم الاستلام</span>
+          )}
+          {request.nusukGroupNumber && (
+            <span className="bg-emerald-50 text-emerald-800 font-bold px-2.5 py-1 rounded-lg border border-emerald-200 flex items-center gap-1.5">
+              <span>رقم نسك:</span>
+              <span className="font-mono">{request.nusukGroupNumber}</span>
             </span>
-          ) : (
-            <RequestStatusBadge status={request.status} />
+          )}
+          {request.senderCode && (
+            <span className="bg-sky-50 text-sky-800 font-bold px-2.5 py-1 rounded-lg border border-sky-200 flex items-center gap-1">
+              <span>كود المرسل:</span>
+              <span className="font-mono">{request.senderCode}</span>
+            </span>
+          )}
+        </div>
+
+        {/* Row 3: Action Toolbar - Full width, wraps smoothly without overflow */}
+        <div className="pt-3 border-t border-gray-100 flex flex-wrap items-center gap-2 w-full">
+          {/* Sender & Admin Actions: تقديم الطلب للاعتماد */}
+          {(role === "Sender" || role === "Admin") && request.status === "Draft" && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                handleSubmitRequest();
+              }}
+              disabled={actionLoading}
+              className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
+            >
+              <Send className="w-3.5 h-3.5" />
+              <span>تقديم الطلب للاعتماد</span>
+            </button>
           )}
 
-          {/* Action buttons by Role */}
-          <div className="flex flex-wrap items-center gap-2 mt-2">
-            {/* Sender & Admin Actions: تقديم الطلب للاعتماد */}
-            {(role === "Sender" || role === "Admin") && request.status === "Draft" && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleSubmitRequest();
-                }}
-                disabled={actionLoading}
-                className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
-              >
-                <Send className="w-3.5 h-3.5" />
-                <span>تقديم الطلب للاعتماد</span>
-              </button>
+          {/* Safa Employee & Admin Actions: بدء التدقيق والمراجعة */}
+          {isSafaReviewer && request.status === "Submitted" && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                handleSafaStartReview();
+              }}
+              disabled={actionLoading}
+              className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
+            >
+              <Check className="w-3.5 h-3.5" />
+              <span>بدء التدقيق والمراجعة</span>
+            </button>
+          )}
+
+          {isSafaReviewer &&
+            (request.status === "UnderReview" ||
+              request.status === "DocumentsCompleted" ||
+              request.status === "SafaRegistrationCompleted") && (
+              <>
+                <button
+                  type="button"
+                  onClick={async (e) => {
+                    e.preventDefault();
+                    if (!canCompleteSafa) {
+                      await alert({
+                        title: "تنبيه تدقيق المستندات",
+                        message: docCheck.reason || "لا يمكن إدخال رقم نسك إلا بعد قبول جميع المستندات.",
+                        variant: "warning",
+                      });
+                      return;
+                    }
+                    const dep = request.departureDate || request.travelDate;
+                    const ret = request.returnDate;
+                    const senderCode = request.senderCode || resolveSenderCode(user);
+                    const suggested = formatOfficialGroupName(senderCode, dep, ret);
+                    const currentIsGeneric = !request.groupName || request.groupName.startsWith("مجموعة ") || request.groupName.startsWith("طلب جديد");
+                    setNusukGroupName(currentIsGeneric && suggested ? suggested : (request.groupName || suggested || ""));
+                    setShowNusukModal(true);
+                  }}
+                  disabled={actionLoading || !canCompleteSafa}
+                  title={
+                    !canCompleteSafa
+                      ? docCheck.reason || "يجب تدقيق وقبول جميع المستندات أولاً"
+                      : request.nusukGroupNumber
+                      ? "تعديل رقم نسك وإكمال صفا"
+                      : "إدخال رقم نسك وإكمال صفا"
+                  }
+                  className={
+                    !canCompleteSafa
+                      ? "bg-gray-200 text-gray-400 border border-gray-300 cursor-not-allowed text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5"
+                      : "bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
+                  }
+                >
+                  <Building className="w-3.5 h-3.5" />
+                  <span>
+                    {request.nusukGroupNumber
+                      ? "تعديل رقم نسك وإكمال صفا"
+                      : "إدخال رقم نسك وإكمال صفا"}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleSendToSaudiAgent();
+                  }}
+                  disabled={actionLoading || !request.nusukGroupNumber || !canCompleteSafa}
+                  title={
+                    !canCompleteSafa
+                      ? docCheck.reason || "يجب تدقيق وقبول جميع المستندات أولاً"
+                      : !request.nusukGroupNumber
+                      ? "يجب إدخال رقم مجموعة نسك أولاً"
+                      : "إحالة إلى الوكيل السعودي"
+                  }
+                  className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>إحالة للوكيل السعودي</span>
+                </button>
+
+                {request.status === "SafaRegistrationCompleted" && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleSafaStartReview();
+                    }}
+                    disabled={actionLoading}
+                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold px-3 py-2 rounded-xl flex items-center gap-1 cursor-pointer"
+                    title="إعادة المعاملة لحالة قيد المراجعة لتعديل المستندات أو التدقيق"
+                  >
+                    <span>إعادة للمراجعة</span>
+                  </button>
+                )}
+              </>
             )}
 
-            {/* Safa Employee & Admin Actions: بدء التدقيق والمراجعة */}
-            {isSafaReviewer && request.status === "Submitted" && (
+          {/* زر إرسال حزمة المعاملة لمجموعة الواتساب (متاح لموظف الصفا والأدمن في كل المراحل بعد المسودة) */}
+          {isSafaReviewer && request.status !== "Draft" && request.status !== "Submitted" && (
+            <WhatsAppGroupSendButton
+              request={request}
+              ticketDoc={
+                request.groupDocuments?.find((d) => d.documentType === "FlightTicket") ||
+                request.travelers?.[0]?.documents?.find((d) => d.documentType === "FlightTicket")
+              }
+              hostDoc={
+                request.hostingInfo?.hostIdDocument ||
+                request.groupDocuments?.find((d) => d.documentType === "HostId")
+              }
+            />
+          )}
+
+          {/* Saudi Agent & Admin Direct Action: زر "تم" للوكيل السعودي وللأدمن */}
+          {(isSaudiAgent || isAdmin) && (
+            request.status === "Archived" ? (
+              <div className="flex items-center gap-1.5 bg-purple-50 text-purple-700 border border-purple-200 px-4 py-2 rounded-xl text-xs font-black shadow-xs">
+                <Archive className="w-4 h-4 text-purple-600" />
+                <span>المعاملة في الأرشيف (تم) ✓</span>
+              </div>
+            ) : (
               <button
                 type="button"
                 onClick={(e) => {
                   e.preventDefault();
-                  handleSafaStartReview();
+                  handleAgentArchive();
+                }}
+                disabled={actionLoading}
+                className="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs sm:text-sm font-black px-6 py-2 rounded-xl shadow-md hover:shadow-lg flex items-center gap-2 cursor-pointer transition-all active:scale-95"
+                title="اعتماد المعاملة ونقلها إلى الأرشيف (تم)"
+              >
+                <Check className="w-4 h-4 stroke-[3]" />
+                <span>تم</span>
+              </button>
+            )
+          )}
+
+          {/* Admin Testing Workflow Actions */}
+          {isAdmin && !isSaudiAgent && request.status === "ReadyForSaudiAgent" && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                handleAgentReceive();
+              }}
+              disabled={actionLoading}
+              className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
+            >
+              <CheckCircle className="w-3.5 h-3.5" />
+              <span>تأكيد استلام المعاملة</span>
+            </button>
+          )}
+
+          {isAdmin &&
+            !isSaudiAgent &&
+            (request.status === "ReceivedBySaudiAgent" ||
+              request.status === "SaudiAgentProcessing") && (
+              <>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setCorrectionTarget({});
+                    setShowCorrectionModal(true);
+                  }}
+                  className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
+                >
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  <span>طلب تصحيح / ملاحظة</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleLinkProgram();
+                  }}
+                  disabled={actionLoading}
+                  className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Link2 className="w-3.5 h-3.5" />
+                  <span>تم ربط البرنامج</span>
+                </button>
+              </>
+            )}
+
+          {isAdmin && !isSaudiAgent && request.status === "ProgramLinked" && (
+            request.hasHosting ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleRequestHostingAcceptance();
                 }}
                 disabled={actionLoading}
                 className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
               >
-                <Check className="w-3.5 h-3.5" />
-                <span>بدء التدقيق والمراجعة</span>
+                <Home className="w-3.5 h-3.5" />
+                <span>طلب قبول الاستضافة</span>
               </button>
-            )}
-
-            {isSafaReviewer &&
-              (request.status === "UnderReview" ||
-                request.status === "DocumentsCompleted" ||
-                request.status === "SafaRegistrationCompleted") && (
-                <>
-                  <button
-                    type="button"
-                    onClick={async (e) => {
-                      e.preventDefault();
-                      if (!canCompleteSafa) {
-                        await alert({
-                          title: "تنبيه تدقيق المستندات",
-                          message: docCheck.reason || "لا يمكن إدخال رقم نسك إلا بعد قبول جميع المستندات.",
-                          variant: "warning",
-                        });
-                        return;
-                      }
-                      const dep = request.departureDate || request.travelDate;
-                      const ret = request.returnDate;
-                      const senderCode = request.senderCode || resolveSenderCode(user);
-                      const suggested = formatOfficialGroupName(senderCode, dep, ret);
-                      const currentIsGeneric = !request.groupName || request.groupName.startsWith("مجموعة ") || request.groupName.startsWith("طلب جديد");
-                      setNusukGroupName(currentIsGeneric && suggested ? suggested : (request.groupName || suggested || ""));
-                      setShowNusukModal(true);
-                    }}
-                    disabled={actionLoading || !canCompleteSafa}
-                    title={
-                      !canCompleteSafa
-                        ? docCheck.reason || "يجب تدقيق وقبول جميع المستندات أولاً"
-                        : request.nusukGroupNumber
-                        ? "تعديل رقم نسك وإكمال صفا"
-                        : "إدخال رقم نسك وإكمال صفا"
-                    }
-                    className={
-                      !canCompleteSafa
-                        ? "bg-gray-200 text-gray-400 border border-gray-300 cursor-not-allowed text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5"
-                        : "bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
-                    }
-                  >
-                    <Building className="w-3.5 h-3.5" />
-                    <span>
-                      {request.nusukGroupNumber
-                        ? "تعديل رقم نسك وإكمال صفا"
-                        : "إدخال رقم نسك وإكمال صفا"}
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handleSendToSaudiAgent();
-                    }}
-                    disabled={actionLoading || !request.nusukGroupNumber || !canCompleteSafa}
-                    title={
-                      !canCompleteSafa
-                        ? docCheck.reason || "يجب تدقيق وقبول جميع المستندات أولاً"
-                        : !request.nusukGroupNumber
-                        ? "يجب إدخال رقم مجموعة نسك أولاً"
-                        : "إحالة إلى الوكيل السعودي"
-                    }
-                    className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                    <span>إحالة للوكيل السعودي</span>
-                  </button>
-
-                  {request.status === "SafaRegistrationCompleted" && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleSafaStartReview();
-                      }}
-                      disabled={actionLoading}
-                      className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold px-3 py-2 rounded-xl flex items-center gap-1 cursor-pointer"
-                      title="إعادة المعاملة لحالة قيد المراجعة لتعديل المستندات أو التدقيق"
-                    >
-                      <span>إعادة للمراجعة</span>
-                    </button>
-                  )}
-                </>
-              )}
-
-            {/* زر إرسال حزمة المعاملة لمجموعة الواتساب (متاح لموظف الصفا والأدمن في كل المراحل بعد المسودة) */}
-            {isSafaReviewer && request.status !== "Draft" && request.status !== "Submitted" && (
-              <WhatsAppGroupSendButton
-                request={request}
-                ticketDoc={
-                  request.groupDocuments?.find((d) => d.documentType === "FlightTicket") ||
-                  request.travelers?.[0]?.documents?.find((d) => d.documentType === "FlightTicket")
-                }
-                hostDoc={
-                  request.hostingInfo?.hostIdDocument ||
-                  request.groupDocuments?.find((d) => d.documentType === "HostId")
-                }
-              />
-            )}
-
-            {/* Saudi Agent & Admin Direct Action: زر "تم" للوكيل السعودي وللأدمن */}
-            {(isSaudiAgent || isAdmin) && (
-              request.status === "Archived" ? (
-                <div className="flex items-center gap-1.5 bg-purple-50 text-purple-700 border border-purple-200 px-4 py-2 rounded-xl text-xs font-black shadow-xs">
-                  <Archive className="w-4 h-4 text-purple-600" />
-                  <span>المعاملة في الأرشيف (تم) ✓</span>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handleAgentArchive();
-                  }}
-                  disabled={actionLoading}
-                  className="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs sm:text-sm font-black px-6 py-2.5 rounded-xl shadow-md hover:shadow-lg flex items-center gap-2 cursor-pointer transition-all active:scale-95"
-                  title="اعتماد المعاملة ونقلها إلى الأرشيف (تم)"
-                >
-                  <Check className="w-4 h-4 stroke-[3]" />
-                  <span>تم</span>
-                </button>
-              )
-            )}
-
-            {/* Admin Testing Workflow Actions */}
-            {isAdmin && !isSaudiAgent && request.status === "ReadyForSaudiAgent" && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleAgentReceive();
-                }}
-                disabled={actionLoading}
-                className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
-              >
-                <CheckCircle className="w-3.5 h-3.5" />
-                <span>تأكيد استلام المعاملة</span>
-              </button>
-            )}
-
-            {isAdmin &&
-              !isSaudiAgent &&
-              (request.status === "ReceivedBySaudiAgent" ||
-                request.status === "SaudiAgentProcessing") && (
-                <>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setCorrectionTarget({});
-                      setShowCorrectionModal(true);
-                    }}
-                    className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <AlertTriangle className="w-3.5 h-3.5" />
-                    <span>طلب تصحيح / ملاحظة</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handleLinkProgram();
-                    }}
-                    disabled={actionLoading}
-                    className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Link2 className="w-3.5 h-3.5" />
-                    <span>تم ربط البرنامج</span>
-                  </button>
-                </>
-              )}
-
-            {isAdmin && !isSaudiAgent && request.status === "ProgramLinked" && (
-              request.hasHosting ? (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handleRequestHostingAcceptance();
-                  }}
-                  disabled={actionLoading}
-                  className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Home className="w-3.5 h-3.5" />
-                  <span>طلب قبول الاستضافة</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handleAgentComplete();
-                  }}
-                  disabled={actionLoading}
-                  className="bg-green-600 hover:bg-green-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Check className="w-3.5 h-3.5" />
-                  <span>تم اعتماده وإنهاء المعاملة ✓</span>
-                </button>
-              )
-            )}
-
-            {/* Step 3: Sender / Admin when HostingAcceptanceRequested sees "تم قبول طلب الاستضافة" */}
-            {(isSender || isAdmin) && request.status === "HostingAcceptanceRequested" && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleAcceptHosting();
-                }}
-                disabled={actionLoading}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
-              >
-                <Check className="w-3.5 h-3.5" />
-                <span>تم قبول طلب الاستضافة</span>
-              </button>
-            )}
-
-            {/* Step 4: Sender / Admin when HostingAcceptedBySender sees "تأكيد الاستضافة للوكيل" */}
-            {(isSender || isAdmin) && request.status === "HostingAcceptedBySender" && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleConfirmHosting();
-                }}
-                disabled={actionLoading}
-                className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
-              >
-                <Send className="w-3.5 h-3.5" />
-                <span>تأكيد الاستضافة للوكيل</span>
-              </button>
-            )}
-
-            {isAdmin && !isSaudiAgent && request.status === "HostingConfirmed" && (
+            ) : (
               <button
                 type="button"
                 onClick={(e) => {
@@ -2174,91 +2132,138 @@ export default function RequestDetailPage({
                 <Check className="w-3.5 h-3.5" />
                 <span>تم اعتماده وإنهاء المعاملة ✓</span>
               </button>
-            )}
+            )
+          )}
 
-            {isAdmin && !isSaudiAgent && request.status === "Completed" && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleAgentArchive();
-                }}
-                disabled={actionLoading}
-                className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
-                title="إيداع المعاملة في الأرشيف (تم)"
-              >
-                <Check className="w-3.5 h-3.5" />
-                <span>تم (إيداع في الأرشيف)</span>
-              </button>
-            )}
+          {/* Step 3: Sender / Admin when HostingAcceptanceRequested sees "تم قبول طلب الاستضافة" */}
+          {(isSender || isAdmin) && request.status === "HostingAcceptanceRequested" && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                handleAcceptHosting();
+              }}
+              disabled={actionLoading}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
+            >
+              <Check className="w-3.5 h-3.5" />
+              <span>تم قبول طلب الاستضافة</span>
+            </button>
+          )}
 
-            {isAdmin && !isSaudiAgent && request.status === "Archived" && (
-              <div className="flex items-center gap-1.5 bg-purple-50 text-purple-700 border border-purple-200 px-3 py-1.5 rounded-xl text-xs font-bold">
-                <Archive className="w-3.5 h-3.5 text-purple-600" />
-                <span>المعاملة مؤرشفة (تم) ✓</span>
-              </div>
-            )}
+          {/* Step 4: Sender / Admin when HostingAcceptedBySender sees "تأكيد الاستضافة للوكيل" */}
+          {(isSender || isAdmin) && request.status === "HostingAcceptedBySender" && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                handleConfirmHosting();
+              }}
+              disabled={actionLoading}
+              className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
+            >
+              <Send className="w-3.5 h-3.5" />
+              <span>تأكيد الاستضافة للوكيل</span>
+            </button>
+          )}
 
-            {/* Admin Management Actions: Archive & Delete */}
-            {role === "Admin" && (
-              <div className="flex items-center gap-1.5 border-r border-gray-200 pr-2 mr-1">
-                {request.status === "Archived" ? (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handleAdminUnarchive();
-                    }}
-                    disabled={actionLoading}
-                    className="bg-amber-100 hover:bg-amber-200 text-amber-900 text-xs font-bold px-3 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
-                    title="إلغاء أرشفة المعاملة"
-                  >
-                    <Archive className="w-3.5 h-3.5" />
-                    <span>إلغاء الأرشفة</span>
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handleAdminArchive();
-                    }}
-                    disabled={actionLoading}
-                    className="bg-purple-100 hover:bg-purple-200 text-purple-900 text-xs font-bold px-3 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
-                    title="أرشفة المعاملة"
-                  >
-                    <Archive className="w-3.5 h-3.5" />
-                    <span>أرشفة</span>
-                  </button>
-                )}
+          {isAdmin && !isSaudiAgent && request.status === "HostingConfirmed" && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                handleAgentComplete();
+              }}
+              disabled={actionLoading}
+              className="bg-green-600 hover:bg-green-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
+            >
+              <Check className="w-3.5 h-3.5" />
+              <span>تم اعتماده وإنهاء المعاملة ✓</span>
+            </button>
+          )}
 
+          {isAdmin && !isSaudiAgent && request.status === "Completed" && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                handleAgentArchive();
+              }}
+              disabled={actionLoading}
+              className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+              title="إيداع المعاملة في الأرشيف (تم)"
+            >
+              <Check className="w-3.5 h-3.5" />
+              <span>تم (إيداع في الأرشيف)</span>
+            </button>
+          )}
+
+          {isAdmin && !isSaudiAgent && request.status === "Archived" && (
+            <div className="flex items-center gap-1.5 bg-purple-50 text-purple-700 border border-purple-200 px-3 py-1.5 rounded-xl text-xs font-bold">
+              <Archive className="w-3.5 h-3.5 text-purple-600" />
+              <span>المعاملة مؤرشفة (تم) ✓</span>
+            </div>
+          )}
+
+          {/* Admin Management Actions: Archive & Delete */}
+          {role === "Admin" && (
+            <div className="flex flex-wrap items-center gap-2">
+              {request.status === "Archived" ? (
                 <button
                   type="button"
                   onClick={(e) => {
                     e.preventDefault();
-                    handleAdminDelete();
+                    handleAdminUnarchive();
                   }}
                   disabled={actionLoading}
-                  className="bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold px-3 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer border border-red-200 transition-colors"
-                  title="حذف المعاملة نهائياً من النظام"
+                  className="bg-amber-100 hover:bg-amber-200 text-amber-900 text-xs font-bold px-3 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                  title="إلغاء أرشفة المعاملة"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>مسح المعاملة</span>
+                  <Archive className="w-3.5 h-3.5" />
+                  <span>إلغاء الأرشفة</span>
                 </button>
-              </div>
-            )}
+              ) : (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleAdminArchive();
+                  }}
+                  disabled={actionLoading}
+                  className="bg-purple-100 hover:bg-purple-200 text-purple-900 text-xs font-bold px-3 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                  title="أرشفة المعاملة"
+                >
+                  <Archive className="w-3.5 h-3.5" />
+                  <span>أرشفة</span>
+                </button>
+              )}
 
-            {/* Direct WhatsApp Messaging Trigger */}
-            <button
-              type="button"
-              onClick={() => setShowWhatsAppModal(true)}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
-              title="إرسال رسالة واتساب بنماذج جاهزة ذكية"
-            >
-              <MessageCircle className="w-3.5 h-3.5" />
-              <span>إرسال واتساب</span>
-            </button>
-          </div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleAdminDelete();
+                }}
+                disabled={actionLoading}
+                className="bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold px-3 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer border border-red-200 transition-colors"
+                title="حذف المعاملة نهائياً من النظام"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>مسح المعاملة</span>
+              </button>
+            </div>
+          )}
+
+          {/* Direct WhatsApp Messaging Trigger */}
+          <button
+            type="button"
+            onClick={() => setShowWhatsAppModal(true)}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+            title="إرسال رسالة واتساب بنماذج جاهزة ذكية"
+          >
+            <MessageCircle className="w-3.5 h-3.5" />
+            <span>إرسال واتساب</span>
+          </button>
         </div>
       </div>
 
