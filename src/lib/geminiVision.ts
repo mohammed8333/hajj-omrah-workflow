@@ -5,7 +5,16 @@
 
 const GEMINI_API_KEY_STORAGE_KEY = "gemini_ai_api_key";
 const GEMINI_SELECTED_MODEL_KEY = "gemini_selected_model";
-const DEFAULT_GEMINI_MODEL = "gemini-3.6-flash";
+const DEFAULT_GEMINI_MODEL = "gemini-2.0-flash";
+
+export const CANDIDATE_GEMINI_MODELS: string[] = [
+  "gemini-2.0-flash",
+  "gemini-1.5-flash",
+  "gemini-2.0-flash-lite",
+  "gemini-1.5-flash-8b",
+  "gemini-1.5-pro",
+  "gemini-2.0-flash-exp",
+];
 
 export interface GeminiPassportResult {
   fullNameArabic?: string;
@@ -109,24 +118,18 @@ export async function resolveAvailableGeminiModel(
   // 1. Check cached model if not force refreshing
   if (!forceRefresh && typeof window !== "undefined") {
     const cached = localStorage.getItem(GEMINI_SELECTED_MODEL_KEY);
-    // Discard any deprecated or broken cached models
-    if (cached && cached !== "gemini-2.5-flash") {
+    // Discard any deprecated, fictional, or broken cached models
+    if (
+      cached &&
+      !cached.startsWith("gemini-3.") &&
+      cached !== "gemini-2.5-flash"
+    ) {
       return cached;
     }
   }
 
-  // Known candidate models (newest first, explicitly starting with gemini-3.6-flash)
-  const candidatePool: string[] = [
-    "gemini-3.6-flash",
-    "gemini-3.6-flash-preview",
-    "gemini-3.6",
-    "gemini-2.0-flash",
-    "gemini-2.0-flash-exp",
-    "gemini-1.5-flash-latest",
-    "gemini-1.5-flash-002",
-    "gemini-1.5-flash",
-    "gemini-1.5-pro",
-  ];
+  // Known candidate models (newest and most reliable first)
+  const candidatePool: string[] = [...CANDIDATE_GEMINI_MODELS];
 
   // 2. Query Google's ListModels API to discover exact available models
   try {
@@ -309,50 +312,76 @@ async function callGeminiVision(
     },
   };
 
-  let model = await resolveAvailableGeminiModel(apiKey);
-  let endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  // 1. Determine preferred model
+  const preferredModel = await resolveAvailableGeminiModel(apiKey);
 
-  let response = await fetch(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  // 2. Build prioritized list of models to try
+  const modelsToTry: string[] = [
+    preferredModel,
+    ...CANDIDATE_GEMINI_MODELS.filter((m) => m !== preferredModel),
+  ];
 
-  // If model is deprecated or not found, resolve a fresh active model and retry once
-  if (!response.ok && (response.status === 404 || response.status === 400)) {
-    const errorData = await response.json().catch(() => ({}));
-    const errMsg = (errorData?.error?.message || "").toLowerCase();
-    if (
-      errMsg.includes("not found") ||
-      errMsg.includes("no longer available") ||
-      errMsg.includes("not supported")
-    ) {
-      console.warn(`Model ${model} failed, resolving a fresh active model...`);
-      model = await resolveAvailableGeminiModel(apiKey, true);
-      endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-      response = await fetch(endpoint, {
+  let lastErrorMsg = "";
+
+  for (let i = 0; i < modelsToTry.length; i++) {
+    const currentModel = modelsToTry[i];
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${apiKey}`;
+
+    try {
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+
+      if (response.ok) {
+        const data = await response.json();
+        const textOutput = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (textOutput) {
+          // Successfully obtained scan result, persist this healthy model
+          if (typeof window !== "undefined") {
+            localStorage.setItem(GEMINI_SELECTED_MODEL_KEY, currentModel);
+          }
+          return textOutput;
+        }
+      }
+
+      const errorData = await response.json().catch(() => ({}));
+      const errMsg = errorData?.error?.message || `HTTP ${response.status}`;
+      lastErrorMsg = errMsg;
+
+      console.warn(
+        `Gemini vision model [${currentModel}] failed (${response.status}: ${errMsg}). Trying alternative model...`
+      );
+
+      // If Google explicitly suggested another model in the error message, insert it next
+      const suggestedMatch = errMsg.match(/models\/([a-zA-Z0-9\.\-_]+)/);
+      if (suggestedMatch && suggestedMatch[1] && !modelsToTry.includes(suggestedMatch[1])) {
+        modelsToTry.splice(i + 1, 0, suggestedMatch[1]);
+      }
+
+      // If high demand (503) or rate-limit (429), pause briefly before trying next model
+      if (response.status === 503 || response.status === 429) {
+        await new Promise((r) => setTimeout(r, 700));
+      }
+    } catch (netErr: unknown) {
+      const netMsg = netErr instanceof Error ? netErr.message : "خطأ اتصال بالشبكة";
+      lastErrorMsg = netMsg;
+      console.warn(`Network error with Gemini model [${currentModel}]:`, netErr);
     }
   }
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    const errMsg =
-      errorData?.error?.message ||
-      `خطأ في فحص الوثيقة بالذكاء الاصطناعي (${response.status})`;
-    throw new Error(errMsg);
+  // Format user-friendly error if all models exhausted
+  let friendlyMsg = lastErrorMsg;
+  if (lastErrorMsg.includes("high demand") || lastErrorMsg.includes("503")) {
+    friendlyMsg =
+      "تشهد خوادم Google Gemini ضغطاً مؤقتاً في الوقت الحالي (503 High Demand). تم التحويل التلقائي للقارئ البديل، يرجى إعادة المحاولة بعد لحظات.";
+  } else if (lastErrorMsg.includes("quota") || lastErrorMsg.includes("429")) {
+    friendlyMsg =
+      "تم تجاوز حد الطلبات لمفتاح Gemini مؤقتاً (429 Rate Limit). يرجى الانتظار نصف دقيقة والمحاولة مجدداً.";
   }
 
-  const data = await response.json();
-  const textOutput = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!textOutput) {
-    throw new Error("لم يرجع محرك الذكاء الاصطناعي أي بيانات للمستند.");
-  }
-
-  return textOutput;
+  throw new Error(friendlyMsg || "فشل فحص المستند بالذكاء الاصطناعي عبر كافة موديلات Gemini المتاحة.");
 }
 
 /**
