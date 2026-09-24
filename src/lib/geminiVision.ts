@@ -3,6 +3,8 @@
  * Supports Passports, National IDs (Saudi, Egyptian, etc.), Iqamas, and Flight Tickets.
  */
 
+import { api } from "./api";
+
 const GEMINI_API_KEY_STORAGE_KEY = "gemini_ai_api_key";
 const GEMINI_SELECTED_MODEL_KEY = "gemini_selected_model";
 const DEFAULT_GEMINI_MODEL = "gemini-3.8-flash";
@@ -53,26 +55,69 @@ export interface GeminiFlightTicketResult {
   returnFlightDepartureTime?: string;
 }
 
-// 1. Storage & Key Management
-export function getGeminiApiKey(): string | null {
-  if (typeof window === "undefined") return null;
-  const key = localStorage.getItem(GEMINI_API_KEY_STORAGE_KEY);
-  return key ? key.trim() : null;
+// 1. Storage & Central Database Key Management
+let memoryApiKey: string | null = null;
+
+export async function syncGeminiApiKeyFromDatabase(): Promise<string | null> {
+  try {
+    const cloudKey = await api.settings.get(GEMINI_API_KEY_STORAGE_KEY);
+    if (cloudKey && cloudKey.trim()) {
+      const clean = cloudKey.trim();
+      memoryApiKey = clean;
+      if (typeof window !== "undefined") {
+        localStorage.setItem(GEMINI_API_KEY_STORAGE_KEY, clean);
+      }
+      return clean;
+    }
+  } catch (err) {
+    console.warn("Could not sync Gemini key from database:", err);
+  }
+  return getGeminiApiKey();
 }
 
-export function setGeminiApiKey(apiKey: string): void {
-  if (typeof window === "undefined") return;
+export function getGeminiApiKey(): string | null {
+  if (memoryApiKey) return memoryApiKey;
+  if (typeof window === "undefined") return null;
+  const key = localStorage.getItem(GEMINI_API_KEY_STORAGE_KEY);
+  if (key && key.trim()) {
+    memoryApiKey = key.trim();
+    return memoryApiKey;
+  }
+  return null;
+}
+
+export async function ensureGeminiApiKey(explicitKey?: string): Promise<string | null> {
+  if (explicitKey && explicitKey.trim()) {
+    return explicitKey.trim();
+  }
+  const current = getGeminiApiKey();
+  if (current) return current;
+  return await syncGeminiApiKeyFromDatabase();
+}
+
+export function setGeminiApiKey(apiKey: string, syncToDatabase = true): void {
   const trimmed = apiKey.trim();
-  if (trimmed) {
-    localStorage.setItem(GEMINI_API_KEY_STORAGE_KEY, trimmed);
-  } else {
-    localStorage.removeItem(GEMINI_API_KEY_STORAGE_KEY);
+  memoryApiKey = trimmed || null;
+  if (typeof window !== "undefined") {
+    if (trimmed) {
+      localStorage.setItem(GEMINI_API_KEY_STORAGE_KEY, trimmed);
+    } else {
+      localStorage.removeItem(GEMINI_API_KEY_STORAGE_KEY);
+    }
+  }
+  if (syncToDatabase) {
+    api.settings.set(GEMINI_API_KEY_STORAGE_KEY, trimmed).catch((e) => {
+      console.warn("Failed to persist Gemini API key to database:", e);
+    });
   }
 }
 
 export function removeGeminiApiKey(): void {
-  if (typeof window === "undefined") return;
-  localStorage.removeItem(GEMINI_API_KEY_STORAGE_KEY);
+  memoryApiKey = null;
+  if (typeof window !== "undefined") {
+    localStorage.removeItem(GEMINI_API_KEY_STORAGE_KEY);
+  }
+  api.settings.set(GEMINI_API_KEY_STORAGE_KEY, "").catch(console.warn);
 }
 
 // 2. Probing helper to verify if a Gemini model is active and working
@@ -262,14 +307,27 @@ async function fileOrUrlToBase64(
   return blobToBase64(fileOrUrl);
 }
 
-function blobToBase64(blob: Blob): Promise<{ base64: string; mimeType: string }> {
+function blobToBase64(blob: Blob | File): Promise<{ base64: string; mimeType: string }> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
       const result = reader.result as string;
       const commaIdx = result.indexOf(",");
       const meta = result.substring(5, commaIdx);
-      let mimeType = meta.split(";")[0] || blob.type || "image/jpeg";
+      let mimeType = meta.split(";")[0] || blob.type || "";
+
+      // Ensure PDF and common image extensions are accurately mapped to the correct MIME type
+      const fileName = (blob as File).name ? (blob as File).name.toLowerCase() : "";
+      if (fileName.endsWith(".pdf") || mimeType.includes("pdf")) {
+        mimeType = "application/pdf";
+      } else if (fileName.match(/\.(jpe?g)$/) || mimeType.includes("jpeg") || mimeType.includes("jpg")) {
+        mimeType = "image/jpeg";
+      } else if (fileName.endsWith(".png") || mimeType.includes("png")) {
+        mimeType = "image/png";
+      } else if (fileName.endsWith(".webp") || mimeType.includes("webp")) {
+        mimeType = "image/webp";
+      }
+
       if (!mimeType || mimeType === "application/octet-stream") {
         mimeType = "image/jpeg";
       }
@@ -287,10 +345,13 @@ async function callGeminiVision(
   fileOrUrl: File | Blob | string,
   explicitApiKey?: string
 ): Promise<string> {
-  const apiKey = (explicitApiKey || getGeminiApiKey() || "").trim();
+  let apiKey = (explicitApiKey || getGeminiApiKey() || "").trim();
+  if (!apiKey) {
+    apiKey = (await ensureGeminiApiKey()) || "";
+  }
   if (!apiKey) {
     throw new Error(
-      "لم يتم العثور على مفتاح Google Gemini API. يرجى حفظ المفتاح في الإعدادات أولاً."
+      "لم يتم العثور على مفتاح Google Gemini API في النظام أو قاعدة البيانات. يرجى إدخال وحفظ المفتاح في صفحة الإعدادات ليتم تفعيله على كافة الأجهزة."
     );
   }
 
@@ -437,7 +498,8 @@ Return strictly a JSON object with this structure:
 }
 `;
 
-  const rawJson = await callGeminiVision(prompt, fileOrUrl, apiKey);
+  const effectiveKey = await ensureGeminiApiKey(apiKey);
+  const rawJson = await callGeminiVision(prompt, fileOrUrl, effectiveKey || undefined);
   try {
     const parsed = JSON.parse(cleanJsonString(rawJson));
     return {
@@ -484,7 +546,8 @@ Return strictly a JSON object with this structure:
 }
 `;
 
-  const rawJson = await callGeminiVision(prompt, fileOrUrl, apiKey);
+  const effectiveKey = await ensureGeminiApiKey(apiKey);
+  const rawJson = await callGeminiVision(prompt, fileOrUrl, effectiveKey || undefined);
   try {
     const parsed = JSON.parse(cleanJsonString(rawJson));
     return {
@@ -541,7 +604,8 @@ Return strictly a valid JSON object matching this structure:
 }
 `;
 
-  const rawJson = await callGeminiVision(prompt, fileOrUrl, apiKey);
+  const effectiveKey = await ensureGeminiApiKey(apiKey);
+  const rawJson = await callGeminiVision(prompt, fileOrUrl, effectiveKey || undefined);
   try {
     const parsed = JSON.parse(cleanJsonString(rawJson));
 

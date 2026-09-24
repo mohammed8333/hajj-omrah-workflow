@@ -2300,6 +2300,20 @@ class LocalDatabaseEngine {
       storageSizeKb: Math.max(1, Math.round(storageBytes / 1024)),
     };
   }
+
+  public getSetting(key: string): string | null {
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem(`hajj_sys_setting_${key}`);
+  }
+
+  public setSetting(key: string, value: string): void {
+    if (typeof window === "undefined") return;
+    if (value) {
+      localStorage.setItem(`hajj_sys_setting_${key}`, value);
+    } else {
+      localStorage.removeItem(`hajj_sys_setting_${key}`);
+    }
+  }
 }
 
 export const localDB = new LocalDatabaseEngine();

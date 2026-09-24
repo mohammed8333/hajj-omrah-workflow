@@ -200,3 +200,17 @@ on conflict (username) do nothing;
 -- ====================================================================
 alter table if exists public.app_users add column if not exists sender_code text;
 alter table if exists public.group_requests add column if not exists sender_code text;
+
+-- ====================================================================
+-- 14. جدول إعدادات النظام ومفتاح الذكاء الاصطناعي المركزي (System Settings)
+-- ====================================================================
+create table if not exists public.system_settings (
+    key text primary key,
+    value text not null,
+    updated_at timestamptz not null default now()
+);
+
+alter table public.system_settings enable row level security;
+create policy "Allow all for anon on system_settings" on public.system_settings for all using (true) with check (true);
+alter publication supabase_realtime add table public.system_settings;
+

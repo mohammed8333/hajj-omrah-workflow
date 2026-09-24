@@ -704,4 +704,31 @@ export const api = {
       return await supabaseService.migration.migrateLocalDataToSupabase(requests, users, onProgress);
     },
   },
+
+  // Central System Settings (Gemini API key, global configs)
+  settings: {
+    get: async (key: string): Promise<string | null> => {
+      if (isSupabaseConfigured()) {
+        try {
+          const val = await supabaseService.settings.get(key);
+          if (val) {
+            // Cache locally
+            localDB.setSetting(key, val);
+            return val;
+          }
+        } catch (e) {
+          console.warn("Cloud settings get error:", e);
+        }
+      }
+      return localDB.getSetting(key);
+    },
+
+    set: async (key: string, value: string): Promise<void> => {
+      localDB.setSetting(key, value);
+      if (isSupabaseConfigured()) {
+        await supabaseService.settings.set(key, value);
+      }
+    },
+  },
 };
+

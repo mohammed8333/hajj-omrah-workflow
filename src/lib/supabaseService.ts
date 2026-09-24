@@ -1390,4 +1390,63 @@ export const supabaseService = {
       return { importedRequests: localRequests.length, importedUsers: localUsers.length };
     },
   },
+
+  settings: {
+    get: async (key: string): Promise<string | null> => {
+      try {
+        const client = getClient();
+        // 1. Try system_settings table first
+        const { data, error } = await client
+          .from("system_settings")
+          .select("value")
+          .eq("key", key)
+          .maybeSingle();
+
+        if (!error && data && data.value) {
+          return data.value;
+        }
+
+        // 2. Seamless fallback: check app_users table config row
+        const { data: userConfig, error: uErr } = await client
+          .from("app_users")
+          .select("phone")
+          .eq("id", `sys_setting_${key}`)
+          .maybeSingle();
+
+        if (!uErr && userConfig && userConfig.phone) {
+          return userConfig.phone;
+        }
+      } catch (err) {
+        console.warn("Error reading cloud setting:", key, err);
+      }
+      return null;
+    },
+
+    set: async (key: string, value: string): Promise<void> => {
+      try {
+        const client = getClient();
+        // 1. Try upserting to system_settings table
+        const { error } = await client
+          .from("system_settings")
+          .upsert({ key, value, updated_at: new Date().toISOString() });
+
+        if (!error) return;
+
+        // 2. Seamless fallback if system_settings table not yet created: store in app_users
+        await client.from("app_users").upsert({
+          id: `sys_setting_${key}`,
+          username: `__sys_config_${key}__`,
+          password: "system_protected",
+          full_name: `System Config: ${key}`,
+          role: "Admin",
+          phone: value,
+          is_active: false,
+        });
+      } catch (err) {
+        console.warn("Error writing cloud setting:", key, err);
+        throw err;
+      }
+    },
+  },
 };
+

@@ -1,12 +1,13 @@
 import { createWorker } from "tesseract.js";
 import { parseMrzLines } from "./mrzScanner";
-import { scanHostIdWithGemini, getGeminiApiKey } from "./geminiVision";
+import { scanHostIdWithGemini, ensureGeminiApiKey } from "./geminiVision";
 
 export interface ScannedHostIdData {
   hostName?: string;
   hostBirthDate?: string;
   hostNationality?: string;
   idNumber?: string;
+  hostPhone?: string;
   rawText?: string;
 }
 
@@ -215,7 +216,7 @@ export async function scanHostId(
   onProgress?: (step: string) => void
 ): Promise<ScannedHostIdData | null> {
   // 1. Try Google Gemini Vision AI if API key is configured
-  const geminiKey = getGeminiApiKey();
+  const geminiKey = await ensureGeminiApiKey();
   if (geminiKey) {
     try {
       onProgress?.("جاري الفحص الذكي للهوية عبر Google Gemini Vision AI...");
@@ -232,6 +233,7 @@ export async function scanHostId(
           hostBirthDate: geminiResult.hostBirthDate,
           hostNationality: geminiResult.hostNationality,
           idNumber: geminiResult.idNumber,
+          hostPhone: geminiResult.hostPhone,
           rawText: "Gemini Vision AI extraction",
         };
       }

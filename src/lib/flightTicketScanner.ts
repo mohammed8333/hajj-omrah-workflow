@@ -1,4 +1,4 @@
-import { scanFlightTicketWithGemini, getGeminiApiKey } from "./geminiVision";
+import { scanFlightTicketWithGemini, ensureGeminiApiKey } from "./geminiVision";
 
 export interface ScannedFlightTicketData {
   departureDate?: string;
@@ -41,10 +41,10 @@ export async function scanFlightTicket(
   onProgress?: (msg: string) => void,
   explicitApiKey?: string
 ): Promise<ScannedFlightTicketData | null> {
-  const apiKey = (explicitApiKey || getGeminiApiKey() || "").trim();
+  const apiKey = (explicitApiKey || await ensureGeminiApiKey() || "").trim();
 
   if (!apiKey) {
-    throw new Error("لم يتم العثور على مفتاح Google Gemini API. يرجى إدخال مفتاح الـ API المجاني لتفعيل الفحص الذكي للتذاكر.");
+    throw new Error("لم يتم العثور على مفتاح Google Gemini API في قاعدة البيانات أو الإعدادات. يرجى حفظ المفتاح في صفحة الإعدادات لتفعيل الفحص الذكي للتذاكر على كافة الأجهزة.");
   }
 
   try {

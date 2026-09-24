@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
@@ -35,7 +35,7 @@ import {
 import { scanPassportMRZ, translateEnglishNameToArabic } from "@/lib/mrzScanner";
 import { scanHostId } from "@/lib/hostIdScanner";
 import { scanFlightTicket, calculateAirportArrivalTime } from "@/lib/flightTicketScanner";
-import { getGeminiApiKey, setGeminiApiKey } from "@/lib/geminiVision";
+import { getGeminiApiKey, setGeminiApiKey, ensureGeminiApiKey, syncGeminiApiKeyFromDatabase } from "@/lib/geminiVision";
 import { useDialog } from "@/lib/dialog-context";
 import { FileDropArea } from "@/components/ui/FileDropArea";
 import { validateHostPhone, validateTravelerPhone } from "@/lib/phoneUtils";
@@ -67,6 +67,10 @@ export default function UnifiedNewRequestPage() {
   const { user } = useAuth();
   const { confirm, prompt, alert } = useDialog();
 
+  useEffect(() => {
+    syncGeminiApiKeyFromDatabase().catch(console.warn);
+  }, []);
+
   // Hosting
   const [hasHosting, setHasHosting] = useState(false);
   const [hostName, setHostName] = useState("");
@@ -79,12 +83,12 @@ export default function UnifiedNewRequestPage() {
   const [hostScanSuccess, setHostScanSuccess] = useState(false);
   const [hostScanMessage, setHostScanMessage] = useState("");
 
-  // Run OCR scan on host ID file
+  // Run OCR scan on host ID file (PDF or Image)
   const runHostIdScan = async (file: File) => {
-    if (!file.type.startsWith("image/")) return;
+    if (!file) return;
     setIsScanningHostId(true);
     setHostScanSuccess(false);
-    setHostScanMessage("جاري فحص وقراءة هوية المستضيف (OCR)...");
+    setHostScanMessage("جاري فحص وقراءة هوية المستضيف بالذكاء الاصطناعي...");
     try {
       const result = await scanHostId(file, (msg) => {
         setHostScanMessage(msg);
@@ -96,23 +100,25 @@ export default function UnifiedNewRequestPage() {
           result.hostNationality ||
           result.idNumber)
       ) {
+        setHasHosting(true);
         if (result.hostName) setHostName(result.hostName);
         if (result.hostBirthDate) setHostBirthDate(result.hostBirthDate);
         if (result.hostNationality) setHostNationality(result.hostNationality);
         if (result.idNumber) setHostNationalId(result.idNumber);
+        if (result.hostPhone) setHostPhone(result.hostPhone);
         setHostScanSuccess(true);
         setHostScanMessage(
           `تم استخراج البيانات بنجاح: ${result.hostName || ""} ${
             result.hostNationality ? `[${result.hostNationality}]` : ""
-          } ${result.hostBirthDate ? `(الميلاد: ${result.hostBirthDate})` : ""}`
+          } ${result.idNumber ? `(رقم الهوية: ${result.idNumber})` : ""}`
         );
       } else {
         setHostScanSuccess(false);
         setHostScanMessage("لم يتم استخراج البيانات بوضوح، يمكنك إدخالها يدوياً.");
       }
-    } catch {
+    } catch (err: any) {
       setHostScanSuccess(false);
-      setHostScanMessage("تعذر فحص الهوية، يرجى كتابة البيانات يدوياً.");
+      setHostScanMessage(err?.message || "تعذر فحص الهوية، يرجى كتابة البيانات يدوياً.");
     } finally {
       setIsScanningHostId(false);
     }
@@ -128,7 +134,8 @@ export default function UnifiedNewRequestPage() {
       return;
     }
     setHostIdFile(file);
-    if (file && file.type.startsWith("image/")) {
+    if (file) {
+      setHasHosting(true);
       setTimeout(() => {
         runHostIdScan(file);
       }, 50);
@@ -160,19 +167,20 @@ export default function UnifiedNewRequestPage() {
 
   // Run AI scan on flight ticket file (Gemini Vision)
   const runTicketScan = async (file: File) => {
-    const currentKey = getGeminiApiKey();
+    if (!file) return;
+    const currentKey = await ensureGeminiApiKey();
     if (!currentKey) {
       const enteredKey = await prompt({
         title: "تفعيل فحص تذكرة الطيران بالذكاء الاصطناعي (Google Gemini AI)",
         message:
-          "لاستخراج مواعيد الرحلات وأرقام الطيران والمطارات آلياً من التذكرة (PDF أو صورة)، الصق مفتاح Google Gemini المجاني هنا (أو اضغط إلغاء للإدخال اليدوي):",
+          "لاستخراج مواعيد الرحلات وأرقام الطيران والمطارات آلياً من التذكرة (PDF أو صورة)، الصق مفتاح Google Gemini المجاني هنا (سيتم حفظه في قاعدة البيانات ليعمل على كافة الأجهزة):",
         placeholder: "AIzaSy...",
-        confirmText: "فحص بالذكاء الاصطناعي ✨",
+        confirmText: "فحص وحفظ في قاعدة البيانات ✨",
         cancelText: "إدخال يدوي",
         variant: "primary",
       });
       if (enteredKey && enteredKey.trim()) {
-        setGeminiApiKey(enteredKey.trim());
+        setGeminiApiKey(enteredKey.trim(), true);
       }
     }
 
@@ -357,9 +365,9 @@ export default function UnifiedNewRequestPage() {
     );
   };
 
-  // Run MRZ scan on passport file
+  // Run MRZ/AI scan on passport file (PDF or Image)
   const runMrzScanForTraveler = async (travelerId: string, file: File) => {
-    if (!file.type.startsWith("image/")) return;
+    if (!file) return;
 
     setTravelers((prev) =>
       prev.map((t) =>
@@ -368,7 +376,7 @@ export default function UnifiedNewRequestPage() {
               ...t,
               isScanning: true,
               scanSuccess: false,
-              scanMessage: "جاري فحص وقراءة شريط الجواز (MRZ)...",
+              scanMessage: "جاري فحص وقراءة بيانات الجواز (بالذكاء الاصطناعي)...",
             }
           : t
       )
@@ -381,9 +389,7 @@ export default function UnifiedNewRequestPage() {
         );
       });
 
-      if (result && result.fullNameArabic) {
-        setHostName((current) => current || result.fullNameArabic);
-
+      if (result && (result.fullNameArabic || result.fullNameEnglish || result.passportNumber)) {
         // Check passport validity (< 6 months)
         let expiryWarning: string | undefined = undefined;
         if (result.expiryDate) {
@@ -415,8 +421,8 @@ export default function UnifiedNewRequestPage() {
             if (t.id !== travelerId) return t;
             return {
               ...t,
-              fullName: result.fullNameArabic,
-              fullNameEnglish: result.fullNameEnglish,
+              fullName: result.fullNameArabic || t.fullName || result.fullNameEnglish,
+              fullNameEnglish: result.fullNameEnglish || t.fullNameEnglish,
               passportNumber: result.passportNumber || t.passportNumber,
               nationality: result.nationality || t.nationality,
               dateOfBirth: result.dateOfBirth || t.dateOfBirth,
@@ -425,7 +431,7 @@ export default function UnifiedNewRequestPage() {
               duplicateWarning,
               isScanning: false,
               scanSuccess: true,
-              scanMessage: `تم التعرف بنجاح على: ${result.fullNameArabic}`,
+              scanMessage: `تم التعرف بنجاح على: ${result.fullNameArabic || result.fullNameEnglish || result.passportNumber}`,
             };
           })
         );
@@ -437,13 +443,13 @@ export default function UnifiedNewRequestPage() {
                   ...t,
                   isScanning: false,
                   scanSuccess: false,
-                  scanMessage: "لم يتم التقاط شريط MRZ بوضوح، يمكنك إدخال الاسم يدوياً.",
+                  scanMessage: "لم يتم التقاط بيانات الجواز بدقة، يمكنك كتابة الاسم والبيانات يدوياً.",
                 }
               : t
           )
         );
       }
-    } catch {
+    } catch (err: any) {
       setTravelers((prev) =>
         prev.map((t) =>
           t.id === travelerId
@@ -451,7 +457,7 @@ export default function UnifiedNewRequestPage() {
                 ...t,
                 isScanning: false,
                 scanSuccess: false,
-                scanMessage: "تعذر فحص الجواز، يرجى كتابة الاسم يدوياً.",
+                scanMessage: err?.message || "تعذر فحص الجواز، يرجى كتابة الاسم يدوياً.",
               }
             : t
         )
@@ -480,8 +486,12 @@ export default function UnifiedNewRequestPage() {
         const updated = { ...t };
         if (docType === "passport") {
           updated.passportFile = file;
-          if (file && file.type.startsWith("image/")) {
-            updated.passportPreview = URL.createObjectURL(file);
+          if (file) {
+            if (file.type.startsWith("image/")) {
+              updated.passportPreview = URL.createObjectURL(file);
+            } else {
+              updated.passportPreview = undefined;
+            }
             setTimeout(() => {
               runMrzScanForTraveler(travelerId, file);
             }, 50);

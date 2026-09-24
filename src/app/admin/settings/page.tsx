@@ -79,6 +79,14 @@ export default function AdminSettingsPage() {
     if (saved) {
       setGeminiKey(saved);
     }
+    // Also load from database (Supabase cloud) so that key stored on one machine shows on all machines!
+    api.settings.get("gemini_ai_api_key").then((cloudKey) => {
+      if (cloudKey && cloudKey.trim()) {
+        setGeminiKey(cloudKey.trim());
+        setGeminiApiKey(cloudKey.trim(), false);
+      }
+    }).catch(console.warn);
+
     if (typeof window !== "undefined") {
       setWaGroup(localStorage.getItem("safa_whatsapp_target_group") || "");
       setWaLink(localStorage.getItem("safa_whatsapp_target_link") || "");
@@ -97,34 +105,47 @@ export default function AdminSettingsPage() {
     }
   };
 
-  const handleSaveGeminiKey = () => {
-    if (!geminiKey.trim()) {
+  const handleSaveGeminiKey = async () => {
+    const trimmed = geminiKey.trim();
+    if (!trimmed) {
       removeGeminiApiKey();
+      try {
+        await api.settings.set("gemini_ai_api_key", "");
+      } catch (e) {
+        console.warn(e);
+      }
       setSuccess("تم حذف مفتاح Gemini AI والاعتماد على المحرك الافتراضي.");
       setGeminiTestStatus(null);
       return;
     }
-    setGeminiApiKey(geminiKey.trim());
-    setSuccess("تم حفظ مفتاح Google Gemini AI بنجاح! سيتم استخدامه فوراً في جميع عمليات فحص الوثائق.");
+    try {
+      setGeminiApiKey(trimmed, true);
+      await api.settings.set("gemini_ai_api_key", trimmed);
+      setSuccess("تم حفظ مفتاح Google Gemini AI بنجاح في قاعدة البيانات! سيعمل تلقائياً وبشكل مباشر على جميع الأجهزة والمتصفحات المتصلة بالموقع.");
+    } catch (e: any) {
+      setSuccess("تم حفظ المفتاح محلياً! (ملاحظة: " + (e?.message || "") + ")");
+    }
   };
 
   const handleTestGeminiKey = async () => {
-    if (!geminiKey.trim()) {
+    const trimmed = geminiKey.trim();
+    if (!trimmed) {
       setError("يرجى كتابة أو لصق مفتاح الـ API أولاً قبل الاختبار.");
       return;
     }
     try {
       setTestingGemini(true);
       setGeminiTestStatus(null);
-      const res = await testGeminiApiKey(geminiKey.trim());
+      const res = await testGeminiApiKey(trimmed);
       setGeminiTestStatus({
         checked: true,
         valid: res.success,
         message: res.message,
       });
       if (res.success) {
-        setGeminiApiKey(geminiKey.trim());
-        setSuccess("المفتاح سليم 100%! تم حفظه وتفعيله كمحرك الفحص الذكي في النظام.");
+        setGeminiApiKey(trimmed, true);
+        await api.settings.set("gemini_ai_api_key", trimmed);
+        setSuccess("المفتاح سليم 100%! تم حفظه وتفعيله في قاعدة البيانات ليعمل على كافة الأجهزة فوراً.");
       } else {
         setError(`فشل الاتصال: ${res.message}`);
       }
@@ -139,11 +160,16 @@ export default function AdminSettingsPage() {
     }
   };
 
-  const handleRemoveGeminiKey = () => {
+  const handleRemoveGeminiKey = async () => {
     removeGeminiApiKey();
+    try {
+      await api.settings.set("gemini_ai_api_key", "");
+    } catch (e) {
+      console.warn(e);
+    }
     setGeminiKey("");
     setGeminiTestStatus(null);
-    setSuccess("تم مسح مفتاح Gemini AI من النظام بنجاح.");
+    setSuccess("تم مسح مفتاح Gemini AI من النظام وقاعدة البيانات بنجاح.");
   };
 
   // Storage Stats
@@ -562,6 +588,11 @@ export default function AdminSettingsPage() {
                 </button>
               )}
             </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 text-[11px] text-gray-500 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100">
+            <Database className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+            <span>يتم حفظ المفتاح مركزياً في قاعدة البيانات، ليقرأ ويعمل تلقائياً على كافة الأجهزة والمتصفحات المتصلة بالنظام بدون الحاجة لإدخاله في كل جهاز.</span>
           </div>
 
           {/* Test Status Banner */}

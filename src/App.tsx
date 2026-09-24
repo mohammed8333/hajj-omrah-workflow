@@ -12,6 +12,7 @@ import RequestDetailPage from "@/app/requests/[id]/page";
 import UsersManagementPage from "@/app/admin/users/page";
 import AuditLogsPage from "@/app/admin/audit-logs/page";
 import AdminSettingsPage from "@/app/admin/settings/page";
+import { syncGeminiApiKeyFromDatabase } from "@/lib/geminiVision";
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -108,6 +109,10 @@ function RequestDetailWrapper() {
 }
 
 export default function App() {
+  React.useEffect(() => {
+    syncGeminiApiKeyFromDatabase().catch(console.warn);
+  }, []);
+
   return (
     <GlobalErrorBoundary>
       <HashRouter>

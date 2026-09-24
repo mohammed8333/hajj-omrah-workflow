@@ -1,5 +1,5 @@
 import { createWorker } from "tesseract.js";
-import { scanPassportWithGemini, getGeminiApiKey } from "./geminiVision";
+import { scanPassportWithGemini, ensureGeminiApiKey } from "./geminiVision";
 
 export interface ScannedPassportData {
   fullNameArabic: string;
@@ -500,7 +500,7 @@ export async function scanPassportMRZ(
   onProgress?: (step: string) => void
 ): Promise<ScannedPassportData | null> {
   // 1. Try Google Gemini Vision AI if API key is configured
-  const geminiKey = getGeminiApiKey();
+  const geminiKey = await ensureGeminiApiKey();
   if (geminiKey) {
     try {
       onProgress?.("جاري الفحص الذكي عبر Google Gemini Vision AI...");
