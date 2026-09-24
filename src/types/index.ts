@@ -34,7 +34,7 @@ export type DocumentReviewStatus =
   | "NeedsCorrection"
   | "Missing";
 
-export type TravelerStatus = "Pending" | "Accepted" | "NeedsCorrection";
+export type TravelerStatus = "Pending" | "Accepted" | "NeedsCorrection" | "Rejected";
 
 export type CorrectionStatus = "Pending" | "Resolved" | "Cancelled";
 
@@ -45,6 +45,7 @@ export interface User {
   role: UserRole;
   phone?: string;
   senderCode?: string;
+  password?: string;
   isActive: boolean;
   createdAt: string;
   lastLoginAt?: string;

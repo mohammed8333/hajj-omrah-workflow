@@ -51,8 +51,10 @@ export const WhatsAppGroupSendButton: React.FC<WhatsAppGroupSendButtonProps> = (
   } | null>(null);
   const [targetGroup, setTargetGroup] = useState<string>("");
   const [groupLink, setGroupLink] = useState<string>("");
-  const [availableGroups, setAvailableGroups] = useState<Array<{ id: string; subject: string }>>([]);
   const [copiedText, setCopiedText] = useState(false);
+  const [availableGroups, setAvailableGroups] = useState<
+    Array<{ id: string; subject: string; participantsCount?: number }>
+  >([]);
 
   // Load saved group settings from localStorage
   useEffect(() => {

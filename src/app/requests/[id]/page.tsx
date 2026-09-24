@@ -56,6 +56,7 @@ import {
   Ticket,
   MessageSquare,
   MessageCircle,
+  Plus,
 } from "lucide-react";
 import { scanPassportMRZ, translateEnglishNameToArabic } from "@/lib/mrzScanner";
 import { scanHostId } from "@/lib/hostIdScanner";
@@ -2786,7 +2787,7 @@ export default function RequestDetailPage({
             <span className="text-xs bg-sky-50 text-sky-800 font-semibold px-2.5 py-1 rounded-md border border-sky-200">
               مشتركة لجميع المسافرين
             </span>
-            {(canEditDocs || role === "Admin" || role === "SafaEmployee") && (
+            {(canEditAnyData || isSafaReviewer) && (
               <button
                 type="button"
                 onClick={() => {

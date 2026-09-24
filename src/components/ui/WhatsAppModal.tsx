@@ -38,7 +38,8 @@ export function WhatsAppModal({ isOpen, onClose, request }: WhatsAppModalProps) 
   // Initialize recipient phone from request contact or host phone
   useEffect(() => {
     if (isOpen && request) {
-      const defaultPhone = request.contactPhone || request.hostPhone || "";
+      const hostPhone = (request as any).hostPhone || (request as any).hostingInfo?.hostPhone;
+      const defaultPhone = request.contactPhone || hostPhone || "";
       setPhone(defaultPhone);
       // Auto-select template based on request state
       if (request.nusukGroupNumber && request.status !== "Completed") {
@@ -112,15 +113,21 @@ export function WhatsAppModal({ isOpen, onClose, request }: WhatsAppModalProps) 
                     هاتف التواصل ({request.contactPhone})
                   </button>
                 )}
-                {request.hostPhone && request.hostPhone !== request.contactPhone && (
-                  <button
-                    type="button"
-                    onClick={() => setPhone(request.hostPhone!)}
-                    className="text-emerald-700 hover:underline cursor-pointer"
-                  >
-                    هاتف المستضيف ({request.hostPhone})
-                  </button>
-                )}
+                {(() => {
+                  const hPhone = (request as any).hostPhone || (request as any).hostingInfo?.hostPhone;
+                  if (hPhone && hPhone !== request.contactPhone) {
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => setPhone(hPhone)}
+                        className="text-emerald-700 hover:underline cursor-pointer"
+                      >
+                        هاتف المستضيف ({hPhone})
+                      </button>
+                    );
+                  }
+                  return null;
+                })()}
               </span>
             </label>
             <div className="relative">

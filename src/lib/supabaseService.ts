@@ -398,7 +398,7 @@ export const supabaseService = {
       // Fetch document counts & traveler photos
       const { data: docs } = await client
         .from("documents")
-        .select("id, group_request_id, traveler_id, document_type, storage_url, storage_path")
+        .select("id, group_request_id, traveler_id, document_type, storage_url, storage_path, original_file_name")
         .in("group_request_id", requestIds);
 
       // Fetch pending corrections count
@@ -469,7 +469,7 @@ export const supabaseService = {
           };
         });
 
-        const isSV314 = r.flight_number === "SV314" || ticketDoc?.original_file_name?.includes("74");
+        const isSV314 = r.flight_number === "SV314" || (ticketDoc as any)?.original_file_name?.includes("74");
 
         return {
           id: r.id,

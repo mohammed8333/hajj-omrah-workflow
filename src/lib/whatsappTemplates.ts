@@ -83,14 +83,14 @@ export function generateWhatsAppMessage(
   customNote?: string
 ): string {
   const travelersCount =
-    "travelers" in request && Array.isArray(request.travelers)
-      ? request.travelers.length
-      : request.travelersCount || 1;
+    "travelers" in request && Array.isArray((request as GroupRequestDetail).travelers)
+      ? (request as GroupRequestDetail).travelers.length
+      : (request as GroupRequestSummary).travelersCount || 1;
 
   const firstTraveler =
-    "travelers" in request && request.travelers?.[0]
-      ? request.travelers[0].fullName
-      : request.travelersList?.[0]?.fullName || request.groupName || "المعتمر";
+    "travelers" in request && (request as GroupRequestDetail).travelers?.[0]
+      ? (request as GroupRequestDetail).travelers[0].fullName
+      : (request as GroupRequestSummary).travelersList?.[0]?.fullName || request.groupName || "المعتمر";
 
   const appTitle = "نظام مسار الحج والعمرة";
 

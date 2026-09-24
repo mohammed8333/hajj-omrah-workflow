@@ -180,6 +180,7 @@ export const api = {
         nusukGroupNumber?: string;
         destination?: string;
         notes?: string;
+        senderCode?: string;
         hasHosting?: boolean;
         hostName?: string;
         hostPhone?: string;
@@ -388,6 +389,11 @@ export const api = {
       localDB.unarchiveRequest(id, current);
       return { message: "تم إلغاء أرشفة المعاملة بنجاح" };
     },
+
+    runAutoMaintenance: async (): Promise<{ deletedCount: number; archivedCount: number }> => {
+      await delay();
+      return localDB.applyAutoMaintenance();
+    },
   },
 
   travelers: {
@@ -441,7 +447,22 @@ export const api = {
       }
       await delay();
       const current = await api.auth.getMe();
-      return localDB.updateTraveler(travelerId, data, current);
+      const updated = localDB.updateTraveler(travelerId, data, current);
+      return (
+        updated || {
+          id: travelerId,
+          groupRequestId: "",
+          fullName: data.fullName || "",
+          passportNumber: data.passportNumber,
+          phoneNumber: data.phoneNumber,
+          nationality: data.nationality,
+          dateOfBirth: data.dateOfBirth,
+          status: "Pending",
+          notes: data.notes,
+          createdAt: new Date().toISOString(),
+          documents: [],
+        }
+      );
     },
 
     delete: async (travelerId: string): Promise<{ message: string }> => {

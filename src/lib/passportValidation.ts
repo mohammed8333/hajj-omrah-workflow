@@ -13,6 +13,7 @@ export function checkPassportValidity(
   isExpiringSoon: boolean;
   daysRemaining: number;
   message: string;
+  warning?: string;
 } {
   if (!expiryDateStr) {
     return {
@@ -26,12 +27,14 @@ export function checkPassportValidity(
 
   const expiry = new Date(expiryDateStr);
   if (isNaN(expiry.getTime())) {
+    const msg = "صيغة تاريخ انتهاء الجواز غير صالحة";
     return {
       isInvalid: true,
       isExpired: false,
       isExpiringSoon: false,
       daysRemaining: 0,
-      message: "صيغة تاريخ انتهاء الجواز غير صالحة",
+      message: msg,
+      warning: msg,
     };
   }
 
@@ -48,24 +51,28 @@ export function checkPassportValidity(
   const daysRemaining = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
   if (daysRemaining <= 0) {
+    const msg = "جواز السفر منتهي الصلاحية! لن يتم قبوله في إصدار التأشيرات.";
     return {
       isInvalid: true,
       isExpired: true,
       isExpiringSoon: true,
       daysRemaining,
-      message: "جواز السفر منتهي الصلاحية! لن يتم قبوله في إصدار التأشيرات.",
+      message: msg,
+      warning: msg,
     };
   }
 
   // Less than 6 months (approx 180 days)
   if (daysRemaining < 180) {
     const months = Math.floor(daysRemaining / 30);
+    const msg = `تنبيه: صلاحية الجواز متبقٍ عليها أقل من 6 أشهر (${months} أشهر و ${daysRemaining % 30} يوماً). قد يُرفض في المطار أو التأشيرة.`;
     return {
       isInvalid: false,
       isExpired: false,
       isExpiringSoon: true,
       daysRemaining,
-      message: `تنبيه: صلاحية الجواز متبقٍ عليها أقل من 6 أشهر (${months} أشهر و ${daysRemaining % 30} يوماً). قد يُرفض في المطار أو التأشيرة.`,
+      message: msg,
+      warning: msg,
     };
   }
 

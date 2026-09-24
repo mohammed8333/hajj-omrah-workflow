@@ -1270,6 +1270,7 @@ class LocalDatabaseEngine {
       nusukGroupNumber?: string;
       destination?: string;
       notes?: string;
+      senderCode?: string;
       hasHosting?: boolean;
       hostName?: string;
       hostPhone?: string;
@@ -1284,6 +1285,7 @@ class LocalDatabaseEngine {
     if (!req) throw new Error("المعاملة غير موجودة");
 
     if (data.groupName !== undefined) req.groupName = data.groupName;
+    if (data.senderCode !== undefined) req.senderCode = data.senderCode;
     if (data.contactPhone !== undefined) req.contactPhone = data.contactPhone;
     if (data.travelDate !== undefined) req.travelDate = data.departureDate || data.travelDate;
     if (data.departureDate !== undefined) req.departureDate = data.departureDate;
@@ -1857,7 +1859,7 @@ class LocalDatabaseEngine {
   public updateTraveler(
     travelerId: string,
     data: {
-      fullName: string;
+      fullName?: string;
       passportNumber?: string;
       phoneNumber?: string;
       nationality?: string;
@@ -1866,17 +1868,17 @@ class LocalDatabaseEngine {
       notes?: string;
     },
     currentUser?: User
-  ) {
+  ): Traveler | undefined {
     for (const req of this.requests) {
       const trv = req.travelers.find((t) => t.id === travelerId);
       if (trv) {
-        trv.fullName = data.fullName;
-        trv.passportNumber = data.passportNumber;
+        if (data.fullName !== undefined) trv.fullName = data.fullName;
+        if (data.passportNumber !== undefined) trv.passportNumber = data.passportNumber;
         if (data.phoneNumber !== undefined) trv.phoneNumber = data.phoneNumber;
-        trv.nationality = data.nationality;
-        trv.dateOfBirth = data.dateOfBirth;
+        if (data.nationality !== undefined) trv.nationality = data.nationality;
+        if (data.dateOfBirth !== undefined) trv.dateOfBirth = data.dateOfBirth;
         if (data.expiryDate !== undefined) trv.expiryDate = data.expiryDate;
-        trv.notes = data.notes;
+        if (data.notes !== undefined) trv.notes = data.notes;
         req.updatedAt = new Date().toISOString();
         this.persistRequests();
         this.logAction(
@@ -1885,7 +1887,7 @@ class LocalDatabaseEngine {
           "Traveler",
           trv.id
         );
-        return;
+        return trv;
       }
     }
     throw new Error("المعتمر غير موجود");
