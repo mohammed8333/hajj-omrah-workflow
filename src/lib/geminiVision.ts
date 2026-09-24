@@ -5,15 +5,18 @@
 
 const GEMINI_API_KEY_STORAGE_KEY = "gemini_ai_api_key";
 const GEMINI_SELECTED_MODEL_KEY = "gemini_selected_model";
-const DEFAULT_GEMINI_MODEL = "gemini-2.0-flash";
+const DEFAULT_GEMINI_MODEL = "gemini-3.8-flash";
 
 export const CANDIDATE_GEMINI_MODELS: string[] = [
+  "gemini-3.8-flash",
+  "gemini-3.5-flash",
+  "gemini-3.5-flash-lite",
+  "gemini-3.7-flash",
+  "gemini-3.6-flash",
+  "gemini-3.1-pro",
+  "gemini-3.0-flash",
+  "gemini-2.5-flash",
   "gemini-2.0-flash",
-  "gemini-1.5-flash",
-  "gemini-2.0-flash-lite",
-  "gemini-1.5-flash-8b",
-  "gemini-1.5-pro",
-  "gemini-2.0-flash-exp",
 ];
 
 export interface GeminiPassportResult {
@@ -118,11 +121,10 @@ export async function resolveAvailableGeminiModel(
   // 1. Check cached model if not force refreshing
   if (!forceRefresh && typeof window !== "undefined") {
     const cached = localStorage.getItem(GEMINI_SELECTED_MODEL_KEY);
-    // Discard any deprecated, fictional, or broken cached models
+    // Only accept modern 3.x or 2.5 models from cache
     if (
       cached &&
-      !cached.startsWith("gemini-3.") &&
-      cached !== "gemini-2.5-flash"
+      (cached.startsWith("gemini-3.") || cached === "gemini-2.5-flash")
     ) {
       return cached;
     }
@@ -148,13 +150,15 @@ export async function resolveAvailableGeminiModel(
             lower.includes("gemini") &&
             !lower.includes("embedding") &&
             !lower.includes("imagen") &&
-            !lower.includes("aqa") &&
-            name !== "gemini-2.5-flash"
+            !lower.includes("aqa")
           );
         });
 
-      // Sort: prioritize flash and higher version numbers
+      // Sort: prioritize Gemini 3.x, flash, and higher version numbers
       contentModels.sort((a, b) => {
+        const a3 = a.includes("3.") ? 1 : 0;
+        const b3 = b.includes("3.") ? 1 : 0;
+        if (a3 !== b3) return b3 - a3;
         const aFlash = a.includes("flash") ? 1 : 0;
         const bFlash = b.includes("flash") ? 1 : 0;
         if (aFlash !== bFlash) return bFlash - aFlash;

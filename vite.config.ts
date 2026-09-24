@@ -62,6 +62,7 @@ function autoVersionPlugin() {
         const currentCss = files.find((f) => f.startsWith("index-") && f.endsWith(".css"));
 
         const legacyJsFiles = [
+          "index-B-T5ib8S.js",
           "index-yNnBZM0a.js",
           "index-BhcvEjM6.js",
           "index-Bm8nOx5y.js",
