@@ -74,6 +74,8 @@ export interface DocumentItem {
   uploadedAt: string;
   reviewStatus: DocumentReviewStatus;
   reviewNote?: string;
+  storagePath?: string;
+  storageUrl?: string;
 }
 
 export interface Traveler {

@@ -71,6 +71,7 @@ import { WhatsAppModal } from "@/components/ui/WhatsAppModal";
 import { checkPassportValidity } from "@/lib/passportValidation";
 import { formatOfficialGroupName, resolveSenderCode } from "@/lib/groupNaming";
 import { WhatsAppGroupSendButton } from "@/components/requests/WhatsAppGroupSendButton";
+import { downloadFile } from "@/lib/fileDownload";
 
 export default function RequestDetailPage({
   requestId: propRequestId,
@@ -195,21 +196,26 @@ export default function RequestDetailPage({
   useEffect(() => {
     let isMounted = true;
     if (previewDoc) {
-      setPreviewDocLoading(true);
-      api.documents
-        .getStreamUrl(previewDoc.id)
-        .then((url) => {
-          if (isMounted) {
-            setPreviewDocUrl(url);
-            setPreviewDocLoading(false);
-          }
-        })
-        .catch(() => {
-          if (isMounted) {
-            setPreviewDocUrl(null);
-            setPreviewDocLoading(false);
-          }
-        });
+      if (previewDoc.storageUrl) {
+        setPreviewDocUrl(previewDoc.storageUrl);
+        setPreviewDocLoading(false);
+      } else {
+        setPreviewDocLoading(true);
+        api.documents
+          .getStreamUrl(previewDoc.id)
+          .then((url) => {
+            if (isMounted) {
+              setPreviewDocUrl(url);
+              setPreviewDocLoading(false);
+            }
+          })
+          .catch(() => {
+            if (isMounted) {
+              setPreviewDocUrl(null);
+              setPreviewDocLoading(false);
+            }
+          });
+      }
     } else {
       setPreviewDocUrl(null);
       setPreviewDocLoading(false);
@@ -737,7 +743,7 @@ export default function RequestDetailPage({
     try {
       setIsMrzScanningTravelerId(traveler.id);
       setError(null);
-      const streamUrl = await api.documents.getStreamUrl(passDoc.id);
+      const streamUrl = passDoc.storageUrl || (await api.documents.getStreamUrl(passDoc.id));
       const scanResult = await scanPassportMRZ(streamUrl);
       if (scanResult && scanResult.fullNameArabic) {
         await api.travelers.update(traveler.id, {
@@ -766,15 +772,11 @@ export default function RequestDetailPage({
   const handleDownloadDoc = async (doc: DocumentItem) => {
     try {
       setActionLoading(true);
-      const url = await api.documents.getStreamUrl(doc.id);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download =
+      const url = doc.storageUrl || (await api.documents.getStreamUrl(doc.id));
+      const fileName =
         doc.originalFileName ||
         `document-${doc.documentType}.${doc.mimeType?.includes("pdf") ? "pdf" : "jpg"}`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      await downloadFile(url, fileName);
     } catch (e) {
       console.error("Download failed", e);
       setError("فشل تنزيل الملف، يرجى المحاولة مرة أخرى.");
@@ -922,7 +924,7 @@ export default function RequestDetailPage({
     try {
       setIsScanningHostIdDoc(true);
       setError(null);
-      const streamUrl = await api.documents.getStreamUrl(doc.id);
+      const streamUrl = doc.storageUrl || (await api.documents.getStreamUrl(doc.id));
       const scanResult = await scanHostId(streamUrl);
       if (
         scanResult &&
@@ -953,7 +955,8 @@ export default function RequestDetailPage({
       }
     } catch (err: unknown) {
       console.error("Host ID scan failed:", err);
-      setError("حدث خطأ أثناء فحص صورة هوية المستضيف بالذكاء الاصطناعي.");
+      const msg = err instanceof Error ? err.message : "حدث خطأ أثناء فحص صورة هوية المستضيف بالذكاء الاصطناعي.";
+      setError(msg);
     } finally {
       setIsScanningHostIdDoc(false);
     }
@@ -1018,7 +1021,7 @@ export default function RequestDetailPage({
     try {
       setIsScanningFlightTicketDoc(true);
       setError(null);
-      const url = await api.documents.getStreamUrl(ticketDoc.id);
+      const url = ticketDoc.storageUrl || (await api.documents.getStreamUrl(ticketDoc.id));
       if (!url) throw new Error("تعذر جلب ملف تذكرة الطيران للفحص");
 
       const result = await scanFlightTicket(url);
@@ -3863,7 +3866,9 @@ export default function RequestDetailPage({
                   <span className="text-xs font-medium">جاري تحميل المستند...</span>
                 </div>
               ) : previewDocUrl ? (
-                previewDoc.mimeType === "application/pdf" ? (
+                previewDoc.mimeType === "application/pdf" ||
+                previewDoc.originalFileName?.toLowerCase().endsWith(".pdf") ||
+                previewDocUrl.toLowerCase().includes(".pdf") ? (
                   <iframe
                     src={previewDocUrl}
                     className="w-full h-full rounded-lg border-0 bg-white"

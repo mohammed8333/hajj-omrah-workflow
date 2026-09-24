@@ -90,6 +90,15 @@ function mapUser(row: any): User {
 
 // Map snake_case DB row to TypeScript DocumentItem
 function mapDoc(row: any): DocumentItem {
+  let storageUrl = row.storage_url || undefined;
+  if (!storageUrl && row.storage_path) {
+    try {
+      const client = getClient();
+      const { data: pubData } = client.storage.from(BUCKET_NAME).getPublicUrl(row.storage_path);
+      storageUrl = pubData?.publicUrl;
+    } catch {}
+  }
+
   return {
     id: row.id,
     groupRequestId: row.group_request_id || undefined,
@@ -104,6 +113,8 @@ function mapDoc(row: any): DocumentItem {
     uploadedAt: row.uploaded_at,
     reviewStatus: row.review_status as DocumentReviewStatus,
     reviewNote: row.review_note || undefined,
+    storagePath: row.storage_path || undefined,
+    storageUrl,
   };
 }
 

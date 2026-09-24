@@ -37,6 +37,7 @@ import { useDialog } from "@/lib/dialog-context";
 import { getWhatsAppUrl } from "@/lib/phoneUtils";
 import { WhatsAppModal } from "@/components/ui/WhatsAppModal";
 import { notificationsService } from "@/lib/notificationsService";
+import { downloadFile } from "@/lib/fileDownload";
 
 // اقتطاع الاسم الثلاثي فقط (3 مقاطع كحد أقصى)
 function getThreePartName(fullName?: string): string {
@@ -291,12 +292,7 @@ export default function RequestsListPage() {
     }
     try {
       const url = docUrl || (await api.documents.getStreamUrl(docId!));
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = fileName || "document.pdf";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      await downloadFile(url, fileName || "document.pdf");
     } catch (err) {
       console.error("Failed to download document:", err);
       await alert({

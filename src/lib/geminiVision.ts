@@ -15,10 +15,6 @@ export const CANDIDATE_GEMINI_MODELS: string[] = [
   "gemini-3.5-flash-lite",
   "gemini-3.7-flash",
   "gemini-3.6-flash",
-  "gemini-3.1-pro",
-  "gemini-3.0-flash",
-  "gemini-2.5-flash",
-  "gemini-2.0-flash",
 ];
 
 export interface GeminiPassportResult {
@@ -166,12 +162,20 @@ export async function resolveAvailableGeminiModel(
   // 1. Check cached model if not force refreshing
   if (!forceRefresh && typeof window !== "undefined") {
     const cached = localStorage.getItem(GEMINI_SELECTED_MODEL_KEY);
-    // Only accept modern 3.x or 2.5 models from cache
+    // Strictly accept verified active 3.x flash models from cache
     if (
       cached &&
-      (cached.startsWith("gemini-3.") || cached === "gemini-2.5-flash")
+      (cached === "gemini-3.8-flash" ||
+        cached === "gemini-3.5-flash" ||
+        cached === "gemini-3.5-flash-lite" ||
+        cached === "gemini-3.7-flash" ||
+        cached === "gemini-3.6-flash")
     ) {
       return cached;
+    }
+    // Evict any deprecated model (gemini-2.5-flash, gemini-2.0-flash, gemini-1.5-*, etc.)
+    if (cached) {
+      localStorage.removeItem(GEMINI_SELECTED_MODEL_KEY);
     }
   }
 

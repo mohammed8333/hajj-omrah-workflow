@@ -2,14 +2,13 @@ import XLSX from "xlsx-js-style";
 import { GroupRequestDetail } from "@/types";
 import { STATUS_MAP } from "./constants";
 
-// Helper: build direct link to view document inside request detail page
-function buildDocUrl(requestId: string, docId: string): string {
+// Helper: build direct cloud link or fallback link to view document
+function buildDocUrl(requestId: string, doc?: { id: string; storageUrl?: string } | null): string {
+  if (!doc) return "لم يُرفع بعد";
+  if (doc.storageUrl) return doc.storageUrl;
   if (typeof window === "undefined") return "";
   const origin = window.location.origin;
-  const pathname = window.location.pathname.endsWith("/")
-    ? window.location.pathname
-    : window.location.pathname.substring(0, window.location.pathname.lastIndexOf("/") + 1);
-  return `${origin}${pathname}?requestId=${encodeURIComponent(requestId)}&docId=${encodeURIComponent(docId)}`;
+  return `${origin}/requests/${encodeURIComponent(requestId)}?docId=${encodeURIComponent(doc.id)}`;
 }
 
 // Helpers to extract documents from a request
@@ -62,7 +61,7 @@ export function exportRequestsToExcel(requests: GroupRequestDetail[]) {
   requests.forEach((r, rIdx) => {
     const statusArabic = STATUS_MAP[r.status]?.label || r.status;
     const hostDoc = getHostDocument(r);
-    const hostLink = hostDoc ? buildDocUrl(r.id, hostDoc.id) : "لم يُرفع بعد";
+    const hostLink = buildDocUrl(r.id, hostDoc);
 
     const travelers = r.travelers && r.travelers.length > 0 ? r.travelers : null;
 
@@ -88,9 +87,9 @@ export function exportRequestsToExcel(requests: GroupRequestDetail[]) {
         "اسم المعتمر / المسافر": "لا يوجد مسافرين مسجلين",
         "رقم جواز السفر": "-",
         "رقم هاتف المسافر": "-",
-        "رابط صورة الجواز": passDoc ? buildDocUrl(r.id, passDoc.id) : "لم يُرفع بعد",
-        "رابط الصورة الشخصية": photoDoc ? buildDocUrl(r.id, photoDoc.id) : "لم يُرفع بعد",
-        "رابط تذكرة الطيران": ticketDoc ? buildDocUrl(r.id, ticketDoc.id) : "لم يُرفع بعد",
+        "رابط صورة الجواز": buildDocUrl(r.id, passDoc),
+        "رابط الصورة الشخصية": buildDocUrl(r.id, photoDoc),
+        "رابط تذكرة الطيران": buildDocUrl(r.id, ticketDoc),
         "رابط صورة الاستضافة": hostLink,
         "يوجد استضافة / فندق": r.hasHosting ? "نعم" : "لا",
         "اسم الفندق / المستضيف": r.hostingInfo?.hostName || "-",
@@ -118,9 +117,9 @@ export function exportRequestsToExcel(requests: GroupRequestDetail[]) {
           t.documents?.find((d) => d.documentType === "FlightTicket") ||
           getTicketDocument(r);
 
-        const tPassLink = tPassDoc ? buildDocUrl(r.id, tPassDoc.id) : "لم يُرفع بعد";
-        const tPhotoLink = tPhotoDoc ? buildDocUrl(r.id, tPhotoDoc.id) : "لم يُرفع بعد";
-        const tTicketLink = tTicketDoc ? buildDocUrl(r.id, tTicketDoc.id) : "لم يُرفع بعد";
+        const tPassLink = buildDocUrl(r.id, tPassDoc);
+        const tPhotoLink = buildDocUrl(r.id, tPhotoDoc);
+        const tTicketLink = buildDocUrl(r.id, tTicketDoc);
 
         if (isFirst) {
           // Row 1: Full transaction details + First traveler's details
@@ -202,7 +201,7 @@ export function exportRequestsToExcel(requests: GroupRequestDetail[]) {
   requests.forEach((r, rIdx) => {
     const statusArabic = STATUS_MAP[r.status]?.label || r.status;
     const hostDoc = getHostDocument(r);
-    const hostLink = hostDoc ? buildDocUrl(r.id, hostDoc.id) : "لم يُرفع بعد";
+    const hostLink = buildDocUrl(r.id, hostDoc);
 
     r.travelers?.forEach((t, tIndex) => {
       let tStatus = "قيد التدقيق";
@@ -216,9 +215,9 @@ export function exportRequestsToExcel(requests: GroupRequestDetail[]) {
         t.documents?.find((d) => d.documentType === "FlightTicket") ||
         getTicketDocument(r);
 
-      const tPassLink = tPassDoc ? buildDocUrl(r.id, tPassDoc.id) : "لم يُرفع بعد";
-      const tPhotoLink = tPhotoDoc ? buildDocUrl(r.id, tPhotoDoc.id) : "لم يُرفع بعد";
-      const tTicketLink = tTicketDoc ? buildDocUrl(r.id, tTicketDoc.id) : "لم يُرفع بعد";
+      const tPassLink = buildDocUrl(r.id, tPassDoc);
+      const tPhotoLink = buildDocUrl(r.id, tPhotoDoc);
+      const tTicketLink = buildDocUrl(r.id, tTicketDoc);
 
       travelersData.push({
         "م": travelerCounter++,
