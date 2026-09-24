@@ -15,7 +15,7 @@
       // نظام الكشف الفوري عن التحديثات وتجاوز كاش المتصفح تلقائياً
       // =================================================================
       (function () {
-        var CURRENT_VERSION = "1790205394243";
+        var CURRENT_VERSION = "1790242316123";
         var isUpdating = false;
 
         // إلغاء أي Service Worker أو Cache قديم قد يعلق في كروم الموبايل
@@ -82,11 +82,7 @@
                 var serverVersion = String(data.version);
                 var localVersion = String(CURRENT_VERSION);
 
-                if (
-                  serverVersion !== localVersion &&
-                  serverVersion !== '1790205394243' &&
-                  localVersion !== '1790205394243'
-                ) {
+                if (serverVersion && localVersion && serverVersion !== localVersion && !localVersion.includes('%APP_')) {
                   console.log('[AutoUpdate] New version detected:', serverVersion, 'local:', localVersion);
                   triggerUpdate(serverVersion);
                 }
@@ -140,18 +136,28 @@
       // Auto-recover from stale cached chunk 404 errors
       window.addEventListener('error', function (e) {
         if (e && (e.target && e.target.tagName === 'SCRIPT')) {
-          var key = 'last_auto_reload_' + window.location.pathname;
+          console.warn('[Script Load Error] Script failed to load, fetching fresh version...');
+          var key = 'last_script_err_reload';
           var last = sessionStorage.getItem(key);
           var now = Date.now();
-          if (!last || now - parseInt(last, 10) > 10000) {
+          if (!last || now - parseInt(last, 10) > 4000) {
             sessionStorage.setItem(key, String(now));
-            window.location.reload();
+            try {
+              if ('caches' in window) {
+                caches.keys().then(function (names) {
+                  names.forEach(function (n) { caches.delete(n); });
+                });
+              }
+            } catch (err) {}
+            var currentUrl = new URL(window.location.href);
+            currentUrl.searchParams.set('_v', String(now));
+            window.location.replace(currentUrl.toString());
           }
         }
       }, true);
     </script>
-    <script type="module" crossorigin src="./assets/index-bqTvIEOr.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-B4wyjQBa.css">
+    <script type="module" crossorigin src="./assets/index-D7ajJOaM.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-B1zo2y_x.css">
   </head>
   <body class="min-h-full flex flex-col font-sans bg-gray-50 text-gray-900 selection:bg-sky-500 selection:text-white">
     <div id="root" class="min-h-full flex flex-col flex-1"></div>

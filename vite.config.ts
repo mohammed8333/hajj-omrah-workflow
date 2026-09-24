@@ -53,6 +53,44 @@ function autoVersionPlugin() {
           console.error("Failed to copy 404.html:", e);
         }
       }
+
+      // Preserve backwards compatibility for cached browsers
+      const assetsDir = path.join(outDir, "assets");
+      if (fs.existsSync(assetsDir)) {
+        const files = fs.readdirSync(assetsDir);
+        const currentJs = files.find((f) => f.startsWith("index-") && f.endsWith(".js"));
+        const currentCss = files.find((f) => f.startsWith("index-") && f.endsWith(".css"));
+
+        const legacyJsFiles = [
+          "index-Bm8nOx5y.js",
+          "index-BebDt11y.js",
+          "index-bqTvIEOr.js",
+        ];
+        const legacyCssFiles = [
+          "index-DbVaPr8P.css",
+          "index-CscPjje2.css",
+          "index-B4wyjQBa.css",
+        ];
+
+        if (currentJs) {
+          legacyJsFiles.forEach((legacyName) => {
+            if (legacyName !== currentJs) {
+              try {
+                fs.copyFileSync(path.join(assetsDir, currentJs), path.join(assetsDir, legacyName));
+              } catch (_) {}
+            }
+          });
+        }
+        if (currentCss) {
+          legacyCssFiles.forEach((legacyName) => {
+            if (legacyName !== currentCss) {
+              try {
+                fs.copyFileSync(path.join(assetsDir, currentCss), path.join(assetsDir, legacyName));
+              } catch (_) {}
+            }
+          });
+        }
+      }
     },
   };
 }
