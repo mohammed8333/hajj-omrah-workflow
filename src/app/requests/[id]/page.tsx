@@ -2465,28 +2465,43 @@ export default function RequestDetailPage({
           {/* 1. بيانات ومستندات المستضيف (المستضيف ببياناته) */}
           {request.hasHosting ? (
         <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-            <div className="flex items-center gap-2">
-              <Home className="w-5 h-5 text-amber-600" />
-              <h2 className="text-base font-bold text-gray-900">
-                بيانات الاستضافة المشتركة للمجموعة
-              </h2>
+          <div className="border-b border-gray-100 pb-3 space-y-2.5">
+            {/* عنوان الاستضافة بالأعلى */}
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                  <Home className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-gray-900">
+                    بيانات الاستضافة المشتركة للمجموعة
+                  </h2>
+                  <p className="text-[11px] text-gray-500">
+                    بيانات ومستند المستضيف المعتمدة لكافة مسافري المعاملة
+                  </p>
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs bg-amber-50 text-amber-800 font-semibold px-2.5 py-1 rounded-md border border-amber-200">
-                مشتركة لجميع المسافرين
+
+            {/* الأزرار والشارات تحت العنوان مباشرة دون أي تداخل أو خروج عن الإطار */}
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <span className="text-xs bg-amber-50 text-amber-800 font-semibold px-2.5 py-1.5 rounded-lg border border-amber-200 flex items-center gap-1.5 shadow-2xs">
+                <Users className="w-3.5 h-3.5 text-amber-600" />
+                <span>مشتركة لجميع المسافرين</span>
               </span>
+
               {canEditAnyData && (
-                <div className="flex items-center gap-2">
+                <>
                   <button
                     type="button"
                     onClick={openHostModal}
-                    className="text-xs text-amber-800 hover:text-amber-900 bg-amber-100/70 hover:bg-amber-100 border border-amber-300 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                    className="text-xs text-amber-900 hover:text-amber-950 bg-amber-100 hover:bg-amber-200/80 border border-amber-300 px-2.5 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
                     title="تعديل بيانات ومستند المستضيف"
                   >
-                    <Edit2 className="w-3.5 h-3.5" />
+                    <Edit2 className="w-3.5 h-3.5 text-amber-700" />
                     <span>تعديل بيانات ومستند المستضيف</span>
                   </button>
+
                   <button
                     type="button"
                     onClick={async () => {
@@ -2510,13 +2525,13 @@ export default function RequestDetailPage({
                         }
                       }
                     }}
-                    className="text-xs text-rose-700 hover:text-rose-900 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                    className="text-xs text-rose-700 hover:text-rose-900 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
                     title="تحويل لسفر عادي بدون مستضيف"
                   >
                     <UserMinus className="w-3.5 h-3.5 text-rose-600" />
                     <span>إلغاء الاستضافة (تحويل لعادي)</span>
                   </button>
-                </div>
+                </>
               )}
             </div>
           </div>
@@ -2691,154 +2706,203 @@ export default function RequestDetailPage({
                   className="rounded-xl"
                 >
                   {hostDoc ? (
-                    <div className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs">
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-5 h-5 text-sky-600" />
-                        <div>
-                          <div className="font-semibold text-gray-800">
-                            {hostDoc.originalFileName}
+                    <div className="p-3.5 bg-gray-50 border border-gray-200 rounded-xl text-xs space-y-3">
+                      {/* السطر الأول: بيانات الملف بوضوح وشارة الحالة */}
+                      <div className="flex items-start sm:items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          <div className="w-8 h-8 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center shrink-0">
+                            <FileText className="w-4 h-4" />
                           </div>
-                          <div className="text-[10px] text-gray-400">
-                            {(hostDoc.fileSize / 1024).toFixed(1)} KB
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-baseline gap-1.5 flex-wrap">
+                              <span className="font-bold text-gray-700 shrink-0">الملف:</span>
+                              <span className="font-semibold text-gray-900 break-all text-xs" dir="ltr">
+                                {hostDoc.originalFileName}
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-gray-400 mt-0.5">
+                              {(hostDoc.fileSize / 1024).toFixed(1)} KB
+                            </div>
                           </div>
+                        </div>
+
+                        <div className="shrink-0">
+                          <DocumentStatusBadge status={hostDoc.reviewStatus} />
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <DocumentStatusBadge
-                          status={hostDoc.reviewStatus}
-                        />
+                      {/* السطر الثاني: الخيارات والأزرار كاملة جنب بعض داخل الفريم بدون أي خروج أو قص */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-gray-200/70">
+                        {/* خيارات التدقيق السريع لموظف صفا / الوكيل */}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {(isSafaReviewer || isAgent) && (
+                            <div className="flex flex-wrap items-center gap-1 bg-white p-1 rounded-lg border border-gray-200 shadow-2xs">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  handleQuickReview(hostDoc.id, "Accepted");
+                                }}
+                                disabled={actionLoading}
+                                className={`px-2 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer ${
+                                  hostDoc.reviewStatus === "Accepted"
+                                    ? "bg-emerald-600 text-white shadow-xs"
+                                    : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                                }`}
+                                title="قبول هوية المستضيف"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                                <span>مقبول</span>
+                              </button>
 
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            setPreviewDoc(hostDoc);
-                          }}
-                          className="p-1.5 text-gray-600 hover:text-sky-600 hover:bg-gray-200 rounded-lg cursor-pointer"
-                          title="معاينة المستند"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  handleQuickReview(hostDoc.id, "NeedsCorrection");
+                                }}
+                                disabled={actionLoading}
+                                className={`px-2 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer ${
+                                  hostDoc.reviewStatus === "NeedsCorrection"
+                                    ? "bg-amber-600 text-white shadow-xs"
+                                    : "bg-amber-50 text-amber-700 hover:bg-amber-100"
+                                }`}
+                                title="طلب تعديل هوية المستضيف"
+                              >
+                                <AlertTriangle className="w-3.5 h-3.5" />
+                                <span>عايز تعديل</span>
+                              </button>
 
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handleDownloadDoc(hostDoc);
-                          }}
-                          className="p-1.5 text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
-                          title="تنزيل هوية المستضيف"
-                        >
-                          <Download className="w-4 h-4" />
-                        </button>
-
-                        {canEditAnyData && (
-                          <label
-                            className="p-1.5 text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors cursor-pointer shadow-2xs"
-                            title="استبدال / رفع هوية المستضيف مجدداً (أو اسحب الملف هنا)"
-                          >
-                            <UploadCloud className="w-4 h-4" />
-                            <input
-                              type="file"
-                              accept=".pdf,.jpg,.jpeg,.png"
-                              className="hidden"
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) handleFileUpload(file, "HostId");
-                              }}
-                            />
-                          </label>
-                        )}
-
-                        <button
-                          type="button"
-                          disabled={isScanningHostIdDoc}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handleScanExistingHostId(hostDoc);
-                          }}
-                          className="p-1.5 text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition-colors cursor-pointer disabled:opacity-50 shadow-2xs"
-                          title="فحص واستخراج بيانات هوية المستضيف تلقائياً (مسح ذكي OCR)"
-                        >
-                          {isScanningHostIdDoc ? (
-                            <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
-                          ) : (
-                            <ScanText className="w-4 h-4" />
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  handleQuickReview(hostDoc.id, "Rejected");
+                                }}
+                                disabled={actionLoading}
+                                className={`px-2 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer ${
+                                  hostDoc.reviewStatus === "Rejected"
+                                    ? "bg-rose-600 text-white shadow-xs"
+                                    : "bg-rose-50 text-rose-700 hover:bg-rose-100"
+                                }`}
+                                title="رفض هوية المستضيف"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                                <span>مرفوض</span>
+                              </button>
+                            </div>
                           )}
-                        </button>
 
-                        {/* Quick Review Buttons when Pending */}
-                        {(isSafaReviewer || isAgent) && hostDoc.reviewStatus === "Pending" && (
-                          <div className="flex items-center gap-1">
+                          {isAgent && hostDoc.reviewStatus !== "Pending" && (
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.preventDefault();
-                                handleQuickReview(hostDoc.id, "Accepted");
+                                handleQuickReview(hostDoc.id, "Pending", "تمت إعادة المستند للمراجعة من قبل الوكيل");
                               }}
                               disabled={actionLoading}
-                              className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors cursor-pointer shadow-2xs"
-                              title="قبول هوية المستضيف (صح)"
+                              className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                              title="إعادة فتح تدقيق المستند"
                             >
-                              <Check className="w-4 h-4" />
+                              <Undo2 className="w-3.5 h-3.5" />
+                              <span>إعادة تدقيق</span>
                             </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                handleQuickReview(hostDoc.id, "NeedsCorrection");
-                              }}
-                              disabled={actionLoading}
-                              className="p-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors cursor-pointer shadow-2xs"
-                              title="طلب تصحيح هوية المستضيف (مثلث الخطر)"
-                            >
-                              <AlertTriangle className="w-4 h-4" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                handleQuickReview(hostDoc.id, "Rejected");
-                              }}
-                              disabled={actionLoading}
-                              className="p-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition-colors cursor-pointer shadow-2xs"
-                              title="رفض هوية المستضيف (إكس)"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                        )}
+                          )}
+                        </div>
 
-                        {/* Agent Return/Reset Action: only Agent can return reviewed documents */}
-                        {isAgent && hostDoc.reviewStatus !== "Pending" && (
+                        {/* أزرار العمليات (معاينة، تنزيل، فحص ذكي، استبدال، حذف) */}
+                        <div className="flex flex-wrap items-center gap-1.5">
                           <button
                             type="button"
                             onClick={(e) => {
                               e.preventDefault();
-                              handleQuickReview(hostDoc.id, "Pending", "تمت إعادة المستند للمراجعة من قبل الوكيل");
+                              setPreviewDoc(hostDoc);
                             }}
-                            disabled={actionLoading}
-                            className="p-1.5 bg-amber-50 hover:bg-amber-500 text-amber-800 hover:text-white border border-amber-300 rounded-lg transition-colors cursor-pointer shadow-2xs"
-                            title="إعادة فتح تدقيق المستند لموظف الصفا (إعادة التدقيق)"
+                            className="p-1.5 text-gray-700 bg-white hover:text-sky-600 hover:bg-sky-50 border border-gray-200 rounded-lg transition-colors cursor-pointer shadow-2xs"
+                            title="معاينة المستند"
                           >
-                            <Undo2 className="w-4 h-4" />
+                            <Eye className="w-4 h-4" />
                           </button>
-                        )}
 
-                        {canEditAnyData && (
                           <button
                             type="button"
                             onClick={(e) => {
                               e.preventDefault();
-                              handleDeleteDocument(hostDoc.id);
+                              handleDownloadDoc(hostDoc);
                             }}
-                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
-                            title="حذف المستند"
+                            className="p-1.5 text-emerald-700 bg-white hover:bg-emerald-50 border border-gray-200 rounded-lg transition-colors cursor-pointer shadow-2xs"
+                            title="تنزيل هوية المستضيف"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Download className="w-4 h-4" />
                           </button>
-                        )}
+
+                          <button
+                            type="button"
+                            disabled={isScanningHostIdDoc}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              handleScanExistingHostId(hostDoc);
+                            }}
+                            className="p-1.5 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition-colors cursor-pointer disabled:opacity-50 shadow-2xs"
+                            title="فحص واستخراج بيانات هوية المستضيف تلقائياً (مسح ذكي بالذكاء الاصطناعي)"
+                          >
+                            {isScanningHostIdDoc ? (
+                              <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
+                            ) : (
+                              <ScanText className="w-4 h-4" />
+                            )}
+                          </button>
+
+                          {canEditAnyData && (
+                            <label
+                              className="p-1.5 text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors cursor-pointer shadow-2xs"
+                              title="استبدال / رفع هوية المستضيف مجدداً"
+                            >
+                              <UploadCloud className="w-4 h-4" />
+                              <input
+                                type="file"
+                                accept=".pdf,.jpg,.jpeg,.png"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handleFileUpload(file, "HostId");
+                                }}
+                              />
+                            </label>
+                          )}
+
+                          {canEditAnyData && (
+                            <button
+                              type="button"
+                              onClick={async (e) => {
+                                e.preventDefault();
+                                const confirmed = await confirm({
+                                  title: "تأكيد حذف المستند",
+                                  message: "هل أنت متأكد من رغبتك في حذف هوية المستضيف نهائياً من المعاملة؟",
+                                  variant: "danger",
+                                  confirmText: "نعم، حذف",
+                                  cancelText: "إلغاء",
+                                });
+                                if (confirmed) {
+                                  try {
+                                    setActionLoading(true);
+                                    await api.documents.delete(hostDoc.id);
+                                    setSuccess("تم حذف مستند هوية المستضيف بنجاح.");
+                                    await loadRequest(false);
+                                  } catch (err: unknown) {
+                                    if (err instanceof Error) setError(err.message);
+                                  } finally {
+                                    setActionLoading(false);
+                                  }
+                                }
+                              }}
+                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 border border-gray-200 bg-white rounded-lg transition-colors cursor-pointer shadow-2xs"
+                              title="حذف المستند"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ) : (
@@ -3092,154 +3156,203 @@ export default function RequestDetailPage({
                 className="rounded-xl"
               >
                 {ticketDoc ? (
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs gap-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center shrink-0">
-                        <Ticket className="w-4 h-4" />
+                  <div className="p-3.5 bg-gray-50 border border-gray-200 rounded-xl text-xs space-y-3">
+                    {/* السطر الأول: بيانات الملف بوضوح وشارة الحالة */}
+                    <div className="flex items-start sm:items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <div className="w-8 h-8 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center shrink-0">
+                          <Ticket className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-baseline gap-1.5 flex-wrap">
+                            <span className="font-bold text-gray-700 shrink-0">الملف:</span>
+                            <span className="font-semibold text-gray-900 break-all text-xs" dir="ltr">
+                              {ticketDoc.originalFileName}
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-gray-400 mt-0.5">
+                            {(ticketDoc.fileSize / 1024).toFixed(1)} KB
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <div className="font-semibold text-gray-800">
-                          {ticketDoc.originalFileName}
-                        </div>
-                        <div className="text-[10px] text-gray-400">
-                          {(ticketDoc.fileSize / 1024).toFixed(1)} KB
-                        </div>
+
+                      <div className="shrink-0">
+                        <DocumentStatusBadge status={ticketDoc.reviewStatus} />
                       </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2">
-                      <DocumentStatusBadge status={ticketDoc.reviewStatus} />
+                    {/* السطر الثاني: الخيارات والأزرار كاملة جنب بعض داخل الفريم */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-gray-200/70">
+                      {/* خيارات التدقيق السريع */}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {(isSafaReviewer || isAgent) && (
+                          <div className="flex flex-wrap items-center gap-1 bg-white p-1 rounded-lg border border-gray-200 shadow-2xs">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handleQuickReview(ticketDoc.id, "Accepted");
+                              }}
+                              disabled={actionLoading}
+                              className={`px-2 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer ${
+                                ticketDoc.reviewStatus === "Accepted"
+                                  ? "bg-emerald-600 text-white shadow-xs"
+                                  : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                              }`}
+                              title="قبول تذكرة الطيران"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                              <span>مقبول</span>
+                            </button>
 
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setPreviewDoc(ticketDoc);
-                        }}
-                        className="p-1.5 text-gray-600 hover:text-sky-600 hover:bg-gray-200 rounded-lg cursor-pointer"
-                        title="معاينة المستند"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handleQuickReview(ticketDoc.id, "NeedsCorrection");
+                              }}
+                              disabled={actionLoading}
+                              className={`px-2 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer ${
+                                ticketDoc.reviewStatus === "NeedsCorrection"
+                                  ? "bg-amber-600 text-white shadow-xs"
+                                  : "bg-amber-50 text-amber-700 hover:bg-amber-100"
+                              }`}
+                              title="طلب تعديل تذكرة الطيران"
+                            >
+                              <AlertTriangle className="w-3.5 h-3.5" />
+                              <span>عايز تعديل</span>
+                            </button>
 
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handleDownloadDoc(ticketDoc);
-                        }}
-                        className="p-1.5 text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
-                        title="تنزيل تذكرة الطيران"
-                      >
-                        <Download className="w-4 h-4" />
-                      </button>
-
-                      {canEditAnyData && (
-                        <label
-                          className="p-1.5 text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors cursor-pointer shadow-2xs"
-                          title="استبدال / رفع تذكرة الطيران مجدداً (أو اسحب الملف هنا)"
-                        >
-                          <UploadCloud className="w-4 h-4" />
-                          <input
-                            type="file"
-                            accept=".pdf,.jpg,.jpeg,.png"
-                            className="hidden"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) handleFileUpload(file, "FlightTicket");
-                            }}
-                          />
-                        </label>
-                      )}
-
-                      <button
-                        type="button"
-                        disabled={isScanningFlightTicketDoc}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handleScanExistingFlightTicket(ticketDoc);
-                        }}
-                        className="p-1.5 text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition-colors cursor-pointer disabled:opacity-50 shadow-2xs"
-                        title="فحص واستخراج بيانات تذكرة الطيران بالذكاء الاصطناعي (Google Gemini)"
-                      >
-                        {isScanningFlightTicketDoc ? (
-                          <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
-                        ) : (
-                          <Sparkles className="w-4 h-4 text-indigo-600" />
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handleQuickReview(ticketDoc.id, "Rejected");
+                              }}
+                              disabled={actionLoading}
+                              className={`px-2 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer ${
+                                ticketDoc.reviewStatus === "Rejected"
+                                  ? "bg-rose-600 text-white shadow-xs"
+                                  : "bg-rose-50 text-rose-700 hover:bg-rose-100"
+                              }`}
+                              title="رفض تذكرة الطيران"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                              <span>مرفوض</span>
+                            </button>
+                          </div>
                         )}
-                      </button>
 
-                      {/* Quick Review Buttons when Pending */}
-                      {(isSafaReviewer || isAgent) && ticketDoc.reviewStatus === "Pending" && (
-                        <div className="flex items-center gap-1">
+                        {isAgent && ticketDoc.reviewStatus !== "Pending" && (
                           <button
                             type="button"
                             onClick={(e) => {
                               e.preventDefault();
-                              handleQuickReview(ticketDoc.id, "Accepted");
+                              handleQuickReview(ticketDoc.id, "Pending", "تمت إعادة المستند للمراجعة من قبل الوكيل");
                             }}
                             disabled={actionLoading}
-                            className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors cursor-pointer shadow-2xs"
-                            title="قبول تذكرة الطيران (صح)"
+                            className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                            title="إعادة فتح تدقيق المستند"
                           >
-                            <Check className="w-4 h-4" />
+                            <Undo2 className="w-3.5 h-3.5" />
+                            <span>إعادة تدقيق</span>
                           </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              handleQuickReview(ticketDoc.id, "NeedsCorrection");
-                            }}
-                            disabled={actionLoading}
-                            className="p-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors cursor-pointer shadow-2xs"
-                            title="طلب تصحيح تذكرة الطيران (مثلث الخطر)"
-                          >
-                            <AlertTriangle className="w-4 h-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              handleQuickReview(ticketDoc.id, "Rejected");
-                            }}
-                            disabled={actionLoading}
-                            className="p-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition-colors cursor-pointer shadow-2xs"
-                            title="رفض تذكرة الطيران (إكس)"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      )}
+                        )}
+                      </div>
 
-                      {/* Agent Return/Reset Action */}
-                      {isAgent && ticketDoc.reviewStatus !== "Pending" && (
+                      {/* أزرار العمليات */}
+                      <div className="flex flex-wrap items-center gap-1.5">
                         <button
                           type="button"
                           onClick={(e) => {
                             e.preventDefault();
-                            handleQuickReview(ticketDoc.id, "Pending", "تمت إعادة المستند للمراجعة من قبل الوكيل");
+                            setPreviewDoc(ticketDoc);
                           }}
-                          disabled={actionLoading}
-                          className="p-1.5 bg-amber-50 hover:bg-amber-500 text-amber-800 hover:text-white border border-amber-300 rounded-lg transition-colors cursor-pointer shadow-2xs"
-                          title="إعادة فتح تدقيق تذكرة الطيران لموظف الصفا (إعادة التدقيق)"
+                          className="p-1.5 text-gray-700 bg-white hover:text-sky-600 hover:bg-sky-50 border border-gray-200 rounded-lg transition-colors cursor-pointer shadow-2xs"
+                          title="معاينة المستند"
                         >
-                          <Undo2 className="w-4 h-4" />
+                          <Eye className="w-4 h-4" />
                         </button>
-                      )}
 
-                      {canEditAnyData && (
                         <button
                           type="button"
                           onClick={(e) => {
                             e.preventDefault();
-                            handleDeleteDocument(ticketDoc.id);
+                            handleDownloadDoc(ticketDoc);
                           }}
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
-                          title="حذف المستند"
+                          className="p-1.5 text-emerald-700 bg-white hover:bg-emerald-50 border border-gray-200 rounded-lg transition-colors cursor-pointer shadow-2xs"
+                          title="تنزيل تذكرة الطيران"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Download className="w-4 h-4" />
                         </button>
-                      )}
+
+                        <button
+                          type="button"
+                          disabled={isScanningFlightTicketDoc}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleScanExistingFlightTicket(ticketDoc);
+                          }}
+                          className="p-1.5 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition-colors cursor-pointer disabled:opacity-50 shadow-2xs"
+                          title="فحص واستخراج بيانات تذكرة الطيران بالذكاء الاصطناعي (Google Gemini)"
+                        >
+                          {isScanningFlightTicketDoc ? (
+                            <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
+                          ) : (
+                            <Sparkles className="w-4 h-4 text-indigo-600" />
+                          )}
+                        </button>
+
+                        {canEditAnyData && (
+                          <label
+                            className="p-1.5 text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors cursor-pointer shadow-2xs"
+                            title="استبدال / رفع تذكرة الطيران مجدداً"
+                          >
+                            <UploadCloud className="w-4 h-4" />
+                            <input
+                              type="file"
+                              accept=".pdf,.jpg,.jpeg,.png"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleFileUpload(file, "FlightTicket");
+                              }}
+                            />
+                          </label>
+                        )}
+
+                        {canEditAnyData && (
+                          <button
+                            type="button"
+                            onClick={async (e) => {
+                              e.preventDefault();
+                              const confirmed = await confirm({
+                                title: "تأكيد حذف المستند",
+                                message: "هل أنت متأكد من رغبتك في حذف تذكرة الطيران نهائياً من المعاملة؟",
+                                variant: "danger",
+                                confirmText: "نعم، حذف",
+                                cancelText: "إلغاء",
+                              });
+                              if (confirmed) {
+                                try {
+                                  setActionLoading(true);
+                                  await api.documents.delete(ticketDoc.id);
+                                  setSuccess("تم حذف تذكرة الطيران بنجاح.");
+                                  await loadRequest(false);
+                                } catch (err: unknown) {
+                                  if (err instanceof Error) setError(err.message);
+                                } finally {
+                                  setActionLoading(false);
+                                }
+                              }
+                            }}
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 border border-gray-200 bg-white rounded-lg transition-colors cursor-pointer shadow-2xs"
+                            title="حذف المستند"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ) : (
