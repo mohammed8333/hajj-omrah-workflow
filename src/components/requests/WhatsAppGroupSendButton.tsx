@@ -450,17 +450,28 @@ export const WhatsAppGroupSendButton: React.FC<WhatsAppGroupSendButtonProps> = (
                   {bridgeStatus?.connected
                     ? "خادم الواتساب المحلي: متصل وجاهز للإرسال ✓"
                     : bridgeStatus?.online
-                    ? "الخادم يعمل وبانتظار مسح كود QR في سطر الأوامر"
+                    ? "الخادم يعمل وبانتظار مسح كود QR في شاشة السيرفر"
                     : "خادم الواتساب المحلي غير مشغّل حالياً"}
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={checkBridgeStatus}
-                className="text-[11px] text-sky-600 hover:underline font-bold cursor-pointer"
-              >
-                تحديث الحالة 🔄
-              </button>
+              <div className="flex items-center gap-2">
+                <a
+                  href="http://localhost:5055"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[11px] text-emerald-700 hover:text-emerald-900 font-bold flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-lg transition-colors"
+                >
+                  <span>لوحة السيرفر 🖥️</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+                <button
+                  type="button"
+                  onClick={checkBridgeStatus}
+                  className="text-[11px] text-sky-600 hover:underline font-bold cursor-pointer"
+                >
+                  تحديث 🔄
+                </button>
+              </div>
             </div>
 
             {/* Instruction if bridge is offline */}

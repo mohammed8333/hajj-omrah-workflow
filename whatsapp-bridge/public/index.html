@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>لوحة تحكم خادم الواتساب | WhatsApp Bridge</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Tajawal', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#ecfdf5',
+              100: '#d1fae5',
+              500: '#10b981',
+              600: '#059669',
+              700: '#047857',
+              800: '#065f46',
+              900: '#064e3b',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      font-family: 'Tajawal', sans-serif;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #1e293b;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #475569;
+      border-radius: 4px;
+    }
+    @keyframes pulse-subtle {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+    .pulse-subtle {
+      animation: pulse-subtle 2s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+  <!-- Top Navbar -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <!-- Brand -->
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-md shadow-emerald-600/20">
+            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2m.01 1.67c2.2 0 4.26.86 5.82 2.42a8.225 8.225 0 0 1 2.41 5.83c0 4.54-3.7 8.24-8.24 8.24-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.32a8.196 8.196 0 0 1-1.26-4.38c0-4.54 3.7-8.24 8.24-8.24m4.52 11.59c-.25-.13-1.47-.72-1.7-.81-.23-.08-.39-.13-.56.13-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.13-1.06-.39-2.02-1.25-.75-.67-1.26-1.5-1.41-1.75-.15-.25-.02-.39.11-.51.11-.11.25-.29.37-.44.12-.15.17-.25.25-.42.08-.17.04-.31-.02-.44-.06-.12-.56-1.35-.77-1.85-.2-.49-.41-.42-.56-.43h-.48c-.17 0-.44.06-.67.31-.23.25-.88.86-.88 2.1 0 1.24.9 2.44 1.03 2.61.12.17 1.77 2.7 4.29 3.79.6.26 1.07.41 1.44.53.6.19 1.15.16 1.58.1.48-.07 1.47-.6 1.68-1.18.21-.58.21-1.07.15-1.18-.06-.1-.23-.17-.48-.29z"/>
+            </svg>
+          </div>
+          <div>
+            <h1 class="font-extrabold text-slate-900 text-base sm:text-lg flex items-center gap-2">
+              <span>خادم الواتساب المحلي</span>
+              <span class="text-xs px-2 py-0.5 rounded-md font-mono bg-slate-100 text-slate-600 border border-slate-200">v2.0</span>
+            </h1>
+            <p class="text-xs text-slate-500 hidden sm:block">
+              جسر الإرسال الآلي لحزم المعاملات والمستندات لمجموعات الواتساب
+            </p>
+          </div>
+        </div>
+
+        <!-- Connection Status & Actions -->
+        <div class="flex items-center gap-3">
+          <div id="statusBadge" class="flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all bg-slate-100 text-slate-600 border-slate-200">
+            <span class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+            <span id="statusText">جاري فحص الاتصال...</span>
+          </div>
+
+          <button id="btnReconnect" onclick="triggerReconnect()" title="إعادة الاتصال" class="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl border border-slate-200 cursor-pointer transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+
+          <a href="http://localhost:3000" target="_blank" class="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-xl transition-colors">
+            <span>فتح نظام المسار</span>
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          </a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-6">
+
+    <!-- HERO SECTION: Dynamic according to connection state -->
+    <div id="heroCard" class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs transition-all">
+      <!-- Loading Skeleton -->
+      <div id="loadingView" class="py-12 flex flex-col items-center justify-center text-center space-y-4">
+        <div class="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+        <p class="text-sm font-semibold text-slate-500">جاري الاتصال بالخادم وقراءة حالة الجلسة...</p>
+      </div>
+
+      <!-- State 1: QR Code View (Needs Scan) -->
+      <div id="qrView" class="hidden flex flex-col lg:flex-row items-center justify-between gap-8 py-4">
+        <div class="space-y-4 max-w-xl text-center lg:text-right">
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
+            <span class="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
+            <span>بانتظار مسح كود QR من الهاتف</span>
+          </div>
+          <h2 class="text-2xl sm:text-3xl font-black text-slate-900 leading-tight">
+            اربط حساب الواتساب بالخادم المحلي
+          </h2>
+          <p class="text-sm text-slate-600 leading-relaxed">
+            امسح الرمز المقابل لمرة واحدة فقط ليتمكن النظام من إرسال حزم المعاملات والمستندات تلقائياً إلى مجموعات الواتساب دون أي تدخل يدوي.
+          </p>
+          
+          <!-- Instructions steps -->
+          <div class="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 text-xs space-y-2.5 text-right font-medium text-slate-700">
+            <div class="flex items-center gap-2 font-bold text-slate-900 border-b border-slate-200/60 pb-1.5">
+              <span class="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-[11px]">1</span>
+              <span>افتح تطبيق WhatsApp على هاتفك</span>
+            </div>
+            <div class="flex items-center gap-2 font-bold text-slate-900 border-b border-slate-200/60 pb-1.5">
+              <span class="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-[11px]">2</span>
+              <span>اضغط على خيارات الإعدادات أو القائمة (⋮) ثم «الأجهزة المرتبطة»</span>
+            </div>
+            <div class="flex items-center gap-2 font-bold text-slate-900">
+              <span class="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-[11px]">3</span>
+              <span>اضغط «ربط جهاز» ووجّه كاميرا الهاتف نحو الرمز المقابل</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- QR Display -->
+        <div class="flex flex-col items-center justify-center p-6 bg-slate-50 border-2 border-dashed border-emerald-300 rounded-3xl shadow-inner space-y-3">
+          <div class="relative bg-white p-4 rounded-2xl shadow-md border border-slate-200">
+            <img id="qrImage" src="" alt="WhatsApp QR Code" class="w-64 h-64 sm:w-72 sm:h-72 object-contain" />
+            <div id="qrLoadingOverlay" class="hidden absolute inset-0 bg-white/90 backdrop-blur-xs rounded-2xl flex flex-col items-center justify-center gap-2">
+              <div class="w-8 h-8 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+              <span class="text-xs font-bold text-slate-600">جاري تحديث الكود...</span>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="triggerReconnect()" class="text-xs font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-100 hover:bg-emerald-200 px-3 py-1.5 rounded-xl cursor-pointer transition-colors flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <span>طلب كود جديد</span>
+            </button>
+            <span class="text-[11px] text-slate-400 font-mono">يتم التحديث تلقائياً</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- State 2: Connected View -->
+      <div id="connectedView" class="hidden flex flex-col md:flex-row items-center justify-between gap-6 py-2">
+        <div class="flex items-center gap-4 sm:gap-6">
+          <div class="relative">
+            <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-emerald-100 border-2 border-emerald-500/30 text-emerald-700 flex items-center justify-center font-bold text-2xl shadow-inner">
+              <svg class="w-10 h-10" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+              </svg>
+            </div>
+            <span class="absolute -bottom-1 -left-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center text-white text-[10px] font-black">✓</span>
+          </div>
+
+          <div class="space-y-1">
+            <div class="flex items-center gap-2">
+              <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
+                متصل وجاهز للإرسال ✓
+              </span>
+              <span id="connGroupsCountBadge" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                0 مجموعات
+              </span>
+            </div>
+            <h2 id="connUserName" class="text-xl sm:text-2xl font-black text-slate-900">
+              حساب الواتساب
+            </h2>
+            <p id="connUserPhone" dir="ltr" class="text-sm font-mono font-bold text-emerald-800 text-right">
+              +966XXXXXXXXX
+            </p>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
+          <button onclick="refreshGroupsList()" class="px-4 py-2.5 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <span>تحديث المجموعات</span>
+          </button>
+
+          <button onclick="triggerLogout()" class="px-4 py-2.5 text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+            <span>تسجيل الخروج (ربط رقم آخر)</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAIN TWO-COLUMN WORKSPACE -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <!-- COLUMN 1 & 2: Groups Explorer & Default Target (2 cols on lg) -->
+      <div class="lg:col-span-2 space-y-6">
+        
+        <!-- Groups Manager Card -->
+        <div class="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+            <div>
+              <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                <span>مجموعات الواتساب المرتبطة بحسابك</span>
+              </h3>
+              <p class="text-xs text-slate-500 mt-0.5">
+                اختر المجموعة المستهدفة لتعيينها كمجموعة افتراضية لإرسال حزم المعاملات
+              </p>
+            </div>
+
+            <!-- Group Search Filter -->
+            <div class="relative w-full sm:w-64">
+              <input 
+                type="text" 
+                id="groupSearchInput" 
+                oninput="renderGroupsTable()" 
+                placeholder="ابحث عن اسم مجموعة..." 
+                class="w-full pl-3 pr-8 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+              />
+              <svg class="w-4 h-4 text-slate-400 absolute right-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+          </div>
+
+          <!-- Active Target Group Banner -->
+          <div id="defaultGroupBanner" class="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold">
+                🎯
+              </div>
+              <div>
+                <span class="font-bold text-emerald-950 block">المجموعة الافتراضية المحددة حالياً:</span>
+                <span id="defaultGroupNameText" class="font-bold text-emerald-800 font-mono text-sm">
+                  لم يتم تحديد مجموعة بعد
+                </span>
+              </div>
+            </div>
+            <button onclick="testSendToDefaultGroup()" class="px-3 py-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs transition-colors cursor-pointer flex items-center gap-1.5 shrink-0">
+              <span>إرسال فحص تجريبي 📲</span>
+            </button>
+          </div>
+
+          <!-- Groups Table / List -->
+          <div class="overflow-x-auto max-h-96 custom-scrollbar rounded-2xl border border-slate-200">
+            <table class="w-full text-right text-xs">
+              <thead class="bg-slate-100 text-slate-600 font-bold sticky top-0 border-b border-slate-200 z-10">
+                <tr>
+                  <th class="p-3">اسم المجموعة</th>
+                  <th class="p-3 text-center">الأعضاء</th>
+                  <th class="p-3 text-left">الإجراءات</th>
+                </tr>
+              </thead>
+              <tbody id="groupsTableBody" class="divide-y divide-slate-100 font-medium">
+                <tr>
+                  <td colspan="3" class="p-8 text-center text-slate-400">
+                    جاري تحميل قائمة المجموعات...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- COLUMN 3: Live Quick Test & Server Logs (1 col on lg) -->
+      <div class="space-y-6">
+
+        <!-- Quick Test Sender Card -->
+        <div class="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs space-y-4">
+          <h3 class="text-base font-bold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-3">
+            <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+            </svg>
+            <span>اختبار الإرسال الفوري</span>
+          </h3>
+
+          <div class="space-y-3 text-xs">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">الوجهة (رقم هاتف أو مجموعة):</label>
+              <input 
+                type="text" 
+                id="testTargetInput" 
+                placeholder="مثال: 966500000000 أو اسم المجموعة" 
+                class="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 font-mono text-slate-900"
+              />
+            </div>
+
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">نص الرسالة التجريبية:</label>
+              <textarea 
+                id="testMessageInput" 
+                rows="3" 
+                class="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 text-slate-900 leading-relaxed"
+              >السلام عليكم ورحمة الله، هذه رسالة فحص تجريبية من خادم مسار الواتساب المحلي 🚀✓</textarea>
+            </div>
+
+            <button 
+              id="btnSendTest" 
+              onclick="sendTestMessage()" 
+              class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-xs cursor-pointer transition-all flex items-center justify-center gap-2"
+            >
+              <span>إرسال الرسالة الآن</span>
+              <svg class="w-4 h-4 -rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              </svg>
+            </button>
+            <div id="testResultMsg" class="hidden p-2.5 rounded-xl text-xs font-bold text-center"></div>
+          </div>
+        </div>
+
+        <!-- Terminal Logs Card -->
+        <div class="bg-slate-900 text-slate-200 rounded-3xl p-5 shadow-lg border border-slate-800 space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2.5 text-xs">
+            <div class="flex items-center gap-2">
+              <span class="w-3 h-3 rounded-full bg-rose-500"></span>
+              <span class="w-3 h-3 rounded-full bg-amber-500"></span>
+              <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
+              <span class="font-mono font-bold text-slate-400 mr-2">سجل أحداث الخادم المباشر</span>
+            </div>
+            <button onclick="clearLogs()" class="text-[11px] text-slate-400 hover:text-white cursor-pointer transition-colors">
+              مسح السجل
+            </button>
+          </div>
+
+          <div id="logsTerminal" class="h-64 overflow-y-auto custom-scrollbar font-mono text-[11px] space-y-1.5 p-1">
+            <div class="text-slate-500">بانتظار الأحداث...</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
+    <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+      <span>نظام إدارة سير المستندات والمعاملات - خدمة الواتساب المحلية (Port: 5055)</span>
+      <span class="font-mono text-slate-400">Hajj & Omrah Workflow System © 2026</span>
+    </div>
+  </footer>
+
+  <!-- App Script -->
+  <script>
+    const STORAGE_KEY_GROUP = "safa_whatsapp_target_group";
+    let state = {
+      connected: false,
+      hasQr: false,
+      qrDataUrl: null,
+      groups: [],
+      user: null,
+      logs: []
+    };
+
+    // Load saved group from localStorage
+    function getSavedGroup() {
+      return localStorage.getItem(STORAGE_KEY_GROUP) || "";
+    }
+
+    function saveTargetGroup(groupId, groupName) {
+      localStorage.setItem(STORAGE_KEY_GROUP, groupId || groupName);
+      updateDefaultGroupUI();
+      showToast(`تم تعيين "${groupName}" كمجموعة افتراضية ✓`);
+    }
+
+    function updateDefaultGroupUI() {
+      const saved = getSavedGroup();
+      const banner = document.getElementById("defaultGroupNameText");
+      if (saved) {
+        const found = state.groups.find(g => g.id === saved || g.subject === saved);
+        banner.textContent = found ? `${found.subject} (${found.participantsCount} عضو)` : saved;
+      } else {
+        banner.textContent = "لم يتم تحديد مجموعة بعد (اختر مجموعة من الجدول أدناه)";
+      }
+    }
+
+    // Fetch Status from Server
+    async function fetchStatus() {
+      try {
+        const res = await fetch("/status");
+        if (res.ok) {
+          const data = await res.json();
+          state.connected = Boolean(data.connected);
+          state.hasQr = Boolean(data.hasQr);
+          state.qrDataUrl = data.qrDataUrl;
+          state.user = data.user;
+          state.logs = data.logs || [];
+          renderUI();
+        } else {
+          setOfflineUI();
+        }
+      } catch (e) {
+        setOfflineUI();
+      }
+    }
+
+    // Render Full UI based on State
+    function renderUI() {
+      const statusBadge = document.getElementById("statusBadge");
+      const statusText = document.getElementById("statusText");
+      const loadingView = document.getElementById("loadingView");
+      const qrView = document.getElementById("qrView");
+      const connectedView = document.getElementById("connectedView");
+
+      loadingView.classList.add("hidden");
+
+      if (state.connected) {
+        // Connected State
+        statusBadge.className = "flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold bg-emerald-50 text-emerald-700 border-emerald-300 shadow-2xs";
+        statusBadge.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span><span>متصل بالواتساب ✓</span>`;
+        
+        qrView.classList.add("hidden");
+        connectedView.classList.remove("hidden");
+
+        if (state.user) {
+          document.getElementById("connUserName").textContent = state.user.name || "حساب الواتساب المرتبط";
+          document.getElementById("connUserPhone").textContent = state.user.phone || "";
+        }
+        document.getElementById("connGroupsCountBadge").textContent = `${state.groups.length} مجموعة مسجلة`;
+
+      } else if (state.hasQr && state.qrDataUrl) {
+        // Needs QR Scan State
+        statusBadge.className = "flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold bg-amber-50 text-amber-800 border-amber-300";
+        statusBadge.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping"></span><span>بانتظار مسح كود QR</span>`;
+
+        connectedView.classList.add("hidden");
+        qrView.classList.remove("hidden");
+
+        const qrImg = document.getElementById("qrImage");
+        qrImg.src = state.qrDataUrl;
+      } else {
+        // Disconnected / Initializing
+        statusBadge.className = "flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold bg-slate-100 text-slate-700 border-slate-300";
+        statusBadge.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-slate-400"></span><span>جاري تهيئة الاتصال...</span>`;
+        
+        qrView.classList.add("hidden");
+        connectedView.classList.add("hidden");
+        loadingView.classList.remove("hidden");
+      }
+
+      renderLogs();
+    }
+
+    function setOfflineUI() {
+      const statusBadge = document.getElementById("statusBadge");
+      statusBadge.className = "flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold bg-rose-50 text-rose-700 border-rose-300";
+      statusBadge.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span><span>الخادم غير مشغل ❌</span>`;
+    }
+
+    // Fetch Groups
+    async function refreshGroupsList() {
+      if (!state.connected) return;
+      try {
+        const res = await fetch("/groups");
+        if (res.ok) {
+          const data = await res.json();
+          state.groups = data.groups || [];
+          renderGroupsTable();
+          updateDefaultGroupUI();
+        }
+      } catch (e) {
+        console.warn("Error fetching groups:", e);
+      }
+    }
+
+    // Render Groups Table
+    function renderGroupsTable() {
+      const tbody = document.getElementById("groupsTableBody");
+      const searchVal = (document.getElementById("groupSearchInput").value || "").toLowerCase().trim();
+      const saved = getSavedGroup();
+
+      if (!state.connected) {
+        tbody.innerHTML = `<tr><td colspan="3" class="p-6 text-center text-slate-400">قم بربط حساب الواتساب أولاً لعرض المجموعات</td></tr>`;
+        return;
+      }
+
+      const filtered = state.groups.filter(g => 
+        g.subject.toLowerCase().includes(searchVal) || g.id.toLowerCase().includes(searchVal)
+      );
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="3" class="p-6 text-center text-slate-400">${searchVal ? 'لا توجد مجموعة تطابق كلمة البحث' : 'لا توجد مجموعات متاحة في هذا الحساب'}</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(g => {
+        const isDefault = saved === g.id || saved === g.subject;
+        return `
+          <tr class="hover:bg-slate-50 transition-colors ${isDefault ? 'bg-emerald-50/50' : ''}">
+            <td class="p-3">
+              <div class="font-bold text-slate-900">${escapeHtml(g.subject)}</div>
+              <div class="text-[10px] text-slate-400 font-mono" dir="ltr">${escapeHtml(g.id)}</div>
+            </td>
+            <td class="p-3 text-center">
+              <span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-bold text-[11px]">
+                ${g.participantsCount} عضو
+              </span>
+            </td>
+            <td class="p-3 text-left">
+              ${isDefault ? `
+                <span class="inline-flex items-center gap-1 text-emerald-700 font-bold text-xs bg-emerald-100 px-3 py-1 rounded-lg">
+                  ✓ المجموعة الافتراضية
+                </span>
+              ` : `
+                <button 
+                  onclick="saveTargetGroup('${escapeHtml(g.id)}', '${escapeHtml(g.subject)}')" 
+                  class="px-2.5 py-1 text-xs font-semibold text-slate-700 hover:text-emerald-700 hover:bg-emerald-50 border border-slate-200 rounded-lg cursor-pointer transition-colors"
+                >
+                  تعيين كافتراضية 🎯
+                </button>
+              `}
+            </td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    // Render Logs Terminal
+    function renderLogs() {
+      const term = document.getElementById("logsTerminal");
+      if (!state.logs || state.logs.length === 0) {
+        term.innerHTML = `<div class="text-slate-500">لا توجد أحداث مسجلة بعد...</div>`;
+        return;
+      }
+
+      term.innerHTML = state.logs.map(log => {
+        let colorClass = "text-slate-300";
+        let badgeClass = "bg-slate-800 text-slate-400";
+        if (log.type === "success") {
+          colorClass = "text-emerald-400";
+          badgeClass = "bg-emerald-950 text-emerald-400 border border-emerald-800/40";
+        } else if (log.type === "warn") {
+          colorClass = "text-amber-300";
+          badgeClass = "bg-amber-950 text-amber-300 border border-amber-800/40";
+        } else if (log.type === "error") {
+          colorClass = "text-rose-400";
+          badgeClass = "bg-rose-950 text-rose-400 border border-rose-800/40";
+        }
+
+        return `
+          <div class="flex items-start gap-2 py-0.5 border-b border-slate-800/40">
+            <span class="text-[10px] text-slate-500 shrink-0 font-mono">${log.time}</span>
+            <span class="text-[9px] px-1.5 py-0.2 rounded font-bold uppercase shrink-0 ${badgeClass}">${log.type}</span>
+            <span class="${colorClass} leading-tight break-all">${escapeHtml(log.message)}</span>
+          </div>
+        `;
+      }).join("");
+    }
+
+    // Actions
+    async function triggerReconnect() {
+      try {
+        await fetch("/reconnect", { method: "POST" });
+        showToast("جاري إعادة الاتصال بالخادم...");
+        setTimeout(fetchStatus, 1500);
+      } catch (e) {
+        alert("تعذر الاتصال بالخادم");
+      }
+    }
+
+    async function triggerLogout() {
+      if (!confirm("هل أنت متأكد من تسجيل الخروج وحذف الجلسة الحالية لربط رقم واتساب جديد؟")) return;
+      try {
+        await fetch("/logout", { method: "POST" });
+        showToast("تم تسجيل الخروج، جاري طلب كود QR جديد...");
+        setTimeout(fetchStatus, 2000);
+      } catch (e) {
+        alert("تعذر تسجيل الخروج");
+      }
+    }
+
+    async function clearLogs() {
+      await fetch("/logs", { method: "DELETE" });
+      state.logs = [];
+      renderLogs();
+    }
+
+    async function sendTestMessage() {
+      const target = document.getElementById("testTargetInput").value.trim();
+      const message = document.getElementById("testMessageInput").value.trim();
+      const resMsg = document.getElementById("testResultMsg");
+      const btn = document.getElementById("btnSendTest");
+
+      if (!target) {
+        alert("يرجى إدخال رقم هاتف أو اختيار مجموعة");
+        return;
+      }
+      if (!message) {
+        alert("يرجى إدخال نص الرسالة");
+        return;
+      }
+
+      try {
+        btn.disabled = true;
+        btn.innerHTML = `<span>جاري الإرسال...</span>`;
+        resMsg.className = "hidden";
+
+        const res = await fetch("/send-test", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ target, message })
+        });
+        const data = await res.json();
+        btn.disabled = false;
+        btn.innerHTML = `<span>إرسال الرسالة الآن</span>`;
+
+        if (res.ok) {
+          resMsg.className = "p-2.5 rounded-xl text-xs font-bold text-center bg-emerald-50 text-emerald-800 border border-emerald-200 block";
+          resMsg.textContent = "تم إرسال الرسالة بنجاح ✓";
+          fetchStatus();
+        } else {
+          resMsg.className = "p-2.5 rounded-xl text-xs font-bold text-center bg-rose-50 text-rose-800 border border-rose-200 block";
+          resMsg.textContent = data.error || "فشل إرسال الرسالة";
+        }
+      } catch (e) {
+        btn.disabled = false;
+        btn.innerHTML = `<span>إرسال الرسالة الآن</span>`;
+        resMsg.className = "p-2.5 rounded-xl text-xs font-bold text-center bg-rose-50 text-rose-800 border border-rose-200 block";
+        resMsg.textContent = "حدث خطأ في الاتصال بالخادم";
+      }
+    }
+
+    function testSendToDefaultGroup() {
+      const saved = getSavedGroup();
+      if (!saved) {
+        alert("يرجى اختيار مجموعة أولاً من القائمة");
+        return;
+      }
+      document.getElementById("testTargetInput").value = saved;
+      document.getElementById("testMessageInput").value = "فحص تجريبي: ربط خادم مسار الواتساب ناجح بنجاح 🎯✓";
+      sendTestMessage();
+    }
+
+    function showToast(msg) {
+      const div = document.createElement("div");
+      div.className = "fixed bottom-5 left-5 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-2xl text-xs font-bold z-50 animate-bounce";
+      div.textContent = msg;
+      document.body.appendChild(div);
+      setTimeout(() => div.remove(), 3500);
+    }
+
+    function escapeHtml(str) {
+      if (!str) return "";
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    // Auto Polling loop
+    fetchStatus();
+    refreshGroupsList();
+    setInterval(fetchStatus, 3000);
+    setInterval(refreshGroupsList, 15000);
+  </script>
+</body>
+</html>
