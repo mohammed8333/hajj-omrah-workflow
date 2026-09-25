@@ -27,22 +27,48 @@ interface WhatsAppGroupSendButtonProps {
   ticketDoc?: DocumentItem;
   hostDoc?: DocumentItem;
   className?: string;
+  disabled?: boolean;
+  disabledReason?: string;
 }
 
 const BRIDGE_URL = "http://localhost:5055";
 const STORAGE_KEY_GROUP = "safa_whatsapp_target_group";
 const STORAGE_KEY_LINK = "safa_whatsapp_target_link";
 
+// Statuses reached only after Safa employee clicks "إحالة للوكيل السعودي"
+const POST_REFERRAL_STATUSES = [
+  "ReadyForSaudiAgent",
+  "ReceivedBySaudiAgent",
+  "SaudiAgentProcessing",
+  "SaudiAgentCorrectionRequired",
+  "ProgramLinked",
+  "HostingAcceptanceRequested",
+  "HostingAcceptedBySender",
+  "HostingConfirmed",
+  "Completed",
+  "Archived",
+];
+
 export const WhatsAppGroupSendButton: React.FC<WhatsAppGroupSendButtonProps> = ({
   request,
   ticketDoc,
   hostDoc,
   className = "",
+  disabled = false,
+  disabledReason,
 }) => {
   const { alert } = useDialog();
   const [showModal, setShowModal] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [sendStep, setSendStep] = useState<string>("");
+
+  // Button is only enabled once the request is officially referred to the Saudi Agent
+  const isReferredToSaudiAgent =
+    POST_REFERRAL_STATUSES.includes(request.status) ||
+    Boolean(request.assignedSaudiAgentId) ||
+    Boolean(request.statusHistory?.some((h) => POST_REFERRAL_STATUSES.includes(h.status)));
+
+  const isButtonEnabled = isReferredToSaudiAgent && !disabled;
   const [bridgeStatus, setBridgeStatus] = useState<{
     online: boolean;
     connected: boolean;
@@ -289,48 +315,96 @@ export const WhatsAppGroupSendButton: React.FC<WhatsAppGroupSendButtonProps> = (
 
   return (
     <>
-      {/* The Main Action Button for Safa Employee with Settings Gear */}
-      <div className={`inline-flex items-stretch rounded-xl shadow-xs ${className}`}>
-        <button
-          type="button"
-          disabled={isSending}
-          onClick={() => {
-            if (!targetGroup.trim() && !groupLink.trim()) {
+      {/* Inactive State: When not yet referred to Saudi Agent */}
+      {!isButtonEnabled ? (
+        <div
+          className={`inline-flex items-stretch rounded-xl border border-gray-300 bg-gray-100 text-gray-400 opacity-75 shadow-none ${className}`}
+          title={
+            disabledReason ||
+            "يتفعل هذا الزر تلقائياً بعد قيام موظف صفا بالضغط على «إحالة للوكيل السعودي»"
+          }
+        >
+          <button
+            type="button"
+            onClick={async () => {
+              await alert({
+                title: "الزر غير مفعّل حالياً",
+                message:
+                  disabledReason ||
+                  "لا يمكن إرسال حزمة المعاملة لمجموعة الواتساب في هذه المرحلة.\nيتفعل هذا الزر تلقائياً بعد قيام موظف صفا بالضغط على زر «إحالة للوكيل السعودي».",
+                variant: "warning",
+              });
+            }}
+            className="px-3.5 py-2 rounded-r-xl flex items-center gap-1.5 cursor-not-allowed font-bold text-xs text-gray-400 hover:text-gray-500 transition-colors"
+          >
+            <MessageCircle className="w-3.5 h-3.5 text-gray-400" />
+            <span>إرسال لمجموعة الواتساب 📲</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={async () => {
+              await alert({
+                title: "الزر غير مفعّل حالياً",
+                message:
+                  disabledReason ||
+                  "يتفعل هذا الزر وإعدادات الإرسال تلقائياً بعد قيام موظف صفا بالضغط على زر «إحالة للوكيل السعودي».",
+                variant: "warning",
+              });
+            }}
+            className="px-2.5 py-2 rounded-l-xl border-r border-gray-300 text-gray-400 hover:text-gray-500 cursor-not-allowed flex items-center justify-center transition-colors"
+            title={
+              disabledReason ||
+              "يتفعل هذا الزر تلقائياً بعد قيام موظف صفا بالضغط على «إحالة للوكيل السعودي»"
+            }
+          >
+            <Settings className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      ) : (
+        /* Active State: The Main Action Button for Safa Employee with Settings Gear */
+        <div className={`inline-flex items-stretch rounded-xl shadow-xs ${className}`}>
+          <button
+            type="button"
+            disabled={isSending}
+            onClick={() => {
+              if (!targetGroup.trim() && !groupLink.trim()) {
+                checkBridgeStatus();
+                setShowModal(true);
+              } else {
+                executeAutomatedSend();
+              }
+            }}
+            className="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-bold px-3.5 py-2 rounded-r-xl flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+            title="إرسال حزمة المعاملة بالكامل للواتساب (النص + التذكرة + الهوية)"
+          >
+            {isSending ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>جاري الإرسال للمجموعة...</span>
+              </>
+            ) : (
+              <>
+                <MessageCircle className="w-3.5 h-3.5" />
+                <span>إرسال لمجموعة الواتساب 📲</span>
+              </>
+            )}
+          </button>
+
+          {/* زر الترس لفتح وتعديل إعدادات المجموعة في أي وقت */}
+          <button
+            type="button"
+            onClick={() => {
               checkBridgeStatus();
               setShowModal(true);
-            } else {
-              executeAutomatedSend();
-            }
-          }}
-          className="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-bold px-3.5 py-2 rounded-r-xl flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
-          title="إرسال حزمة المعاملة بالكامل للواتساب (النص + التذكرة + الهوية)"
-        >
-          {isSending ? (
-            <>
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              <span>جاري الإرسال للمجموعة...</span>
-            </>
-          ) : (
-            <>
-              <MessageCircle className="w-3.5 h-3.5" />
-              <span>إرسال لمجموعة الواتساب 📲</span>
-            </>
-          )}
-        </button>
-
-        {/* زر الترس لفتح وتعديل إعدادات المجموعة في أي وقت */}
-        <button
-          type="button"
-          onClick={() => {
-            checkBridgeStatus();
-            setShowModal(true);
-          }}
-          className="bg-emerald-700 hover:bg-emerald-800 text-emerald-100 hover:text-white px-2.5 py-2 rounded-l-xl border-r border-emerald-500/50 transition-colors cursor-pointer flex items-center justify-center"
-          title="تغيير وضبط إعدادات مجموعة الواتساب المستهدفة ⚙️"
-        >
-          <Settings className="w-3.5 h-3.5" />
-        </button>
-      </div>
+            }}
+            className="bg-emerald-700 hover:bg-emerald-800 text-emerald-100 hover:text-white px-2.5 py-2 rounded-l-xl border-r border-emerald-500/50 transition-colors cursor-pointer flex items-center justify-center"
+            title="تغيير وضبط إعدادات مجموعة الواتساب المستهدفة ⚙️"
+          >
+            <Settings className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Control & Configuration Modal */}
       {showModal && (

@@ -1415,7 +1415,7 @@ export default function RequestDetailPage({
       setError(null);
       setSuccess(null);
       await api.requests.sendToAgent(requestId, undefined, "إحالة المجموعة للوكيل السعودي للمصادقة");
-      setSuccess("تمت إحالة المجموعة بنجاح للوكيل السعودي.");
+      setSuccess("تمت إحالة المجموعة بنجاح للوكيل السعودي وتم تفعيل زر إرسال حزمة الواتساب 📲 بنجاح.");
       await loadRequest();
     } catch (err: unknown) {
       if (err instanceof Error) setError(err.message);
@@ -2017,8 +2017,8 @@ export default function RequestDetailPage({
               </>
             )}
 
-          {/* زر إرسال حزمة المعاملة لمجموعة الواتساب (متاح لموظف الصفا والأدمن في كل المراحل بعد المسودة) */}
-          {isSafaReviewer && request.status !== "Draft" && request.status !== "Submitted" && (
+          {/* زر إرسال حزمة المعاملة لمجموعة الواتساب (يتفعل تلقائياً بعد إحالة المعاملة للوكيل السعودي) */}
+          {isSafaReviewer && request.status !== "Draft" && (
             <WhatsAppGroupSendButton
               request={request}
               ticketDoc={
