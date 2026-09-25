@@ -8,7 +8,6 @@ import Link from "next/link";
 import { isSupabaseConfigured } from "@/lib/supabaseClient";
 import { CloudSettingsModal } from "@/components/ui/CloudSettingsModal";
 import { NotificationsBell } from "@/components/layout/NotificationsBell";
-import { WhatsAppNavBadge } from "@/components/layout/WhatsAppNavBadge";
 
 export function Navbar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
   const { user, role, logout } = useAuth();
@@ -77,9 +76,6 @@ export function Navbar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
                   )}
                 </button>
               )}
-
-              {/* WhatsApp Local Bridge Badge / Button - Visible to Admin & SafaEmployee */}
-              {(role === "Admin" || role === "SafaEmployee") && <WhatsAppNavBadge />}
 
               {/* Live Notifications Bell */}
               {user && <NotificationsBell />}

@@ -13,9 +13,7 @@ if not exist node_modules (
 
 echo [2/2] Running server on http://localhost:5055 ...
 echo ========================================================
-echo Opening WhatsApp Server Dashboard: http://localhost:5055
+echo If QR code appears, scan it from WhatsApp on your phone.
 echo ========================================================
-
-start http://localhost:5055
 node server.js
 pause

@@ -2,8 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const path = require("path");
 const fs = require("fs");
-const qrcodeTerminal = require("qrcode-terminal");
-const QRCode = require("qrcode");
+const qrcode = require("qrcode-terminal");
 const pino = require("pino");
 
 const {
@@ -20,34 +19,11 @@ app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
-// Serve static frontend files
-const PUBLIC_DIR = path.join(__dirname, "public");
-if (!fs.existsSync(PUBLIC_DIR)) {
-  fs.mkdirSync(PUBLIC_DIR, { recursive: true });
-}
-app.use(express.static(PUBLIC_DIR));
-
 // State
 let sock = null;
 let isConnected = false;
 let currentQr = null;
-let currentQrDataUrl = null;
 let cachedGroups = [];
-let connectedUser = null;
-const recentLogs = [];
-
-function addLog(type, message) {
-  const item = {
-    id: Date.now() + Math.random().toString(36).substring(2, 6),
-    time: new Date().toLocaleTimeString("ar-EG"),
-    timestamp: Date.now(),
-    type, // 'info' | 'success' | 'warn' | 'error'
-    message,
-  };
-  recentLogs.unshift(item);
-  if (recentLogs.length > 80) recentLogs.pop();
-  console.log(`[${item.time}] [${type.toUpperCase()}] ${message}`);
-}
 
 const AUTH_DIR = path.join(__dirname, "auth_info");
 if (!fs.existsSync(AUTH_DIR)) {
@@ -75,7 +51,6 @@ function parseBase64Data(dataUrl) {
 // Initialize WhatsApp Socket
 async function startWhatsAppSocket() {
   try {
-    addLog("info", "جاري تهيئة خادم واتساب (Baileys)...");
     const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
     const { version } = await fetchLatestBaileysVersion();
 
@@ -84,7 +59,7 @@ async function startWhatsAppSocket() {
       logger: pino({ level: "silent" }),
       printQRInTerminal: false,
       auth: state,
-      browser: ["مسار الحج والعمرة", "Chrome", "2.0.0"],
+      browser: ["HajjOmrahWorkflow", "Chrome", "1.0.0"],
     });
 
     sock.ev.on("creds.update", saveCreds);
@@ -95,65 +70,27 @@ async function startWhatsAppSocket() {
       if (qr) {
         currentQr = qr;
         isConnected = false;
-        connectedUser = null;
-        try {
-          currentQrDataUrl = await QRCode.toDataURL(qr, {
-            width: 340,
-            margin: 2,
-            color: {
-              dark: "#065f46",
-              light: "#ffffff",
-            },
-          });
-        } catch (e) {
-          console.error("QR Code generation error:", e);
-        }
-
-        addLog("warn", "تم إصدار كود QR جديد وبانتظار المسح من تطبيق الواتساب.");
         console.log("\n=======================================================");
-        console.log("📲 كود QR متاح الآن على شاشة الويب: http://localhost:5055");
+        console.log("📲 امسح كود QR التالي من تطبيق الواتساب للربط:");
         console.log("=======================================================\n");
-        qrcodeTerminal.generate(qr, { small: true });
+        qrcode.generate(qr, { small: true });
+        console.log("\n(أو افتح http://localhost:5055/status لمعاينة الحالة)\n");
       }
 
       if (connection === "close") {
         isConnected = false;
-        connectedUser = null;
         const statusCode = lastDisconnect?.error?.output?.statusCode;
         const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-        addLog(
-          "warn",
-          `انقطع اتصال الواتساب (الرمز: ${statusCode || "غير معروف"}). إعادة المحاولة: ${
-            shouldReconnect ? "نعم" : "لا (تم تسجيل الخروج)"
-          }`
-        );
-
+        console.log(`⚠️ اتصال الواتساب أُغلق (الرمز: ${statusCode}). إعادة الاتصال: ${shouldReconnect}`);
         if (shouldReconnect) {
           setTimeout(startWhatsAppSocket, 3000);
         } else {
-          addLog("error", "تم تسجيل الخروج من جلسة الواتساب. يلزم مسح كود QR جديد.");
-          currentQr = null;
-          currentQrDataUrl = null;
+          console.log("❌ تم تسجيل الخروج من الواتساب. يرجى إعادة التشغيل لمسح كود QR جديد.");
         }
       } else if (connection === "open") {
         isConnected = true;
         currentQr = null;
-        currentQrDataUrl = null;
-
-        // Parse user profile
-        try {
-          const rawId = sock?.user?.id || "";
-          const phone = rawId.split("@")[0].split(":")[0];
-          connectedUser = {
-            id: rawId,
-            phone: phone ? `+${phone}` : "غير معروف",
-            name: sock?.user?.name || "حساب الواتساب المرتبط",
-          };
-        } catch (e) {
-          connectedUser = { id: "", phone: "متصل", name: "حساب الواتساب" };
-        }
-
-        addLog("success", `✅ تم الاتصال بحساب الواتساب بنجاح! (${connectedUser.phone})`);
+        console.log("\n✅ تم الاتصال بحساب الواتساب بنجاح! خادم الإرسال جاهز للعمل.");
         try {
           await refreshGroups();
         } catch (e) {
@@ -162,7 +99,7 @@ async function startWhatsAppSocket() {
       }
     });
   } catch (err) {
-    addLog("error", `فشل بدء اتصال الواتساب: ${err.message}`);
+    console.error("فشل بدء اتصال الواتساب:", err);
     setTimeout(startWhatsAppSocket, 5000);
   }
 }
@@ -176,13 +113,10 @@ async function refreshGroups() {
       id: g.id,
       subject: g.subject || "مجموعة بدون اسم",
       participantsCount: g.participants?.length || 0,
-      creation: g.creation ? new Date(g.creation * 1000).toLocaleDateString("ar-SA") : null,
-      desc: g.desc ? g.desc.toString() : "",
     }));
-    addLog("info", `تم تحديث قائمة المجموعات (${cachedGroups.length} مجموعة مسجلة).`);
     return cachedGroups;
   } catch (e) {
-    addLog("warn", `تعذر جلب المجموعات: ${e?.message}`);
+    console.warn("تعذر جلب المجموعات:", e?.message);
     return cachedGroups;
   }
 }
@@ -207,7 +141,7 @@ async function resolveGroupJid(targetInput) {
           return `${info.id}@g.us`;
         }
       } catch (e) {
-        addLog("warn", `تعذر استخراج بيانات رابط الدعوة: ${e?.message}`);
+        console.warn("Invite link resolution:", e?.message);
       }
     }
   }
@@ -239,10 +173,7 @@ app.get("/status", async (req, res) => {
     connected: isConnected,
     hasQr: Boolean(currentQr),
     qrRaw: currentQr,
-    qrDataUrl: currentQrDataUrl,
     groupsCount: cachedGroups.length,
-    user: connectedUser,
-    logs: recentLogs.slice(0, 30),
     timestamp: new Date().toISOString(),
   });
 });
@@ -256,61 +187,7 @@ app.get("/groups", async (req, res) => {
   res.json({ groups });
 });
 
-// 3. Refresh Groups (POST)
-app.post("/groups/refresh", async (req, res) => {
-  if (!isConnected) {
-    return res.status(400).json({ error: "الواتساب غير متصل حالياً" });
-  }
-  const groups = await refreshGroups();
-  res.json({ success: true, count: groups.length, groups });
-});
-
-// 4. Test Message Sender
-app.post("/send-test", async (req, res) => {
-  try {
-    if (!sock || !isConnected) {
-      return res.status(503).json({ error: "الواتساب غير متصل حالياً. تأكد من مسح كود QR أولاً." });
-    }
-    const { target, message } = req.body;
-    if (!target || !message) {
-      return res.status(400).json({ error: "يرجى تحديد الوجهة (رقم هاتف أو مجموعة) ونص الرسالة" });
-    }
-
-    let targetJid = null;
-    if (target.includes("@g.us") || target.includes("@s.whatsapp.net")) {
-      targetJid = target;
-    } else if (target.includes("chat.whatsapp.com/")) {
-      targetJid = await resolveGroupJid(target);
-    } else {
-      const cleanPhone = target.replace(/[^0-9]/g, "");
-      if (cleanPhone.length >= 8) {
-        targetJid = `${cleanPhone}@s.whatsapp.net`;
-      } else {
-        targetJid = await resolveGroupJid(target);
-      }
-    }
-
-    if (!targetJid) {
-      return res.status(404).json({ error: "تعذر العثور على الرقم أو المجموعة المحددة" });
-    }
-
-    addLog("info", `إرسال رسالة تجريبية إلى: ${targetJid}`);
-    const result = await sock.sendMessage(targetJid, { text: message });
-    addLog("success", `تم إرسال الرسالة التجريبية بنجاح ✓ (${result?.key?.id || "OK"})`);
-
-    res.json({
-      success: true,
-      message: "تم إرسال الرسالة التجريبية بنجاح ✓",
-      id: result?.key?.id,
-      targetJid,
-    });
-  } catch (err) {
-    addLog("error", `فشل الإرسال التجريبي: ${err.message}`);
-    res.status(500).json({ error: err.message || "فشل إرسال الرسالة" });
-  }
-});
-
-// 5. Send Group Package
+// 3. Send Group Package
 app.post("/send-group-package", async (req, res) => {
   try {
     if (!sock || !isConnected) {
@@ -344,14 +221,13 @@ app.post("/send-group-package", async (req, res) => {
     }
 
     if (!groupJid) {
-      addLog("error", `تعذر العثور على المجموعة: "${targetGroup || groupLink}"`);
       return res.status(404).json({
         error:
           "تعذر العثور على المجموعة المحددة. يرجى التأكد من كتابة اسم المجموعة بدقة أو وضع رابطها.",
       });
     }
 
-    addLog("info", `🚀 بدء إرسال حزمة المعاملة (نسك: ${nusukNumber}) إلى المجموعة: ${groupJid}...`);
+    console.log(`\n🚀 بدء إرسال حزمة المعاملة (نسك: ${nusukNumber}) إلى المجموعة: ${groupJid}...`);
     const sentResults = [];
 
     // Message 1: الفاصل العلوي
@@ -439,7 +315,7 @@ app.post("/send-group-package", async (req, res) => {
     const m6 = await sock.sendMessage(groupJid, { text: "=============================" });
     sentResults.push({ step: 6, type: "footer", id: m6?.key?.id });
 
-    addLog("success", `✅ اكتمل إرسال حزمة المعاملة بنجاح (${sentResults.length} رسائل) إلى: ${groupJid}`);
+    console.log(`✅ اكتمل إرسال حزمة المعاملة بنجاح (${sentResults.length} رسائل) إلى: ${groupJid}`);
 
     // Return success with web URL to verify
     const webVerifyUrl = groupLink || `https://web.whatsapp.com`;
@@ -452,89 +328,17 @@ app.post("/send-group-package", async (req, res) => {
       webVerifyUrl,
     });
   } catch (err) {
-    addLog("error", `خطأ أثناء إرسال حزمة المجموعة: ${err.message}`);
+    console.error("خطأ أثناء إرسال حزمة المجموعة:", err);
     res.status(500).json({
       error: err.message || "حدث خطأ غير متوقع أثناء إرسال الرسائل إلى مجموعة الواتساب",
     });
   }
 });
 
-// 6. Logout & Clear Credentials
-app.post("/logout", async (req, res) => {
-  try {
-    addLog("warn", "طلب تسجيل الخروج وحذف بيانات الجلسة بالكامل...");
-    if (sock) {
-      try {
-        await sock.logout();
-      } catch (e) {}
-      try {
-        sock.end();
-      } catch (e) {}
-    }
-
-    isConnected = false;
-    currentQr = null;
-    currentQrDataUrl = null;
-    connectedUser = null;
-    cachedGroups = [];
-
-    // Clear auth_info files
-    if (fs.existsSync(AUTH_DIR)) {
-      const files = fs.readdirSync(AUTH_DIR);
-      for (const file of files) {
-        try {
-          fs.unlinkSync(path.join(AUTH_DIR, file));
-        } catch (e) {}
-      }
-    }
-
-    addLog("info", "تم حذف بيانات الجلسة، جاري إعادة تشغيل السيرفر لتوليد كود QR جديد...");
-    setTimeout(startWhatsAppSocket, 1500);
-
-    res.json({ success: true, message: "تم تسجيل الخروج بنجاح وجاري إعداد كود QR جديد" });
-  } catch (err) {
-    addLog("error", `فشل تسجيل الخروج: ${err.message}`);
-    res.status(500).json({ error: err.message || "فشل تسجيل الخروج" });
-  }
-});
-
-// 7. Reconnect Socket
-app.post("/reconnect", async (req, res) => {
-  try {
-    addLog("info", "إعادة تشغيل اتصال الواتساب يدوياً...");
-    if (sock) {
-      try {
-        sock.end();
-      } catch (e) {}
-    }
-    setTimeout(startWhatsAppSocket, 1000);
-    res.json({ success: true, message: "جاري إعادة الاتصال..." });
-  } catch (err) {
-    res.status(500).json({ error: err.message || "فشل إعادة الاتصال" });
-  }
-});
-
-// 8. Recent Logs
-app.get("/logs", (req, res) => {
-  res.json({ logs: recentLogs });
-});
-
-// 9. Clear Logs
-app.delete("/logs", (req, res) => {
-  recentLogs.length = 0;
-  res.json({ success: true, message: "تم مسح سجل الأحداث" });
-});
-
-// Fallback: serve index.html for root or SPA
-app.get("/", (req, res) => {
-  res.sendFile(path.join(PUBLIC_DIR, "index.html"));
-});
-
 // Start Server & WhatsApp Socket
 app.listen(PORT, () => {
   console.log("=======================================================");
   console.log(`🚀 خادم WhatsApp Bridge يعمل بنجاح على: http://localhost:${PORT}`);
-  console.log(`💻 لوحة التحكم مدمجة ومتاحة على: http://localhost:${PORT}`);
   console.log("=======================================================");
   startWhatsAppSocket();
 });
