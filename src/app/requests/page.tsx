@@ -30,6 +30,7 @@ import {
   ExternalLink,
   CheckCircle2,
   MessageCircle,
+  FileSpreadsheet,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -624,15 +625,26 @@ ${travelersLines}
           </p>
         </div>
 
-        {(role === "Sender" || role === "Admin") && (
+        <div className="flex items-center gap-2 flex-wrap">
           <Link
-            href="/requests/new"
-            className="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white font-bold px-4 py-2.5 rounded-xl shadow-xs text-xs sm:text-sm"
+            href="/reports/sender"
+            className="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-bold px-3.5 py-2.5 rounded-xl shadow-xs text-xs sm:text-sm transition-all cursor-pointer"
+            title="تقرير المعتمرين والمناديب وتصدير إكسيل"
           >
-            <FilePlus className="w-4 h-4" />
-            <span>طلب جديد</span>
+            <FileSpreadsheet className="w-4 h-4" />
+            <span>تقرير المعتمرين والمناديب</span>
           </Link>
-        )}
+
+          {(role === "Sender" || role === "Admin") && (
+            <Link
+              href="/requests/new"
+              className="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white font-bold px-4 py-2.5 rounded-xl shadow-xs text-xs sm:text-sm"
+            >
+              <FilePlus className="w-4 h-4" />
+              <span>طلب جديد</span>
+            </Link>
+          )}
+        </div>
       </div>
 
       {/* Urgent Upcoming Flights Alert Banner (within 48 hours) */}

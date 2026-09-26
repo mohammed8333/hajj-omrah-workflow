@@ -53,6 +53,8 @@ interface TravelerDraft {
   expiryDate?: string;
   expiryWarning?: string;
   duplicateWarning?: string;
+  affiliation?: string;
+  notes?: string;
   passportFile: File | null;
   passportPreview?: string;
   photoFile: File | null;
@@ -320,10 +322,10 @@ export default function UnifiedNewRequestPage() {
     setTravelers((prev) => prev.filter((t) => t.id !== id));
   };
 
-  // Update specific traveler field (name, passport number, phone, expiryDate, etc.)
+  // Update specific traveler field (name, passport number, phone, expiryDate, affiliation, etc.)
   const updateTravelerField = async (
     travelerId: string,
-    field: "fullName" | "passportNumber" | "nationality" | "dateOfBirth" | "phoneNumber" | "expiryDate",
+    field: "fullName" | "passportNumber" | "nationality" | "dateOfBirth" | "phoneNumber" | "expiryDate" | "affiliation" | "notes",
     value: string
   ) => {
     let expiryWarning: string | undefined = undefined;
@@ -362,6 +364,13 @@ export default function UnifiedNewRequestPage() {
         }
         return updated;
       })
+    );
+  };
+
+  const applyAffiliationToAll = (affiliationValue: string) => {
+    if (!affiliationValue) return;
+    setTravelers((prev) =>
+      prev.map((t) => ({ ...t, affiliation: affiliationValue }))
     );
   };
 
@@ -670,6 +679,8 @@ export default function UnifiedNewRequestPage() {
           nationality: t.nationality?.trim() || undefined,
           dateOfBirth: t.dateOfBirth?.trim() || undefined,
           expiryDate: t.expiryDate?.trim() || undefined,
+          affiliation: t.affiliation?.trim() || undefined,
+          notes: t.notes?.trim() || undefined,
         });
 
         // Upload Passport
@@ -1133,6 +1144,49 @@ export default function UnifiedNewRequestPage() {
                     />
                     <Phone className="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   </div>
+                </div>
+              </div>
+
+              {/* الصف 6: التبعية (المندوب) والملاحظات */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {/* التبعية / اسم المندوب */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-bold text-purple-900">
+                      التبعية / اسم المندوب (تابع لمن):
+                    </label>
+                    {travelers.length > 1 && traveler.affiliation?.trim() && (
+                      <button
+                        type="button"
+                        onClick={() => applyAffiliationToAll(traveler.affiliation!)}
+                        className="text-[10px] text-purple-700 hover:text-purple-900 font-bold bg-purple-50 hover:bg-purple-100 px-2 py-0.5 rounded border border-purple-200 transition-colors cursor-pointer"
+                        title="تطبيق نفس التبعية على جميع المسافرين في المعاملة"
+                      >
+                        تطبيق على الكل ⎘
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    value={traveler.affiliation || ""}
+                    onChange={(e) => updateTravelerField(traveler.id, "affiliation", e.target.value)}
+                    placeholder="اكتب اسم المندوب أو العميل التابع له (مثال: أ/ أحمد، شركة النور...)"
+                    className="w-full text-xs py-2.5 px-3 bg-purple-50/30 border border-purple-200 focus:border-purple-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 font-bold text-purple-950 shadow-2xs"
+                  />
+                </div>
+
+                {/* ملاحظات المسافر */}
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                    ملاحظات خاصة بالمعتمر:
+                  </label>
+                  <input
+                    type="text"
+                    value={traveler.notes || ""}
+                    onChange={(e) => updateTravelerField(traveler.id, "notes", e.target.value)}
+                    placeholder="أي ملاحظات تخص هذا المعتمر (اختياري)..."
+                    className="w-full text-xs py-2.5 px-3 bg-white border border-gray-300 focus:border-blue-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 shadow-2xs"
+                  />
                 </div>
               </div>
             </div>

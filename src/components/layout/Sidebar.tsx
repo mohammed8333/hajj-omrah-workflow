@@ -13,6 +13,7 @@ import {
   Settings,
   X,
   Plane,
+  FileSpreadsheet,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -41,6 +42,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       href: "/requests",
       label: "قائمة المعاملات",
       icon: Files,
+      roles: ["Sender", "SafaEmployee", "SaudiAgent", "Admin"],
+    },
+    {
+      href: "/reports/sender",
+      label: "تقرير المعتمرين والمناديب",
+      icon: FileSpreadsheet,
       roles: ["Sender", "SafaEmployee", "SaudiAgent", "Admin"],
     },
     {

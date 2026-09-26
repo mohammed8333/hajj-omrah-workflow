@@ -149,6 +149,8 @@ export default function RequestDetailPage({
   const [editTravelerNationality, setEditTravelerNationality] = useState("");
   const [editTravelerBirthDate, setEditTravelerBirthDate] = useState("");
   const [editTravelerExpiryDate, setEditTravelerExpiryDate] = useState("");
+  const [editTravelerAffiliation, setEditTravelerAffiliation] = useState("");
+  const [editTravelerNotes, setEditTravelerNotes] = useState("");
   const [isMrzScanningTravelerId, setIsMrzScanningTravelerId] = useState<string | null>(null);
   const [isScanningHostIdDoc, setIsScanningHostIdDoc] = useState(false);
 
@@ -191,6 +193,8 @@ export default function RequestDetailPage({
   const [newTravelerNationality, setNewTravelerNationality] = useState("");
   const [newTravelerBirthDate, setNewTravelerBirthDate] = useState("");
   const [newTravelerExpiryDate, setNewTravelerExpiryDate] = useState("");
+  const [newTravelerAffiliation, setNewTravelerAffiliation] = useState("");
+  const [newTravelerNotes, setNewTravelerNotes] = useState("");
   const [isTranslatingNewName, setIsTranslatingNewName] = useState(false);
 
   useEffect(() => {
@@ -439,7 +443,9 @@ export default function RequestDetailPage({
     phoneNumber?: string,
     nationality?: string,
     dateOfBirth?: string,
-    expiryDate?: string
+    expiryDate?: string,
+    affiliation?: string,
+    notes?: string
   ) => {
     if (!fullName.trim()) {
       setError("يرجى كتابة اسم المسافر.");
@@ -469,7 +475,8 @@ export default function RequestDetailPage({
         nationality: nationality?.trim() || current?.nationality,
         dateOfBirth: dateOfBirth?.trim() || current?.dateOfBirth,
         expiryDate: expiryDate !== undefined ? expiryDate?.trim() : current?.expiryDate,
-        notes: current?.notes,
+        affiliation: affiliation !== undefined ? affiliation.trim() : current?.affiliation,
+        notes: notes !== undefined ? notes.trim() : current?.notes,
       });
       setSuccess("تم تحديث بيانات المسافر بنجاح.");
       setEditingTravelerId(null);
@@ -675,6 +682,8 @@ export default function RequestDetailPage({
         nationality: newTravelerNationality.trim() || undefined,
         dateOfBirth: newTravelerBirthDate.trim() || undefined,
         expiryDate: newTravelerExpiryDate.trim() || undefined,
+        affiliation: newTravelerAffiliation.trim() || undefined,
+        notes: newTravelerNotes.trim() || undefined,
       });
       setSuccess("تمت إضافة المسافر بنجاح إلى المعاملة.");
       setShowAddTravelerModal(false);
@@ -684,6 +693,8 @@ export default function RequestDetailPage({
       setNewTravelerNationality("");
       setNewTravelerBirthDate("");
       setNewTravelerExpiryDate("");
+      setNewTravelerAffiliation("");
+      setNewTravelerNotes("");
       await loadRequest(false);
     } catch (err: unknown) {
       if (err instanceof Error) setError(err.message);
@@ -3510,6 +3521,22 @@ export default function RequestDetailPage({
                       className="text-xs px-2.5 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono bg-white w-36"
                     />
 
+                    <input
+                      type="text"
+                      value={editTravelerAffiliation}
+                      onChange={(e) => setEditTravelerAffiliation(e.target.value)}
+                      placeholder="التبعية / المندوب"
+                      className="text-xs px-2.5 py-1.5 border border-purple-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500 font-bold text-purple-900 bg-purple-50/40 w-36"
+                    />
+
+                    <input
+                      type="text"
+                      value={editTravelerNotes}
+                      onChange={(e) => setEditTravelerNotes(e.target.value)}
+                      placeholder="ملاحظات المسافر"
+                      className="text-xs px-2.5 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white w-36"
+                    />
+
                     <div className="flex items-center gap-1.5">
                       <button
                         type="button"
@@ -3521,7 +3548,9 @@ export default function RequestDetailPage({
                             editTravelerPhone,
                             editTravelerNationality,
                             editTravelerBirthDate,
-                            editTravelerExpiryDate
+                            editTravelerExpiryDate,
+                            editTravelerAffiliation,
+                            editTravelerNotes
                           )
                         }
                         disabled={actionLoading || !editTravelerName.trim()}
@@ -3557,6 +3586,8 @@ export default function RequestDetailPage({
                             setEditTravelerNationality(traveler.nationality || "");
                             setEditTravelerBirthDate(traveler.dateOfBirth || "");
                             setEditTravelerExpiryDate(traveler.expiryDate || "");
+                            setEditTravelerAffiliation(traveler.affiliation || "");
+                            setEditTravelerNotes(traveler.notes || "");
                           }}
                           className="text-gray-400 hover:text-blue-600 p-1 rounded hover:bg-blue-50 transition-colors cursor-pointer"
                           title="تعديل بيانات المسافر ورقم الهاتف"
@@ -3622,6 +3653,17 @@ export default function RequestDetailPage({
                       )}
                       {traveler.expiryDate && (
                         <span className="font-mono">• انتهاء الجواز: {traveler.expiryDate}</span>
+                      )}
+                      {traveler.affiliation && (
+                        <span className="inline-flex items-center gap-1 bg-purple-100 text-purple-900 border border-purple-200 text-[11px] font-bold px-2 py-0.5 rounded shadow-2xs">
+                          <span>التبعية:</span>
+                          <span className="font-black text-purple-950">{traveler.affiliation}</span>
+                        </span>
+                      )}
+                      {traveler.notes && (
+                        <span className="text-[11px] text-gray-700 bg-gray-100 border border-gray-200 px-2 py-0.5 rounded">
+                          ملاحظة: {traveler.notes}
+                        </span>
                       )}
                       {(() => {
                         const validity = checkPassportValidity(traveler.expiryDate, request.travelDate);
@@ -4721,6 +4763,32 @@ export default function RequestDetailPage({
                       value={newTravelerExpiryDate}
                       onChange={(e) => setNewTravelerExpiryDate(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 text-gray-800 font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-gray-700 mb-1">
+                      التبعية / اسم المندوب
+                    </label>
+                    <input
+                      type="text"
+                      value={newTravelerAffiliation}
+                      onChange={(e) => setNewTravelerAffiliation(e.target.value)}
+                      placeholder="اسم المندوب أو العميل التابع له"
+                      className="w-full px-3 py-2 border border-purple-300 bg-purple-50/20 rounded-xl focus:ring-2 focus:ring-purple-500 text-purple-950 font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-gray-700 mb-1">
+                      ملاحظات خاصة بالمعتمر
+                    </label>
+                    <input
+                      type="text"
+                      value={newTravelerNotes}
+                      onChange={(e) => setNewTravelerNotes(e.target.value)}
+                      placeholder="أي ملاحظات تخص هذا المعتمر"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 text-gray-800"
                     />
                   </div>
                 </div>

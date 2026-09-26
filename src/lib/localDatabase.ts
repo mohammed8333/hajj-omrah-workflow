@@ -981,6 +981,8 @@ class LocalDatabaseEngine {
           fullName: t.fullName || "مسافر",
           passportNumber: t.passportNumber,
           photoUrl: (photoDoc as any)?.storageUrl || (photoDoc as any)?.fileDataUrl,
+          affiliation: t.affiliation,
+          notes: t.notes,
         };
       });
 
@@ -1816,6 +1818,7 @@ class LocalDatabaseEngine {
       nationality?: string;
       dateOfBirth?: string;
       expiryDate?: string;
+      affiliation?: string;
       notes?: string;
     },
     currentUser?: User
@@ -1833,6 +1836,7 @@ class LocalDatabaseEngine {
       dateOfBirth: data.dateOfBirth,
       expiryDate: data.expiryDate,
       status: "Pending",
+      affiliation: data.affiliation?.trim() || undefined,
       notes: data.notes,
       createdAt: new Date().toISOString(),
       documents: [],
@@ -1859,6 +1863,7 @@ class LocalDatabaseEngine {
       nationality?: string;
       dateOfBirth?: string;
       expiryDate?: string;
+      affiliation?: string;
       notes?: string;
     },
     currentUser?: User
@@ -1872,6 +1877,7 @@ class LocalDatabaseEngine {
         if (data.nationality !== undefined) trv.nationality = data.nationality;
         if (data.dateOfBirth !== undefined) trv.dateOfBirth = data.dateOfBirth;
         if (data.expiryDate !== undefined) trv.expiryDate = data.expiryDate;
+        if (data.affiliation !== undefined) trv.affiliation = data.affiliation?.trim() || undefined;
         if (data.notes !== undefined) trv.notes = data.notes;
         req.updatedAt = new Date().toISOString();
         this.persistRequests();

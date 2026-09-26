@@ -88,6 +88,7 @@ export interface Traveler {
   dateOfBirth?: string;
   expiryDate?: string;
   status: TravelerStatus;
+  affiliation?: string;
   notes?: string;
   createdAt: string;
   documents: DocumentItem[];
@@ -155,6 +156,8 @@ export interface TravelerSummaryItem {
   passportNumber?: string;
   expiryDate?: string;
   photoUrl?: string;
+  affiliation?: string;
+  notes?: string;
 }
 
 export interface GroupRequestSummary {

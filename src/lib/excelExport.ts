@@ -424,3 +424,121 @@ export function exportRequestsToExcel(requests: GroupRequestDetail[]) {
   // Trigger browser download
   XLSX.writeFile(workbook, fileName);
 }
+
+export interface SenderReportExportRow {
+  fullName: string;
+  affiliation: string;
+  departureDate: string;
+  returnDate: string;
+  passportNumber?: string;
+  phoneNumber?: string;
+  groupName?: string;
+  requestNumber?: string;
+  nusukGroupNumber?: string;
+  notes?: string;
+}
+
+/**
+ * Exports Sender Pilgrims & Affiliation Report to a professionally styled Excel file
+ */
+export function exportSenderTravelersReportToExcel(
+  items: SenderReportExportRow[],
+  filterDelegateName?: string
+) {
+  const workbook = XLSX.utils.book_new();
+
+  const data = items.map((item, idx) => ({
+    "م": idx + 1,
+    "اسم المعتمر / المسافر": item.fullName || "-",
+    "التبعية (المندوب)": item.affiliation || "غير محدد",
+    "تاريخ الذهاب": item.departureDate || "-",
+    "تاريخ العودة": item.returnDate || "-",
+    "رقم الجواز": item.passportNumber || "-",
+    "رقم الهاتف": item.phoneNumber || "-",
+    "اسم المجموعة": item.groupName || "-",
+    "رقم المعاملة": item.requestNumber || "-",
+    "رقم نسك": item.nusukGroupNumber || "-",
+    "ملاحظات": item.notes || "-",
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(data);
+
+  // Set column widths
+  ws["!cols"] = [
+    { wch: 6 },  // م
+    { wch: 28 }, // اسم المعتمر
+    { wch: 22 }, // التبعية
+    { wch: 14 }, // تاريخ الذهاب
+    { wch: 14 }, // تاريخ العودة
+    { wch: 16 }, // رقم الجواز
+    { wch: 16 }, // رقم الهاتف
+    { wch: 24 }, // اسم المجموعة
+    { wch: 16 }, // رقم المعاملة
+    { wch: 16 }, // رقم نسك
+    { wch: 30 }, // ملاحظات
+  ];
+
+  // Set RTL direction for the worksheet
+  (ws as any)["!views"] = [{ rightToLeft: true }];
+
+  // Style header and cells
+  if (ws["!ref"]) {
+    const range = XLSX.utils.decode_range(ws["!ref"]);
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+      const headerAddress = XLSX.utils.encode_cell({ r: range.s.r, c: C });
+      const cell = ws[headerAddress];
+      if (cell) {
+        cell.s = {
+          fill: { patternType: "solid", fgColor: { rgb: "1E3A8A" } },
+          font: { name: "Calibri", sz: 11, bold: true, color: { rgb: "FFFFFF" } },
+          alignment: { vertical: "center", horizontal: "center", wrapText: true },
+          border: {
+            top: { style: "thin", color: { rgb: "0F172A" } },
+            bottom: { style: "medium", color: { rgb: "0F172A" } },
+            left: { style: "thin", color: { rgb: "0F172A" } },
+            right: { style: "thin", color: { rgb: "0F172A" } },
+          },
+        };
+      }
+    }
+
+    for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+      const isEven = (R - 1) % 2 === 0;
+      const bgRgb = isEven ? "F8FAFC" : "FFFFFF";
+      for (let C = range.s.c; C <= range.e.c; ++C) {
+        const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+        const cell = ws[cellAddress];
+        if (!cell) continue;
+        cell.s = {
+          fill: { patternType: "solid", fgColor: { rgb: bgRgb } },
+          font: { name: "Calibri", sz: 10, bold: C === 1 || C === 2, color: { rgb: "0F172A" } },
+          alignment: {
+            vertical: "center",
+            horizontal: C === 1 || C === 7 || C === 10 ? "right" : "center",
+            wrapText: true,
+          },
+          border: {
+            top: { style: "thin", color: { rgb: "E2E8F0" } },
+            bottom: { style: "thin", color: { rgb: "E2E8F0" } },
+            left: { style: "thin", color: { rgb: "E2E8F0" } },
+            right: { style: "thin", color: { rgb: "E2E8F0" } },
+          },
+        };
+      }
+    }
+  }
+
+  const sheetTitle = filterDelegateName && filterDelegateName !== "ALL"
+    ? `معتمري ${filterDelegateName}`.substring(0, 31)
+    : "تقرير المعتمرين والمناديب";
+
+  XLSX.utils.book_append_sheet(workbook, ws, sheetTitle);
+
+  const dateStr = new Date().toISOString().split("T")[0];
+  const safeDelegateName = filterDelegateName && filterDelegateName !== "ALL"
+    ? `_مندوب_${filterDelegateName.replace(/[^a-zA-Z0-9\u0600-\u06FF_-]/g, "_")}`
+    : "";
+  const fileName = `تقرير_المعتمرين_والمناديب${safeDelegateName}_${dateStr}.xlsx`;
+
+  XLSX.writeFile(workbook, fileName);
+}

@@ -406,6 +406,7 @@ export const api = {
         nationality?: string;
         dateOfBirth?: string;
         expiryDate?: string;
+        affiliation?: string;
         notes?: string;
       }
     ): Promise<Traveler> => {
@@ -426,6 +427,7 @@ export const api = {
         nationality?: string;
         dateOfBirth?: string;
         expiryDate?: string;
+        affiliation?: string;
         notes?: string;
       }
     ): Promise<Traveler> => {
@@ -440,6 +442,7 @@ export const api = {
           nationality: data.nationality,
           dateOfBirth: data.dateOfBirth,
           status: "Pending",
+          affiliation: data.affiliation,
           notes: data.notes,
           createdAt: new Date().toISOString(),
           documents: [],
@@ -458,6 +461,7 @@ export const api = {
           nationality: data.nationality,
           dateOfBirth: data.dateOfBirth,
           status: "Pending",
+          affiliation: data.affiliation,
           notes: data.notes,
           createdAt: new Date().toISOString(),
           documents: [],

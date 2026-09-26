@@ -118,8 +118,30 @@ function mapDoc(row: any): DocumentItem {
   };
 }
 
+// Helper to extract affiliation from direct column or embedded note tag
+function extractAffiliation(row: any): string | undefined {
+  if (row?.affiliation && typeof row.affiliation === "string" && row.affiliation.trim()) {
+    return row.affiliation.trim();
+  }
+  if (row?.notes && typeof row.notes === "string") {
+    const match = row.notes.match(/\[التبعية:\s*([^\]]+)\]/);
+    if (match) return match[1].trim();
+    const lineMatch = row.notes.match(/^التبعية:\s*(.+)$/m);
+    if (lineMatch) return lineMatch[1].trim();
+  }
+  return undefined;
+}
+
+// Helper to remove embedded affiliation tag from notes
+function cleanNotes(notes?: string | null): string | undefined {
+  if (!notes) return undefined;
+  const cleaned = notes.replace(/\[التبعية:\s*([^\]]+)\]\s*/g, "").trim();
+  return cleaned || undefined;
+}
+
 // Map snake_case DB row to TypeScript Traveler
 function mapTraveler(row: any, docs: DocumentItem[] = []): Traveler {
+  const aff = extractAffiliation(row);
   return {
     id: row.id,
     groupRequestId: row.group_request_id,
@@ -129,7 +151,8 @@ function mapTraveler(row: any, docs: DocumentItem[] = []): Traveler {
     nationality: row.nationality || undefined,
     dateOfBirth: row.date_of_birth || undefined,
     status: row.status,
-    notes: row.notes || undefined,
+    affiliation: aff,
+    notes: cleanNotes(row.notes),
     createdAt: row.created_at,
     documents: docs.filter((d) => d.travelerId === row.id),
   };
@@ -418,12 +441,24 @@ export const supabaseService = {
 
       const requestIds = requests.map((r) => r.id);
 
-      // Fetch traveler counts & details
-      const { data: travelers } = await client
+      // Fetch traveler counts & details (with graceful fallback if affiliation column is not yet in DB)
+      let travelers: any[] | null = null;
+      const { data: trvWithAff, error: trvAffErr } = await client
         .from("travelers")
-        .select("id, group_request_id, full_name, passport_number, created_at")
+        .select("id, group_request_id, full_name, passport_number, affiliation, notes, created_at")
         .in("group_request_id", requestIds)
         .order("created_at", { ascending: true });
+
+      if (trvAffErr) {
+        const { data: trvFallback } = await client
+          .from("travelers")
+          .select("id, group_request_id, full_name, passport_number, notes, created_at")
+          .in("group_request_id", requestIds)
+          .order("created_at", { ascending: true });
+        travelers = trvFallback || [];
+      } else {
+        travelers = trvWithAff || [];
+      }
 
       // Fetch document counts & traveler photos
       const { data: docs } = await client
@@ -491,11 +526,14 @@ export const supabaseService = {
               .getPublicUrl(photoDoc.storage_path);
             photoUrl = pubData?.publicUrl;
           }
+          const aff = extractAffiliation(t);
           return {
             id: t.id,
             fullName: t.full_name || "مسافر",
             passportNumber: t.passport_number || undefined,
             photoUrl: photoUrl || undefined,
+            affiliation: aff,
+            notes: cleanNotes(t.notes),
           };
         });
 
@@ -985,13 +1023,21 @@ export const supabaseService = {
         phoneNumber?: string;
         nationality?: string;
         dateOfBirth?: string;
+        expiryDate?: string;
+        affiliation?: string;
         notes?: string;
       }
     ): Promise<Traveler> => {
       const client = getClient();
       const travelerId = `trv-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
       const now = new Date().toISOString();
-      const row = {
+      const aff = data.affiliation?.trim() || null;
+      let notesCombined = data.notes?.trim() || "";
+      if (aff) {
+        notesCombined = `[التبعية: ${aff}] ${notesCombined}`.trim();
+      }
+
+      const row: any = {
         id: travelerId,
         group_request_id: requestId,
         full_name: data.fullName.trim(),
@@ -1000,15 +1046,28 @@ export const supabaseService = {
         nationality: data.nationality?.trim() || "مصري",
         date_of_birth: data.dateOfBirth?.trim() || null,
         status: "Pending",
-        notes: data.notes?.trim() || null,
+        affiliation: aff,
+        notes: notesCombined || null,
         created_at: now,
       };
 
-      const { data: inserted, error } = await client
+      let { data: inserted, error } = await client
         .from("travelers")
         .insert(row)
         .select()
         .single();
+
+      // Graceful fallback if affiliation column is not yet present in Supabase table
+      if (error && (error.message?.includes("affiliation") || error.code === "PGRST204")) {
+        delete row.affiliation;
+        const retry = await client
+          .from("travelers")
+          .insert(row)
+          .select()
+          .single();
+        inserted = retry.data;
+        error = retry.error;
+      }
 
       if (error) {
         console.error("Error inserting traveler to Supabase:", error);
@@ -1024,7 +1083,8 @@ export const supabaseService = {
         nationality: inserted?.nationality || data.nationality || "مصري",
         dateOfBirth: inserted?.date_of_birth || data.dateOfBirth,
         status: inserted?.status || "Pending",
-        notes: inserted?.notes || data.notes,
+        affiliation: aff || extractAffiliation(inserted),
+        notes: cleanNotes(inserted?.notes || data.notes),
         createdAt: inserted?.created_at || now,
         documents: [],
       };
@@ -1038,6 +1098,8 @@ export const supabaseService = {
         phoneNumber?: string;
         nationality?: string;
         dateOfBirth?: string;
+        expiryDate?: string;
+        affiliation?: string;
         notes?: string;
       }
     ) => {
@@ -1048,9 +1110,42 @@ export const supabaseService = {
       if (data.phoneNumber !== undefined) payload.phone_number = data.phoneNumber.trim();
       if (data.nationality !== undefined) payload.nationality = data.nationality.trim();
       if (data.dateOfBirth !== undefined) payload.date_of_birth = data.dateOfBirth.trim();
-      if (data.notes !== undefined) payload.notes = data.notes.trim();
 
-      const { error } = await client.from("travelers").update(payload).eq("id", id);
+      const affProvided = data.affiliation !== undefined;
+      const notesProvided = data.notes !== undefined;
+
+      if (affProvided || notesProvided) {
+        let currentAff = affProvided ? data.affiliation?.trim() : undefined;
+        let currentNotes = notesProvided ? data.notes?.trim() : undefined;
+
+        if (currentAff === undefined || currentNotes === undefined) {
+          try {
+            const { data: existingTrv } = await client
+              .from("travelers")
+              .select("affiliation, notes")
+              .eq("id", id)
+              .single();
+            if (currentAff === undefined) currentAff = extractAffiliation(existingTrv);
+            if (currentNotes === undefined) currentNotes = cleanNotes(existingTrv?.notes);
+          } catch (_) {}
+        }
+
+        let combinedNotes = (currentNotes || "").trim();
+        if (currentAff) {
+          combinedNotes = `[التبعية: ${currentAff}] ${combinedNotes}`.trim();
+        }
+        payload.notes = combinedNotes || null;
+        if (affProvided) {
+          payload.affiliation = currentAff || null;
+        }
+      }
+
+      let { error } = await client.from("travelers").update(payload).eq("id", id);
+      if (error && (error.message?.includes("affiliation") || error.code === "PGRST204")) {
+        delete payload.affiliation;
+        const retry = await client.from("travelers").update(payload).eq("id", id);
+        error = retry.error;
+      }
       if (error) throw new Error(error.message);
     },
 

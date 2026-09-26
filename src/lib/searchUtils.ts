@@ -45,6 +45,22 @@ export function isTravelerMatch(t: TravelerSummaryItem, rawTerm: string): boolea
     }
   }
 
+  // Match affiliation (التبعية / المندوب)
+  if (t.affiliation) {
+    const normAff = normalizeArabicText(t.affiliation);
+    if (t.affiliation.toLowerCase().includes(term) || normAff.includes(normTerm)) {
+      return true;
+    }
+  }
+
+  // Match traveler notes
+  if (t.notes) {
+    const normNotes = normalizeArabicText(t.notes);
+    if (t.notes.toLowerCase().includes(term) || normNotes.includes(normTerm)) {
+      return true;
+    }
+  }
+
   return false;
 }
 
