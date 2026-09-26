@@ -438,6 +438,35 @@ export interface SenderReportExportRow {
   notes?: string;
 }
 
+const ARABIC_MONTHS_MAP: Record<number, string> = {
+  1: "يناير",
+  2: "فبراير",
+  3: "مارس",
+  4: "أبريل",
+  5: "مايو",
+  6: "يونيو",
+  7: "يوليو",
+  8: "أغسطس",
+  9: "سبتمبر",
+  10: "أكتوبر",
+  11: "نوفمبر",
+  12: "ديسمبر",
+};
+
+function formatArabicDateFriendly(dateStr?: string | null): string {
+  if (!dateStr || !dateStr.trim() || dateStr === "-") return "-";
+  const clean = dateStr.split("T")[0].trim();
+  const parts = clean.split("-");
+  if (parts.length === 3) {
+    const month = parseInt(parts[1], 10);
+    const day = parseInt(parts[2], 10);
+    if (!isNaN(day) && !isNaN(month) && ARABIC_MONTHS_MAP[month]) {
+      return `${day} ${ARABIC_MONTHS_MAP[month]}`;
+    }
+  }
+  return dateStr;
+}
+
 /**
  * Exports Sender Pilgrims & Affiliation Report to a professionally styled Excel file
  */
@@ -447,39 +476,83 @@ export function exportSenderTravelersReportToExcel(
 ) {
   const workbook = XLSX.utils.book_new();
 
-  const data = items.map((item, idx) => ({
-    "م": idx + 1,
-    "اسم المعتمر / المسافر": item.fullName || "-",
-    "التبعية (المندوب)": item.affiliation || "غير محدد",
-    "تاريخ الذهاب": item.departureDate || "-",
-    "تاريخ العودة": item.returnDate || "-",
-    "رقم الجواز": item.passportNumber || "-",
-    "رقم الهاتف": item.phoneNumber || "-",
-    "اسم المجموعة": item.groupName || "-",
-    "رقم المعاملة": item.requestNumber || "-",
-    "رقم نسك": item.nusukGroupNumber || "-",
-    "ملاحظات": item.notes || "-",
-  }));
+  const data = items.map((item, idx) => {
+    let travelDatesStr = "-";
+    if (item.departureDate && item.departureDate !== "-" && item.returnDate && item.returnDate !== "-") {
+      travelDatesStr = `${formatArabicDateFriendly(item.departureDate)} - ${formatArabicDateFriendly(item.returnDate)}`;
+    } else if (item.departureDate && item.departureDate !== "-") {
+      travelDatesStr = formatArabicDateFriendly(item.departureDate);
+    }
+
+    return {
+      "م": idx + 1,
+      "رقم نسك": item.nusukGroupNumber || "-",
+      "اسم المجموعة": item.groupName
+        ? item.requestNumber
+          ? `${item.groupName} (${item.requestNumber})`
+          : item.groupName
+        : "-",
+      "التبعية": item.affiliation || "غير محدد",
+      "تاريخ الذهاب والعودة": travelDatesStr,
+      "اسم المعتمر / المسافر": item.fullName || "-",
+      "رقم الجواز": item.passportNumber || "-",
+      "ملاحظات": item.notes || "-",
+    };
+  });
 
   const ws = XLSX.utils.json_to_sheet(data);
 
   // Set column widths
   ws["!cols"] = [
     { wch: 6 },  // م
-    { wch: 28 }, // اسم المعتمر
-    { wch: 22 }, // التبعية
-    { wch: 14 }, // تاريخ الذهاب
-    { wch: 14 }, // تاريخ العودة
+    { wch: 18 }, // رقم نسك
+    { wch: 28 }, // اسم المجموعة
+    { wch: 20 }, // التبعية
+    { wch: 25 }, // تاريخ الذهاب والعودة
+    { wch: 30 }, // اسم المعتمر
     { wch: 16 }, // رقم الجواز
-    { wch: 16 }, // رقم الهاتف
-    { wch: 24 }, // اسم المجموعة
-    { wch: 16 }, // رقم المعاملة
-    { wch: 16 }, // رقم نسك
-    { wch: 30 }, // ملاحظات
+    { wch: 25 }, // ملاحظات
   ];
 
   // Set RTL direction for the worksheet
   (ws as any)["!views"] = [{ rightToLeft: true }];
+
+  // Merge identical group cells in Excel
+  const merges: XLSX.Range[] = [];
+  let i = 0;
+  while (i < items.length) {
+    const current = items[i];
+    const key = `${current.groupName}_${current.requestNumber}_${current.nusukGroupNumber}_${current.departureDate}_${current.returnDate}`;
+    let j = i + 1;
+    while (j < items.length) {
+      const next = items[j];
+      const nextKey = `${next.groupName}_${next.requestNumber}_${next.nusukGroupNumber}_${next.departureDate}_${next.returnDate}`;
+      if (nextKey === key) {
+        j++;
+      } else {
+        break;
+      }
+    }
+    const count = j - i;
+    if (count > 1) {
+      const startRow = i + 1; // 1-indexed (row 0 is header)
+      const endRow = j;
+      // Col 1: رقم نسك
+      merges.push({ s: { r: startRow, c: 1 }, e: { r: endRow, c: 1 } });
+      // Col 2: اسم المجموعة
+      merges.push({ s: { r: startRow, c: 2 }, e: { r: endRow, c: 2 } });
+      // Col 3: التبعية (if identical affiliation across this span)
+      if (items.slice(i, j).every((item) => (item.affiliation || "غير محدد") === (current.affiliation || "غير محدد"))) {
+        merges.push({ s: { r: startRow, c: 3 }, e: { r: endRow, c: 3 } });
+      }
+      // Col 4: تاريخ الذهاب والعودة
+      merges.push({ s: { r: startRow, c: 4 }, e: { r: endRow, c: 4 } });
+    }
+    i = j;
+  }
+  if (merges.length > 0) {
+    ws["!merges"] = merges;
+  }
 
   // Style header and cells
   if (ws["!ref"]) {
@@ -489,7 +562,7 @@ export function exportSenderTravelersReportToExcel(
       const cell = ws[headerAddress];
       if (cell) {
         cell.s = {
-          fill: { patternType: "solid", fgColor: { rgb: "1E3A8A" } },
+          fill: { patternType: "solid", fgColor: { rgb: "1E293B" } },
           font: { name: "Calibri", sz: 11, bold: true, color: { rgb: "FFFFFF" } },
           alignment: { vertical: "center", horizontal: "center", wrapText: true },
           border: {
@@ -511,17 +584,17 @@ export function exportSenderTravelersReportToExcel(
         if (!cell) continue;
         cell.s = {
           fill: { patternType: "solid", fgColor: { rgb: bgRgb } },
-          font: { name: "Calibri", sz: 10, bold: C === 1 || C === 2, color: { rgb: "0F172A" } },
+          font: { name: "Calibri", sz: 10, bold: C === 1 || C === 5, color: { rgb: "0F172A" } },
           alignment: {
             vertical: "center",
-            horizontal: C === 1 || C === 7 || C === 10 ? "right" : "center",
+            horizontal: C === 2 || C === 5 || C === 7 ? "right" : "center",
             wrapText: true,
           },
           border: {
-            top: { style: "thin", color: { rgb: "E2E8F0" } },
-            bottom: { style: "thin", color: { rgb: "E2E8F0" } },
-            left: { style: "thin", color: { rgb: "E2E8F0" } },
-            right: { style: "thin", color: { rgb: "E2E8F0" } },
+            top: { style: "thin", color: { rgb: "94A3B8" } },
+            bottom: { style: "thin", color: { rgb: "94A3B8" } },
+            left: { style: "thin", color: { rgb: "94A3B8" } },
+            right: { style: "thin", color: { rgb: "94A3B8" } },
           },
         };
       }

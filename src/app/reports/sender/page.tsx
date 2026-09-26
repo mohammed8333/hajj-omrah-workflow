@@ -48,6 +48,54 @@ export interface PilgrimReportItem {
   flightNumber?: string;
 }
 
+const ARABIC_MONTHS: Record<number, string> = {
+  1: "يناير",
+  2: "فبراير",
+  3: "مارس",
+  4: "أبريل",
+  5: "مايو",
+  6: "يونيو",
+  7: "يوليو",
+  8: "أغسطس",
+  9: "سبتمبر",
+  10: "أكتوبر",
+  11: "نوفمبر",
+  12: "ديسمبر",
+};
+
+export function formatArabicDateFriendly(dateStr?: string | null): string {
+  if (!dateStr || !dateStr.trim() || dateStr === "-") return "-";
+  const clean = dateStr.split("T")[0].trim();
+  const parts = clean.split("-");
+  if (parts.length === 3) {
+    const month = parseInt(parts[1], 10);
+    const day = parseInt(parts[2], 10);
+    if (!isNaN(day) && !isNaN(month) && ARABIC_MONTHS[month]) {
+      return `${day} ${ARABIC_MONTHS[month]}`;
+    }
+  }
+  return dateStr;
+}
+
+function computeRowSpans<T>(items: T[], getKey: (item: T) => string): number[] {
+  const spans = new Array(items.length).fill(1);
+  let i = 0;
+  while (i < items.length) {
+    const key = getKey(items[i]);
+    let j = i + 1;
+    while (j < items.length && getKey(items[j]) === key) {
+      j++;
+    }
+    const count = j - i;
+    spans[i] = count;
+    for (let k = i + 1; k < j; k++) {
+      spans[k] = 0;
+    }
+    i = j;
+  }
+  return spans;
+}
+
 export default function SenderReportPage() {
   const { user, role } = useAuth();
 
@@ -241,6 +289,21 @@ export default function SenderReportPage() {
       return true;
     });
   }, [allPilgrims, selectedAffiliation, selectedGroup, startDate, endDate, search]);
+
+  // Precompute rowSpan for merged columns:
+  // When identical Nusuk, Group, and Travel Dates exist across consecutive rows, merge them together
+  const groupMergeSpans = useMemo(() => {
+    return computeRowSpans(filteredPilgrims, (p) => {
+      return `${p.groupRequestId}__${p.nusukGroupNumber || ""}__${p.departureDate || ""}__${p.returnDate || ""}`;
+    });
+  }, [filteredPilgrims]);
+
+  // For affiliation: merge when in the same group, same dates/nusuk, and same affiliation
+  const affiliationMergeSpans = useMemo(() => {
+    return computeRowSpans(filteredPilgrims, (p) => {
+      return `${p.groupRequestId}__${p.nusukGroupNumber || ""}__${p.departureDate || ""}__${p.returnDate || ""}__${p.affiliation || ""}`;
+    });
+  }, [filteredPilgrims]);
 
   // Handle Export to Excel
   const handleExportExcel = () => {
@@ -450,13 +513,15 @@ export default function SenderReportPage() {
                 text-align: center !important;
               }
               .print-table td {
-                border: 1px solid #cbd5e1 !important;
+                border: 1px solid #94a3b8 !important;
                 padding: 3px 3px !important;
                 font-size: 9.5px !important;
                 word-wrap: break-word !important;
                 overflow-wrap: break-word !important;
                 word-break: break-word !important;
-                line-height: 1.2 !important;
+                line-height: 1.25 !important;
+                vertical-align: middle !important;
+                background-color: #ffffff !important;
               }
               .print-avoid-break {
                 break-inside: avoid !important;
@@ -468,11 +533,11 @@ export default function SenderReportPage() {
       />
 
       {/* Official Print Header (Visible ONLY on print) */}
-      <div className="hidden print:block mb-2 border-b-2 border-slate-900 pb-2 text-slate-900 print-avoid-break">
+      <div className="hidden print:block mb-4 border-b-2 border-slate-900 pb-2 text-slate-900 print-avoid-break">
         <div className="flex justify-between items-center">
           <div>
             <h2 className="text-lg font-black text-slate-950">مسار الحج والعمرة - شركة صفا للسياحة</h2>
-            <h3 className="text-xs font-bold text-slate-800 mt-0.5">
+            <h3 className="text-xs font-bold text-slate-800 mt-1">
               تقرير بيانات المعتمرين والتبعية للمرسل
               {selectedAffiliation !== "ALL" && (
                 <span className="text-purple-950 mr-2 font-black">
@@ -750,14 +815,13 @@ export default function SenderReportPage() {
               <thead>
                 <tr className="bg-slate-900 text-white font-bold border-b border-slate-800 print:bg-slate-800">
                   <th className="py-2.5 px-2 w-10 print:w-[4%] text-center print:min-w-0 print:px-1 print:py-1">م</th>
-                  <th className="py-2.5 px-3 min-w-[170px] print:min-w-0 print:w-[21%] print:px-1.5 print:py-1">اسم المعتمر / المسافر</th>
-                  <th className="py-2.5 px-3 min-w-[140px] print:min-w-0 print:w-[15%] print:px-1.5 print:py-1">التبعية (المندوب)</th>
-                  <th className="py-2.5 px-2 min-w-[95px] text-center print:min-w-0 print:w-[10%] print:px-1 print:py-1">ت الذهاب</th>
-                  <th className="py-2.5 px-2 min-w-[95px] text-center print:min-w-0 print:w-[10%] print:px-1 print:py-1">ت العودة</th>
-                  <th className="py-2.5 px-2 min-w-[105px] font-mono text-center print:min-w-0 print:w-[11%] print:px-1 print:py-1">رقم الجواز</th>
-                  <th className="py-2.5 px-3 min-w-[130px] print:min-w-0 print:w-[13%] print:px-1.5 print:py-1">المجموعة / المعاملة</th>
-                  <th className="py-2.5 px-2 min-w-[85px] text-center print:min-w-0 print:w-[8%] print:px-1 print:py-1">رقم نسك</th>
-                  <th className="py-2.5 px-3 min-w-[150px] print:min-w-0 print:w-[18%] print:px-1.5 print:py-1">ملاحظات</th>
+                  <th className="py-2.5 px-2 min-w-[95px] text-center print:min-w-0 print:w-[12%] print:px-1 print:py-1">رقم نسك</th>
+                  <th className="py-2.5 px-3 min-w-[130px] print:min-w-0 print:w-[15%] print:px-1.5 print:py-1">اسم المجموعة</th>
+                  <th className="py-2.5 px-3 min-w-[120px] print:min-w-0 print:w-[12%] print:px-1.5 print:py-1">التبعية</th>
+                  <th className="py-2.5 px-2 min-w-[130px] text-center print:min-w-0 print:w-[14%] print:px-1 print:py-1">تاريخ الذهاب والعودة</th>
+                  <th className="py-2.5 px-3 min-w-[170px] print:min-w-0 print:w-[21%] print:px-1.5 print:py-1">اسم المعتمر</th>
+                  <th className="py-2.5 px-2 min-w-[100px] font-mono text-center print:min-w-0 print:w-[10%] print:px-1 print:py-1">رقم الجواز</th>
+                  <th className="py-2.5 px-3 min-w-[120px] print:min-w-0 print:w-[12%] print:px-1.5 print:py-1">ملاحظات</th>
                   <th className="py-2.5 px-2 w-14 text-center print:hidden">إجراء</th>
                 </tr>
               </thead>
@@ -771,101 +835,117 @@ export default function SenderReportPage() {
                         isEven ? "bg-white" : "bg-slate-50/60"
                       }`}
                     >
-                      {/* Serial Number */}
-                      <td className="py-2 px-2 text-center font-bold text-gray-500 print:text-black print:py-1 print:px-1 print:text-[10px]">
+                      {/* 1. Serial Number (الرقم المسلسل) */}
+                      <td className="py-2 px-2 text-center font-bold text-gray-600 print:text-black print:py-1 print:px-1 print:text-[10px] border border-gray-200 print:border-slate-400">
                         {idx + 1}
                       </td>
 
-                      {/* Traveler Name */}
-                      <td className="py-2 px-3 font-black text-gray-900 text-sm print:text-[11px] print:py-1 print:px-1.5 leading-snug">
+                      {/* 2. Nusuk Number (رقم النسك - Merged if identical) */}
+                      {groupMergeSpans[idx] > 0 && (
+                        <td
+                          rowSpan={groupMergeSpans[idx]}
+                          className="py-2 px-2 text-center font-mono font-bold text-gray-800 print:text-black print:py-1 print:px-1 text-xs print:text-[10px] align-middle bg-white border border-gray-200 print:border-slate-400"
+                        >
+                          {item.nusukGroupNumber ? (
+                            <>
+                              <span className="bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded text-[11px] border border-emerald-200 print:hidden font-black">
+                                {item.nusukGroupNumber}
+                              </span>
+                              <span className="hidden print:inline font-black">
+                                {item.nusukGroupNumber}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+                      )}
+
+                      {/* 3. Group Name & Request Number (اسم المجموعة - Merged if identical) */}
+                      {groupMergeSpans[idx] > 0 && (
+                        <td
+                          rowSpan={groupMergeSpans[idx]}
+                          className="py-2 px-3 print:py-1 print:px-1.5 text-xs print:text-[9.5px] leading-tight align-middle bg-white border border-gray-200 print:border-slate-400"
+                        >
+                          <Link
+                            href={`/requests/${item.groupRequestId}`}
+                            className="font-bold text-sky-800 hover:text-sky-950 hover:underline block print:text-black print:no-underline"
+                            title="عرض تفاصيل المعاملة"
+                          >
+                            {item.groupName}
+                          </Link>
+                          <span className="text-[10px] text-gray-400 print:text-gray-600 font-mono block mt-0.5">
+                            {item.groupRequestNumber}
+                          </span>
+                        </td>
+                      )}
+
+                      {/* 4. Affiliation / Delegate (التبعية - Merged if identical) */}
+                      {affiliationMergeSpans[idx] > 0 && (
+                        <td
+                          rowSpan={affiliationMergeSpans[idx]}
+                          className="py-2 px-3 print:py-1 print:px-1.5 align-middle bg-white border border-gray-200 print:border-slate-400"
+                        >
+                          {item.affiliation ? (
+                            <>
+                              <div className="inline-flex items-center gap-1.5 bg-purple-100/80 text-purple-950 border border-purple-200 px-2 py-0.5 rounded-lg text-xs font-black shadow-2xs print:hidden">
+                                <Building2 className="w-3 h-3 text-purple-600 shrink-0" />
+                                <span>{item.affiliation}</span>
+                              </div>
+                              <span className="hidden print:inline font-bold text-black text-[10px]">
+                                {item.affiliation}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-[11px] font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded print:text-gray-500 print:bg-transparent print:p-0">
+                              غير محدد
+                            </span>
+                          )}
+                        </td>
+                      )}
+
+                      {/* 5. Travel & Return Dates (تاريخ الذهاب والعودة - Merged if identical) */}
+                      {groupMergeSpans[idx] > 0 && (
+                        <td
+                          rowSpan={groupMergeSpans[idx]}
+                          className="py-2 px-2 text-center text-xs print:text-[10px] print:py-1 print:px-1 align-middle bg-white border border-gray-200 print:border-slate-400"
+                        >
+                          <div className="flex flex-col items-center justify-center gap-0.5 leading-tight font-sans">
+                            {item.departureDate ? (
+                              <div className="font-bold text-slate-900 print:text-black whitespace-nowrap">
+                                <span className="text-[9px] text-gray-500 print:text-gray-600 font-normal ml-1">ذهاب:</span>
+                                <span>{formatArabicDateFriendly(item.departureDate)}</span>
+                              </div>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                            {item.returnDate && (
+                              <div className="font-bold text-slate-900 print:text-black whitespace-nowrap">
+                                <span className="text-[9px] text-gray-500 print:text-gray-600 font-normal ml-1">عودة:</span>
+                                <span>{formatArabicDateFriendly(item.returnDate)}</span>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      )}
+
+                      {/* 6. Traveler Name (اسم المعتمر) */}
+                      <td className="py-2 px-3 font-black text-gray-900 text-sm print:text-[10.5px] print:py-1 print:px-1.5 leading-snug border border-gray-200 print:border-slate-400">
                         <span>{item.fullName}</span>
                       </td>
 
-                      {/* Affiliation / Delegate */}
-                      <td className="py-2 px-3 print:py-1 print:px-1.5">
-                        {item.affiliation ? (
-                          <>
-                            <div className="inline-flex items-center gap-1.5 bg-purple-100/80 text-purple-950 border border-purple-200 px-2 py-0.5 rounded-lg text-xs font-black shadow-2xs print:hidden">
-                              <Building2 className="w-3 h-3 text-purple-600 shrink-0" />
-                              <span>{item.affiliation}</span>
-                            </div>
-                            <span className="hidden print:inline font-bold text-black text-[10px]">
-                              {item.affiliation}
-                            </span>
-                          </>
-                        ) : (
-                          <span className="text-[11px] font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded print:text-gray-500 print:bg-transparent print:p-0">
-                            غير محدد
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Travel Date */}
-                      <td className="py-2 px-2 text-center font-mono font-bold text-blue-900 print:text-black print:py-1 print:px-1 text-xs print:text-[10px]">
-                        {item.departureDate ? (
-                          <span className="inline-flex items-center gap-1 justify-center">
-                            <Calendar className="w-3 h-3 text-blue-600 print:hidden" />
-                            <span>{item.departureDate}</span>
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </td>
-
-                      {/* Return Date */}
-                      <td className="py-2 px-2 text-center font-mono font-bold text-emerald-900 print:text-black print:py-1 print:px-1 text-xs print:text-[10px]">
-                        {item.returnDate ? (
-                          <span className="inline-flex items-center gap-1 justify-center">
-                            <Calendar className="w-3 h-3 text-emerald-600 print:hidden" />
-                            <span>{item.returnDate}</span>
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </td>
-
-                      {/* Passport Number */}
-                      <td className="py-2 px-2 text-center font-mono font-bold text-gray-800 print:text-black print:py-1 print:px-1 text-xs print:text-[10px]">
+                      {/* 7. Passport Number (رقم الجواز) */}
+                      <td className="py-2 px-2 text-center font-mono font-bold text-gray-800 print:text-black print:py-1 print:px-1 text-xs print:text-[10px] border border-gray-200 print:border-slate-400">
                         {item.passportNumber || "-"}
                       </td>
 
-                      {/* Group Name & Request */}
-                      <td className="py-2 px-3 print:py-1 print:px-1.5 text-xs print:text-[9.5px] leading-tight">
-                        <Link
-                          href={`/requests/${item.groupRequestId}`}
-                          className="font-bold text-sky-800 hover:text-sky-950 hover:underline block print:text-black print:no-underline"
-                          title="عرض تفاصيل المعاملة"
-                        >
-                          {item.groupName}
-                        </Link>
-                        <span className="text-[10px] text-gray-400 print:text-gray-600 font-mono block">
-                          {item.groupRequestNumber}
-                        </span>
-                      </td>
-
-                      {/* Nusuk Number */}
-                      <td className="py-2 px-2 text-center font-mono font-bold text-gray-800 print:text-black print:py-1 print:px-1 text-xs print:text-[10px]">
-                        {item.nusukGroupNumber ? (
-                          <>
-                            <span className="bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded text-[11px] border border-emerald-200 print:hidden">
-                              {item.nusukGroupNumber}
-                            </span>
-                            <span className="hidden print:inline font-bold">
-                              {item.nusukGroupNumber}
-                            </span>
-                          </>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </td>
-
-                      {/* Notes */}
-                      <td className="py-2 px-3 text-gray-600 print:text-black text-xs print:text-[9.5px] leading-tight print:py-1 print:px-1.5">
+                      {/* 8. Notes (ملاحظات) */}
+                      <td className="py-2 px-3 text-gray-600 print:text-black text-xs print:text-[9.5px] leading-tight print:py-1 print:px-1.5 border border-gray-200 print:border-slate-400">
                         {item.notes || "-"}
                       </td>
 
-                      {/* Actions (Print: hidden) */}
-                      <td className="py-2 px-2 text-center print:hidden">
+                      {/* 9. Action (Quick Edit Affiliation - print:hidden) */}
+                      <td className="py-2 px-2 text-center print:hidden border border-gray-200">
                         <button
                           type="button"
                           onClick={() => {
@@ -886,25 +966,6 @@ export default function SenderReportPage() {
             </table>
           </div>
         )}
-      </div>
-
-      {/* Official Print Signatures Footer (Visible ONLY on print) */}
-      <div className="hidden print:flex justify-between items-end mt-4 pt-2 text-xs font-bold text-slate-900 border-t border-slate-300 print-avoid-break">
-        <div className="text-center w-60">
-          <p className="font-bold text-[11px] mb-1">إعداد وتوقيع المندوب / المشرف</p>
-          <div className="h-8 border-b border-slate-400 border-dashed"></div>
-          <p className="text-[9px] text-slate-600 mt-1 font-mono">الاسم: ............................................</p>
-        </div>
-
-        <div className="text-center text-[10px] text-slate-500 font-mono">
-          <span>مسار الحج والعمرة • شركة صفا للسياحة</span>
-        </div>
-
-        <div className="text-center w-60">
-          <p className="font-bold text-[11px] mb-1">اعتماد وختم شركة صفا للسياحة</p>
-          <div className="h-8 border-b border-slate-400 border-dashed"></div>
-          <p className="text-[9px] text-slate-600 mt-1 font-mono">التوقيع والختم الرسمي</p>
-        </div>
       </div>
 
       {/* Quick Edit Affiliation Modal */}
