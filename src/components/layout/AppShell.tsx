@@ -27,15 +27,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50/50">
-      <Navbar onToggleSidebar={() => setSidebarOpen(true)} />
-
-      <div className="flex-1 flex w-full pb-16 md:pb-0">
-        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-        <main className="flex-1 p-3 sm:p-5 lg:p-6 min-w-0 w-full">{children}</main>
+    <div className="min-h-screen flex flex-col bg-gray-50/50 print:bg-white print:min-h-0 print:p-0 print:m-0 print:block">
+      <div className="print:hidden">
+        <Navbar onToggleSidebar={() => setSidebarOpen(true)} />
       </div>
 
-      <MobileNav onOpenMenu={() => setSidebarOpen(true)} />
+      <div className="flex-1 flex w-full pb-16 md:pb-0 print:pb-0 print:p-0 print:block">
+        <div className="print:hidden">
+          <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        </div>
+        <main className="flex-1 p-3 sm:p-5 lg:p-6 min-w-0 w-full print:p-0 print:m-0 print:w-full print:block">{children}</main>
+      </div>
+
+      <div className="print:hidden">
+        <MobileNav onOpenMenu={() => setSidebarOpen(true)} />
+      </div>
     </div>
   );
 }

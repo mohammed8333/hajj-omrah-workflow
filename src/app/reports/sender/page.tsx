@@ -61,6 +61,7 @@ export default function SenderReportPage() {
   const [selectedGroup, setSelectedGroup] = useState<string>("ALL");
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
+  const [printOrientation, setPrintOrientation] = useState<"landscape" | "portrait">("landscape");
 
   // Quick edit affiliation modal
   const [editingItem, setEditingItem] = useState<PilgrimReportItem | null>(null);
@@ -354,13 +355,41 @@ export default function SenderReportPage() {
             <span>تصدير إكسيل ({filteredPilgrims.length})</span>
           </button>
 
+          {/* Print Orientation Selector */}
+          <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl text-xs font-bold text-gray-700">
+            <button
+              type="button"
+              onClick={() => setPrintOrientation("landscape")}
+              className={`px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${
+                printOrientation === "landscape"
+                  ? "bg-white text-purple-900 shadow-2xs font-black"
+                  : "text-gray-500 hover:text-gray-900"
+              }`}
+              title="طباعة بنسق عرضي / أفقي (موصى به لاحتواء كافة الأعمدة في صفحة واحدة)"
+            >
+              عرضي ↔ (موصى به)
+            </button>
+            <button
+              type="button"
+              onClick={() => setPrintOrientation("portrait")}
+              className={`px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${
+                printOrientation === "portrait"
+                  ? "bg-white text-purple-900 shadow-2xs font-black"
+                  : "text-gray-500 hover:text-gray-900"
+              }`}
+              title="طباعة بنسق طولي / رأسي"
+            >
+              طولي ↕
+            </button>
+          </div>
+
           {/* Print Button */}
           <button
             type="button"
             onClick={handlePrint}
             disabled={loading || filteredPilgrims.length === 0}
             className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white font-bold px-4 py-2.5 rounded-xl shadow-xs text-xs sm:text-sm transition-all disabled:opacity-50 cursor-pointer"
-            title="طباعة التقرير بنسق رسمي"
+            title="طباعة التقرير بنسق رسمي صفحة واحدة"
           >
             <Printer className="w-4 h-4" />
             <span>طباعة التقرير</span>
@@ -368,24 +397,93 @@ export default function SenderReportPage() {
         </div>
       </div>
 
+      {/* Dynamic Print CSS */}
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            @media print {
+              @page {
+                size: A4 ${printOrientation};
+                margin: 5mm 6mm 5mm 6mm;
+              }
+              html, body {
+                background: #ffffff !important;
+                color: #000000 !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 100% !important;
+                height: auto !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                font-family: system-ui, -apple-system, sans-serif !important;
+              }
+              /* Eliminate scrollbars entirely */
+              ::-webkit-scrollbar {
+                display: none !important;
+              }
+              * {
+                box-shadow: none !important;
+                text-shadow: none !important;
+                overflow: visible !important;
+              }
+              .print-no-scroll {
+                overflow: visible !important;
+                overflow-x: visible !important;
+                overflow-y: visible !important;
+                width: 100% !important;
+                max-width: 100% !important;
+              }
+              .print-table {
+                width: 100% !important;
+                max-width: 100% !important;
+                table-layout: fixed !important;
+                border-collapse: collapse !important;
+                font-size: 10px !important;
+              }
+              .print-table th {
+                background-color: #1e293b !important;
+                color: #ffffff !important;
+                border: 1px solid #0f172a !important;
+                padding: 4px 3px !important;
+                font-size: 10px !important;
+                font-weight: bold !important;
+                text-align: center !important;
+              }
+              .print-table td {
+                border: 1px solid #cbd5e1 !important;
+                padding: 3px 3px !important;
+                font-size: 9.5px !important;
+                word-wrap: break-word !important;
+                overflow-wrap: break-word !important;
+                word-break: break-word !important;
+                line-height: 1.2 !important;
+              }
+              .print-avoid-break {
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
+              }
+            }
+          `,
+        }}
+      />
+
       {/* Official Print Header (Visible ONLY on print) */}
-      <div className="hidden print:block mb-6 border-b-2 border-slate-900 pb-4 text-slate-900">
-        <div className="flex justify-between items-start">
+      <div className="hidden print:block mb-2 border-b-2 border-slate-900 pb-2 text-slate-900 print-avoid-break">
+        <div className="flex justify-between items-center">
           <div>
-            <h2 className="text-2xl font-black">منظومة الحج والعمرة - صفا</h2>
-            <h3 className="text-lg font-bold text-slate-700 mt-1">
+            <h2 className="text-lg font-black text-slate-950">مسار الحج والعمرة - شركة صفا للسياحة</h2>
+            <h3 className="text-xs font-bold text-slate-800 mt-0.5">
               تقرير بيانات المعتمرين والتبعية للمرسل
+              {selectedAffiliation !== "ALL" && (
+                <span className="text-purple-950 mr-2 font-black">
+                  (المندوب: {selectedAffiliation === "UNASSIGNED" ? "بدون تبعية محددة" : selectedAffiliation})
+                </span>
+              )}
             </h3>
-            {selectedAffiliation !== "ALL" && (
-              <p className="text-sm font-bold text-purple-900 mt-1">
-                المندوب المحدد:{" "}
-                {selectedAffiliation === "UNASSIGNED" ? "معتمرين بدون تبعية محددة" : selectedAffiliation}
-              </p>
-            )}
           </div>
-          <div className="text-left text-xs space-y-1 font-mono">
+          <div className="text-left text-[9px] space-y-0.5 font-mono text-slate-700">
             <p>تاريخ الطباعة: {new Date().toLocaleDateString("ar-SA")}</p>
-            <p>عدد المعتمرين في الكشف: {filteredPilgrims.length} معتمر</p>
+            <p>إجمالي المعتمرين بالكشف: <strong className="font-black text-black">{filteredPilgrims.length}</strong> معتمر</p>
             {user?.fullName && <p>طُبع بواسطة: {user.fullName}</p>}
           </div>
         </div>
@@ -632,7 +730,7 @@ export default function SenderReportPage() {
       </div>
 
       {/* Main Report Table Container */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden">
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden print:border-none print:shadow-none print:overflow-visible print:bg-white print:p-0 print:m-0">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 text-gray-500">
             <div className="w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mb-3"></div>
@@ -647,20 +745,20 @@ export default function SenderReportPage() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-right border-collapse text-xs">
+          <div className="overflow-x-auto print:overflow-visible print:w-full print:p-0 print:m-0 print-no-scroll">
+            <table className="w-full text-right border-collapse text-xs print:text-[10px] print:w-full print:table-fixed print-table">
               <thead>
                 <tr className="bg-slate-900 text-white font-bold border-b border-slate-800 print:bg-slate-800">
-                  <th className="py-3 px-3 w-12 text-center">م</th>
-                  <th className="py-3 px-4 min-w-[180px]">اسم المعتمر / المسافر</th>
-                  <th className="py-3 px-4 min-w-[160px]">التبعية (المندوب)</th>
-                  <th className="py-3 px-3 min-w-[110px] text-center">ت الذهاب</th>
-                  <th className="py-3 px-3 min-w-[110px] text-center">ت العودة</th>
-                  <th className="py-3 px-3 min-w-[120px] font-mono text-center">رقم الجواز</th>
-                  <th className="py-3 px-4 min-w-[160px]">المجموعة / المعاملة</th>
-                  <th className="py-3 px-3 min-w-[110px] text-center">رقم نسك</th>
-                  <th className="py-3 px-4 min-w-[200px]">ملاحظات</th>
-                  <th className="py-3 px-3 w-20 text-center print:hidden">إجراء</th>
+                  <th className="py-2.5 px-2 w-10 print:w-[4%] text-center print:min-w-0 print:px-1 print:py-1">م</th>
+                  <th className="py-2.5 px-3 min-w-[170px] print:min-w-0 print:w-[21%] print:px-1.5 print:py-1">اسم المعتمر / المسافر</th>
+                  <th className="py-2.5 px-3 min-w-[140px] print:min-w-0 print:w-[15%] print:px-1.5 print:py-1">التبعية (المندوب)</th>
+                  <th className="py-2.5 px-2 min-w-[95px] text-center print:min-w-0 print:w-[10%] print:px-1 print:py-1">ت الذهاب</th>
+                  <th className="py-2.5 px-2 min-w-[95px] text-center print:min-w-0 print:w-[10%] print:px-1 print:py-1">ت العودة</th>
+                  <th className="py-2.5 px-2 min-w-[105px] font-mono text-center print:min-w-0 print:w-[11%] print:px-1 print:py-1">رقم الجواز</th>
+                  <th className="py-2.5 px-3 min-w-[130px] print:min-w-0 print:w-[13%] print:px-1.5 print:py-1">المجموعة / المعاملة</th>
+                  <th className="py-2.5 px-2 min-w-[85px] text-center print:min-w-0 print:w-[8%] print:px-1 print:py-1">رقم نسك</th>
+                  <th className="py-2.5 px-3 min-w-[150px] print:min-w-0 print:w-[18%] print:px-1.5 print:py-1">ملاحظات</th>
+                  <th className="py-2.5 px-2 w-14 text-center print:hidden">إجراء</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -674,33 +772,38 @@ export default function SenderReportPage() {
                       }`}
                     >
                       {/* Serial Number */}
-                      <td className="py-3 px-3 text-center font-bold text-gray-500">
+                      <td className="py-2 px-2 text-center font-bold text-gray-500 print:text-black print:py-1 print:px-1 print:text-[10px]">
                         {idx + 1}
                       </td>
 
                       {/* Traveler Name */}
-                      <td className="py-3 px-4 font-black text-gray-900 text-sm">
+                      <td className="py-2 px-3 font-black text-gray-900 text-sm print:text-[11px] print:py-1 print:px-1.5 leading-snug">
                         <span>{item.fullName}</span>
                       </td>
 
                       {/* Affiliation / Delegate */}
-                      <td className="py-3 px-4">
+                      <td className="py-2 px-3 print:py-1 print:px-1.5">
                         {item.affiliation ? (
-                          <div className="inline-flex items-center gap-1.5 bg-purple-100/80 text-purple-950 border border-purple-200 px-2.5 py-1 rounded-lg text-xs font-black shadow-2xs">
-                            <Building2 className="w-3.5 h-3.5 text-purple-600 shrink-0" />
-                            <span>{item.affiliation}</span>
-                          </div>
+                          <>
+                            <div className="inline-flex items-center gap-1.5 bg-purple-100/80 text-purple-950 border border-purple-200 px-2 py-0.5 rounded-lg text-xs font-black shadow-2xs print:hidden">
+                              <Building2 className="w-3 h-3 text-purple-600 shrink-0" />
+                              <span>{item.affiliation}</span>
+                            </div>
+                            <span className="hidden print:inline font-bold text-black text-[10px]">
+                              {item.affiliation}
+                            </span>
+                          </>
                         ) : (
-                          <span className="text-[11px] font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
+                          <span className="text-[11px] font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded print:text-gray-500 print:bg-transparent print:p-0">
                             غير محدد
                           </span>
                         )}
                       </td>
 
                       {/* Travel Date */}
-                      <td className="py-3 px-3 text-center font-mono font-bold text-blue-900">
+                      <td className="py-2 px-2 text-center font-mono font-bold text-blue-900 print:text-black print:py-1 print:px-1 text-xs print:text-[10px]">
                         {item.departureDate ? (
-                          <span className="inline-flex items-center gap-1">
+                          <span className="inline-flex items-center gap-1 justify-center">
                             <Calendar className="w-3 h-3 text-blue-600 print:hidden" />
                             <span>{item.departureDate}</span>
                           </span>
@@ -710,9 +813,9 @@ export default function SenderReportPage() {
                       </td>
 
                       {/* Return Date */}
-                      <td className="py-3 px-3 text-center font-mono font-bold text-emerald-900">
+                      <td className="py-2 px-2 text-center font-mono font-bold text-emerald-900 print:text-black print:py-1 print:px-1 text-xs print:text-[10px]">
                         {item.returnDate ? (
-                          <span className="inline-flex items-center gap-1">
+                          <span className="inline-flex items-center gap-1 justify-center">
                             <Calendar className="w-3 h-3 text-emerald-600 print:hidden" />
                             <span>{item.returnDate}</span>
                           </span>
@@ -722,42 +825,47 @@ export default function SenderReportPage() {
                       </td>
 
                       {/* Passport Number */}
-                      <td className="py-3 px-3 text-center font-mono font-bold text-gray-700">
+                      <td className="py-2 px-2 text-center font-mono font-bold text-gray-800 print:text-black print:py-1 print:px-1 text-xs print:text-[10px]">
                         {item.passportNumber || "-"}
                       </td>
 
                       {/* Group Name & Request */}
-                      <td className="py-3 px-4">
+                      <td className="py-2 px-3 print:py-1 print:px-1.5 text-xs print:text-[9.5px] leading-tight">
                         <Link
                           href={`/requests/${item.groupRequestId}`}
-                          className="font-bold text-sky-800 hover:text-sky-950 hover:underline block"
+                          className="font-bold text-sky-800 hover:text-sky-950 hover:underline block print:text-black print:no-underline"
                           title="عرض تفاصيل المعاملة"
                         >
                           {item.groupName}
                         </Link>
-                        <span className="text-[10px] text-gray-400 font-mono">
+                        <span className="text-[10px] text-gray-400 print:text-gray-600 font-mono block">
                           {item.groupRequestNumber}
                         </span>
                       </td>
 
                       {/* Nusuk Number */}
-                      <td className="py-3 px-3 text-center">
+                      <td className="py-2 px-2 text-center font-mono font-bold text-gray-800 print:text-black print:py-1 print:px-1 text-xs print:text-[10px]">
                         {item.nusukGroupNumber ? (
-                          <span className="font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded text-[11px] border border-emerald-200">
-                            {item.nusukGroupNumber}
-                          </span>
+                          <>
+                            <span className="bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded text-[11px] border border-emerald-200 print:hidden">
+                              {item.nusukGroupNumber}
+                            </span>
+                            <span className="hidden print:inline font-bold">
+                              {item.nusukGroupNumber}
+                            </span>
+                          </>
                         ) : (
-                          <span className="text-gray-400 font-mono text-[11px]">-</span>
+                          <span className="text-gray-400">-</span>
                         )}
                       </td>
 
                       {/* Notes */}
-                      <td className="py-3 px-4 text-gray-600 text-[11px] leading-relaxed">
+                      <td className="py-2 px-3 text-gray-600 print:text-black text-xs print:text-[9.5px] leading-tight print:py-1 print:px-1.5">
                         {item.notes || "-"}
                       </td>
 
                       {/* Actions (Print: hidden) */}
-                      <td className="py-3 px-3 text-center print:hidden">
+                      <td className="py-2 px-2 text-center print:hidden">
                         <button
                           type="button"
                           onClick={() => {
@@ -781,14 +889,21 @@ export default function SenderReportPage() {
       </div>
 
       {/* Official Print Signatures Footer (Visible ONLY on print) */}
-      <div className="hidden print:flex justify-between items-center pt-10 text-xs font-bold text-slate-800">
-        <div className="text-center w-56">
-          <p className="border-b border-slate-400 pb-12 mb-2">إعداد وتوقيع المندوب / المشرف</p>
-          <p>الاسم: ........................................</p>
+      <div className="hidden print:flex justify-between items-end mt-4 pt-2 text-xs font-bold text-slate-900 border-t border-slate-300 print-avoid-break">
+        <div className="text-center w-60">
+          <p className="font-bold text-[11px] mb-1">إعداد وتوقيع المندوب / المشرف</p>
+          <div className="h-8 border-b border-slate-400 border-dashed"></div>
+          <p className="text-[9px] text-slate-600 mt-1 font-mono">الاسم: ............................................</p>
         </div>
-        <div className="text-center w-56">
-          <p className="border-b border-slate-400 pb-12 mb-2">اعتماد شركة صفا للسياحة</p>
-          <p>التوقيع والختم الرسمي</p>
+
+        <div className="text-center text-[10px] text-slate-500 font-mono">
+          <span>مسار الحج والعمرة • شركة صفا للسياحة</span>
+        </div>
+
+        <div className="text-center w-60">
+          <p className="font-bold text-[11px] mb-1">اعتماد وختم شركة صفا للسياحة</p>
+          <div className="h-8 border-b border-slate-400 border-dashed"></div>
+          <p className="text-[9px] text-slate-600 mt-1 font-mono">التوقيع والختم الرسمي</p>
         </div>
       </div>
 

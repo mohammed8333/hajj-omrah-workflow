@@ -11,7 +11,7 @@ export function MobileNav({ onOpenMenu }: { onOpenMenu: () => void }) {
   const { role } = useAuth();
 
   return (
-    <nav className="md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 z-30 flex items-center justify-around py-2 px-3 shadow-lg">
+    <nav className="md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 z-30 flex items-center justify-around py-2 px-3 shadow-lg print:hidden">
       <Link
         href="/dashboard"
         className={`flex flex-col items-center gap-1 text-xs py-1 px-3 rounded-lg ${
