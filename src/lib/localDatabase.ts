@@ -14,6 +14,7 @@ import {
   User,
 } from "@/types";
 import { resolveSenderCode } from "./groupNaming";
+import { matchesRequestSearch } from "./searchUtils";
 
 const DB_KEY_USERS = "hajj_db_users_v2";
 const DB_KEY_REQUESTS = "hajj_db_requests_v2";
@@ -1054,15 +1055,8 @@ class LocalDatabaseEngine {
     if (senderId && senderId.trim()) {
       list = list.filter((r) => r.senderId === senderId.trim());
     }
-    if (search) {
-      const q = search.toLowerCase();
-      list = list.filter(
-        (r) =>
-          r.groupName.toLowerCase().includes(q) ||
-          r.requestNumber.toLowerCase().includes(q) ||
-          r.contactPhone.includes(q) ||
-          (r.nusukGroupNumber && r.nusukGroupNumber.toLowerCase().includes(q))
-      );
+    if (search && search.trim()) {
+      list = list.filter((r) => matchesRequestSearch(r, search));
     }
 
     return list.sort(

@@ -387,9 +387,28 @@ export const supabaseService = {
         query = query.ilike("nusuk_group_number", `%${nusukNumber.trim()}%`);
       }
       if (search && search.trim()) {
-        query = query.or(
-          `group_name.ilike.%${search.trim()}%,request_number.ilike.%${search.trim()}%,contact_phone.ilike.%${search.trim()}%`
-        );
+        const cleanSearch = search.trim();
+        let matchedGroupIds: string[] = [];
+        try {
+          const { data: matchedTravelers } = await client
+            .from("travelers")
+            .select("group_request_id")
+            .or(`full_name.ilike.%${cleanSearch}%,passport_number.ilike.%${cleanSearch}%`)
+            .limit(100);
+          matchedGroupIds = (matchedTravelers || [])
+            .map((t) => t.group_request_id)
+            .filter(Boolean);
+        } catch (_) {}
+
+        if (matchedGroupIds.length > 0) {
+          query = query.or(
+            `group_name.ilike.%${cleanSearch}%,request_number.ilike.%${cleanSearch}%,contact_phone.ilike.%${cleanSearch}%,id.in.(${matchedGroupIds.join(",")})`
+          );
+        } else {
+          query = query.or(
+            `group_name.ilike.%${cleanSearch}%,request_number.ilike.%${cleanSearch}%,contact_phone.ilike.%${cleanSearch}%`
+          );
+        }
       }
 
       const { data: requests, error } = await query;

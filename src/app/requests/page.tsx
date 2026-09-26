@@ -38,6 +38,7 @@ import { getWhatsAppUrl } from "@/lib/phoneUtils";
 import { WhatsAppModal } from "@/components/ui/WhatsAppModal";
 import { notificationsService } from "@/lib/notificationsService";
 import { downloadFile } from "@/lib/fileDownload";
+import { matchesRequestSearch, getMatchingTravelers, isTravelerMatch } from "@/lib/searchUtils";
 
 // اقتطاع الاسم الثلاثي فقط (3 مقاطع كحد أقصى)
 function getThreePartName(fullName?: string): string {
@@ -552,18 +553,7 @@ ${travelersLines}
   });
 
   const filtered = roleRequests.filter((r) => {
-    const term = search.trim().toLowerCase();
-    const matchesTerm =
-      !term ||
-      r.groupName.toLowerCase().includes(term) ||
-      r.requestNumber.toLowerCase().includes(term) ||
-      (r.nusukGroupNumber && r.nusukGroupNumber.toLowerCase().includes(term)) ||
-      (r.hostName && r.hostName.toLowerCase().includes(term)) ||
-      (r.hostPhone && r.hostPhone.includes(term)) ||
-      (r.senderName && r.senderName.toLowerCase().includes(term)) ||
-      r.contactPhone.includes(term);
-
-    if (!matchesTerm) return false;
+    if (!matchesRequestSearch(r, search)) return false;
 
     if (nusukFilter === "WITH_NUSUK" && !r.nusukGroupNumber) return false;
     if (nusukFilter === "WITHOUT_NUSUK" && r.nusukGroupNumber) return false;
@@ -980,7 +970,7 @@ ${travelersLines}
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="ابحث برقم مجموعة نسك، رقم المعاملة، اسم المجموعة، أو الهاتف..."
+              placeholder="ابحث باسم أي مسافر، رقم الجواز، رقم نسك، اسم المجموعة، أو الهاتف..."
               className="w-full pl-10 pr-10 py-2.5 text-xs sm:text-sm rounded-xl border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-sky-500 focus:border-sky-500 bg-gray-50/50"
             />
             <Search className="w-4 h-4 text-gray-400 absolute right-3.5 top-3" />
@@ -1118,6 +1108,9 @@ ${travelersLines}
           <div className="block md:hidden space-y-3">
             {filtered.map((r) => {
               const isCompleted = r.status === "Completed" || r.status === "Archived";
+              const matchingTravelers = getMatchingTravelers(r, search);
+              const isTravelerMatched = Boolean(search.trim()) && matchingTravelers.length > 0;
+              const currentMobileTab = mobileCardTab[r.id] ?? (isTravelerMatched ? "travelers" : "host");
               const reqTravelers =
                 r.travelersList && r.travelersList.length > 0
                   ? r.travelersList
@@ -1174,6 +1167,17 @@ ${travelersLines}
                       )}
                     </div>
                   </div>
+
+                  {/* إشعار مسافر مطابق للبحث */}
+                  {isTravelerMatched && (
+                    <div className="flex items-center gap-1.5 bg-purple-50 border border-purple-200 text-purple-900 px-2.5 py-1 rounded-xl text-xs font-bold">
+                      <Users className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                      <span className="text-[11px] text-purple-700 shrink-0">مسافر مطابق:</span>
+                      <span className="truncate text-purple-950 font-extrabold">
+                        {matchingTravelers.map((t) => t.fullName).join("، ")}
+                      </span>
+                    </div>
+                  )}
 
                   {/* شريط المرسل والإسناد لموظف صفا والأدمن فقط */}
                   {(role === "SafaEmployee" || role === "Admin") && (
@@ -1257,35 +1261,45 @@ ${travelersLines}
                     {role === "Sender" ? (
                       <div className="bg-purple-50/40 border border-purple-200/80 rounded-xl p-2.5 flex flex-col justify-center text-xs overflow-hidden">
                         <div className="space-y-2 max-h-36 overflow-y-auto pr-0.5">
-                          {reqTravelers.map((t, idx) => (
-                            <div key={t.id || idx} className="flex items-center gap-2 min-w-0">
-                              {t.photoUrl ? (
-                                <img
-                                  src={t.photoUrl}
-                                  alt={t.fullName}
-                                  onClick={(e) => handleViewDoc(undefined, t.photoUrl, `صورة المسافر - ${t.fullName}`, e)}
-                                  className="w-8 h-8 rounded-full object-cover border border-purple-300 shrink-0 shadow-2xs cursor-pointer hover:opacity-80 transition-opacity"
-                                  title="معاينة الصورة"
-                                />
-                              ) : (
-                                <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-700 border border-purple-200 flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
-                                  {t.fullName && t.fullName.trim() ? (
-                                    t.fullName.trim().charAt(0)
-                                  ) : (
-                                    <User className="w-4 h-4 text-purple-600" />
-                                  )}
+                          {reqTravelers.map((t, idx) => {
+                            const isThisMatched = isTravelerMatch(t, search);
+                            return (
+                              <div
+                                key={t.id || idx}
+                                className={`flex items-center gap-2 min-w-0 p-1 rounded-lg transition-colors ${
+                                  isThisMatched ? "bg-purple-100 ring-2 ring-purple-400" : ""
+                                }`}
+                              >
+                                {t.photoUrl ? (
+                                  <img
+                                    src={t.photoUrl}
+                                    alt={t.fullName}
+                                    onClick={(e) => handleViewDoc(undefined, t.photoUrl, `صورة المسافر - ${t.fullName}`, e)}
+                                    className="w-8 h-8 rounded-full object-cover border border-purple-300 shrink-0 shadow-2xs cursor-pointer hover:opacity-80 transition-opacity"
+                                    title="معاينة الصورة"
+                                  />
+                                ) : (
+                                  <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-700 border border-purple-200 flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
+                                    {t.fullName && t.fullName.trim() ? (
+                                      t.fullName.trim().charAt(0)
+                                    ) : (
+                                      <User className="w-4 h-4 text-purple-600" />
+                                    )}
+                                  </div>
+                                )}
+                                <div className="min-w-0 flex-1">
+                                  <span
+                                    className={`text-xs block truncate leading-tight ${
+                                      isThisMatched ? "font-black text-purple-950" : "font-bold text-gray-900"
+                                    }`}
+                                    title={t.fullName}
+                                  >
+                                    {t.fullName}
+                                  </span>
                                 </div>
-                              )}
-                              <div className="min-w-0 flex-1">
-                                <span
-                                  className="text-xs font-bold text-gray-900 block truncate leading-tight"
-                                  title={t.fullName}
-                                >
-                                  {t.fullName}
-                                </span>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     ) : role === "SaudiAgent" ? (
@@ -1398,7 +1412,7 @@ ${travelersLines}
                               setMobileCardTab((prev) => ({ ...prev, [r.id]: "host" }));
                             }}
                             className={`flex-1 py-0.5 text-center rounded-md transition-all cursor-pointer ${
-                              (mobileCardTab[r.id] || "host") === "host"
+                              currentMobileTab === "host"
                                 ? "bg-white text-amber-900 shadow-2xs font-extrabold"
                                 : "text-gray-500 hover:text-gray-800"
                             }`}
@@ -1412,7 +1426,7 @@ ${travelersLines}
                               setMobileCardTab((prev) => ({ ...prev, [r.id]: "travelers" }));
                             }}
                             className={`flex-1 py-0.5 text-center rounded-md transition-all cursor-pointer ${
-                              (mobileCardTab[r.id] || "host") === "travelers"
+                              currentMobileTab === "travelers"
                                 ? "bg-purple-600 text-white shadow-2xs font-extrabold"
                                 : "text-gray-500 hover:text-gray-800"
                             }`}
@@ -1421,37 +1435,47 @@ ${travelersLines}
                           </button>
                         </div>
 
-                        {(mobileCardTab[r.id] || "host") === "travelers" ? (
+                        {currentMobileTab === "travelers" ? (
                           <div className="space-y-1.5 max-h-32 overflow-y-auto pr-0.5 flex-1">
-                            {reqTravelers.map((t, idx) => (
-                              <div key={t.id || idx} className="flex items-center gap-1.5 min-w-0">
-                                {t.photoUrl ? (
-                                  <img
-                                    src={t.photoUrl}
-                                    alt={t.fullName}
-                                    onClick={(e) => handleViewDoc(undefined, t.photoUrl, `صورة المسافر - ${t.fullName}`, e)}
-                                    className="w-7 h-7 rounded-full object-cover border border-purple-300 shrink-0 shadow-2xs cursor-pointer hover:opacity-80 transition-opacity"
-                                    title="معاينة الصورة"
-                                  />
-                                ) : (
-                                  <div className="w-7 h-7 rounded-full bg-purple-100 text-purple-700 border border-purple-200 flex items-center justify-center font-bold text-[10px] shrink-0 shadow-2xs">
-                                    {t.fullName && t.fullName.trim() ? (
-                                      t.fullName.trim().charAt(0)
-                                    ) : (
-                                      <User className="w-3.5 h-3.5 text-purple-600" />
-                                    )}
+                            {reqTravelers.map((t, idx) => {
+                              const isThisMatched = isTravelerMatch(t, search);
+                              return (
+                                <div
+                                  key={t.id || idx}
+                                  className={`flex items-center gap-1.5 min-w-0 p-1 rounded-lg transition-colors ${
+                                    isThisMatched ? "bg-purple-100 ring-2 ring-purple-400" : ""
+                                  }`}
+                                >
+                                  {t.photoUrl ? (
+                                    <img
+                                      src={t.photoUrl}
+                                      alt={t.fullName}
+                                      onClick={(e) => handleViewDoc(undefined, t.photoUrl, `صورة المسافر - ${t.fullName}`, e)}
+                                      className="w-7 h-7 rounded-full object-cover border border-purple-300 shrink-0 shadow-2xs cursor-pointer hover:opacity-80 transition-opacity"
+                                      title="معاينة الصورة"
+                                    />
+                                  ) : (
+                                    <div className="w-7 h-7 rounded-full bg-purple-100 text-purple-700 border border-purple-200 flex items-center justify-center font-bold text-[10px] shrink-0 shadow-2xs">
+                                      {t.fullName && t.fullName.trim() ? (
+                                        t.fullName.trim().charAt(0)
+                                      ) : (
+                                        <User className="w-3.5 h-3.5 text-purple-600" />
+                                      )}
+                                    </div>
+                                  )}
+                                  <div className="min-w-0 flex-1">
+                                    <span
+                                      className={`text-[11px] block truncate leading-tight ${
+                                        isThisMatched ? "font-black text-purple-950" : "font-bold text-gray-900"
+                                      }`}
+                                      title={t.fullName}
+                                    >
+                                      {t.fullName}
+                                    </span>
                                   </div>
-                                )}
-                                <div className="min-w-0 flex-1">
-                                  <span
-                                    className="text-[11px] font-bold text-gray-900 block truncate leading-tight"
-                                    title={t.fullName}
-                                  >
-                                    {t.fullName}
-                                  </span>
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         ) : (
                           <div className="space-y-1 flex-1 flex flex-col justify-between">
@@ -1726,6 +1750,8 @@ ${travelersLines}
                       Boolean(search.trim()) &&
                       Boolean(r.nusukGroupNumber) &&
                       r.nusukGroupNumber!.toLowerCase().includes(search.trim().toLowerCase());
+                    const matchingTravelers = getMatchingTravelers(r, search);
+                    const isTravelerMatched = Boolean(search.trim()) && matchingTravelers.length > 0;
                     const reqTravelers =
                       r.travelersList && r.travelersList.length > 0
                         ? r.travelersList
@@ -1766,6 +1792,20 @@ ${travelersLines}
                             </div>
                           ) : (
                             <span className="text-gray-400 text-xs italic">قيد التسجيل</span>
+                          )}
+                          {isTravelerMatched && (
+                            <div
+                              className="mt-1 flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-900 border border-purple-300 max-w-[170px] truncate"
+                              title={`مسافر مطابق: ${matchingTravelers.map((t) => t.fullName).join("، ")}`}
+                            >
+                              <Users className="w-2.5 h-2.5 text-purple-700 shrink-0" />
+                              <span className="truncate">{matchingTravelers[0].fullName}</span>
+                              {matchingTravelers.length > 1 && (
+                                <span className="text-[9px] font-extrabold text-purple-700 shrink-0">
+                                  +{matchingTravelers.length - 1}
+                                </span>
+                              )}
+                            </div>
                           )}
                         </td>
 
@@ -1859,35 +1899,45 @@ ${travelersLines}
                         {(role === "Sender" || role === "SafaEmployee" || role === "Admin") && (
                           <td className="py-2.5 px-3 align-middle border-l border-gray-100">
                             <div className="bg-purple-50/40 border border-purple-200/80 rounded-xl p-2 min-w-[170px] max-w-xs space-y-1.5 max-h-44 overflow-y-auto">
-                              {reqTravelers.map((t, idx) => (
-                                <div key={t.id || idx} className="flex items-center gap-2.5 min-w-0">
-                                  {t.photoUrl ? (
-                                    <img
-                                      src={t.photoUrl}
-                                      alt={t.fullName}
-                                      onClick={(e) => handleViewDoc(undefined, t.photoUrl, `صورة المسافر - ${t.fullName}`, e)}
-                                      className="w-9 h-9 rounded-full object-cover border border-purple-300 shrink-0 shadow-2xs cursor-pointer hover:opacity-80 transition-opacity"
-                                      title="معاينة الصورة"
-                                    />
-                                  ) : (
-                                    <div className="w-9 h-9 rounded-full bg-purple-100 text-purple-700 border border-purple-200 flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
-                                      {t.fullName && t.fullName.trim() ? (
-                                        t.fullName.trim().charAt(0)
-                                      ) : (
-                                        <User className="w-4 h-4 text-purple-600" />
-                                      )}
+                              {reqTravelers.map((t, idx) => {
+                                const isThisMatched = isTravelerMatch(t, search);
+                                return (
+                                  <div
+                                    key={t.id || idx}
+                                    className={`flex items-center gap-2.5 min-w-0 p-1 rounded-lg transition-colors ${
+                                      isThisMatched ? "bg-purple-100 ring-2 ring-purple-400" : ""
+                                    }`}
+                                  >
+                                    {t.photoUrl ? (
+                                      <img
+                                        src={t.photoUrl}
+                                        alt={t.fullName}
+                                        onClick={(e) => handleViewDoc(undefined, t.photoUrl, `صورة المسافر - ${t.fullName}`, e)}
+                                        className="w-9 h-9 rounded-full object-cover border border-purple-300 shrink-0 shadow-2xs cursor-pointer hover:opacity-80 transition-opacity"
+                                        title="معاينة الصورة"
+                                      />
+                                    ) : (
+                                      <div className="w-9 h-9 rounded-full bg-purple-100 text-purple-700 border border-purple-200 flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
+                                        {t.fullName && t.fullName.trim() ? (
+                                          t.fullName.trim().charAt(0)
+                                        ) : (
+                                          <User className="w-4 h-4 text-purple-600" />
+                                        )}
+                                      </div>
+                                    )}
+                                    <div className="min-w-0 flex-1">
+                                      <span
+                                        className={`text-xs block truncate leading-tight ${
+                                          isThisMatched ? "font-black text-purple-950" : "font-bold text-gray-900"
+                                        }`}
+                                        title={t.fullName}
+                                      >
+                                        {t.fullName}
+                                      </span>
                                     </div>
-                                  )}
-                                  <div className="min-w-0 flex-1">
-                                    <span
-                                      className="text-xs font-bold text-gray-900 block truncate leading-tight"
-                                      title={t.fullName}
-                                    >
-                                      {t.fullName}
-                                    </span>
                                   </div>
-                                </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           </td>
                         )}
