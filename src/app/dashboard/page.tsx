@@ -43,6 +43,13 @@ import { WhatsAppModal } from "@/components/ui/WhatsAppModal";
 import { notificationsService } from "@/lib/notificationsService";
 import { downloadFile } from "@/lib/fileDownload";
 import { matchesRequestSearch, getMatchingTravelers, isTravelerMatch } from "@/lib/searchUtils";
+import {
+  TableColumnFiltersRow,
+  TableColumnFiltersToggle,
+  TableColumnFiltersState,
+  initialColumnFilters,
+  matchesColumnFilters,
+} from "@/components/requests/TableColumnFilters";
 
 // اقتطاع الاسم الثلاثي فقط (3 مقاطع كحد أقصى)
 function getThreePartName(fullName?: string): string {
@@ -184,6 +191,38 @@ export default function DashboardPage() {
     url: null,
     loading: false,
   });
+
+  // Admin Interactive Column Filters
+  const [colFilters, setColFilters] = useState<TableColumnFiltersState>(initialColumnFilters);
+  const [showColFilters, setShowColFilters] = useState<boolean>(true);
+
+  const handleColFilterChange = (key: keyof TableColumnFiltersState, val: string) => {
+    setColFilters((prev) => ({ ...prev, [key]: val }));
+  };
+
+  const resetColFilters = () => {
+    setColFilters(initialColumnFilters);
+  };
+
+  const distinctSenders = React.useMemo(() => {
+    const set = new Set<string>();
+    requests.forEach((r) => {
+      if (r.senderName && r.senderName.trim()) set.add(r.senderName.trim());
+    });
+    return Array.from(set).sort();
+  }, [requests]);
+
+  const activeColFiltersCount = React.useMemo(() => {
+    let count = 0;
+    if (colFilters.nusuk.trim()) count++;
+    if (colFilters.status) count++;
+    if (colFilters.sender) count++;
+    if (colFilters.departureDate) count++;
+    if (colFilters.returnDate) count++;
+    if (colFilters.traveler.trim()) count++;
+    if (colFilters.hosting && colFilters.hosting !== "ALL") count++;
+    return count;
+  }, [colFilters]);
 
   const copyToClipboard = (nusuk: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -513,6 +552,9 @@ ${travelersLines}
     if (nusukFilter === "WITHOUT_NUSUK" && r.nusukGroupNumber) return false;
 
     if (statusFilter && r.status !== statusFilter) return false;
+
+    // Apply Admin interactive column filters
+    if (role === "Admin" && !matchesColumnFilters(r, colFilters)) return false;
 
     if (activeTab === "ALL") return true;
     if (activeTab === "NEW") return r.status === "Submitted" || r.status === "Draft";
@@ -1123,6 +1165,15 @@ ${travelersLines}
             </select>
           </div>
 
+          {role === "Admin" && (
+            <TableColumnFiltersToggle
+              role={role}
+              isOpen={showColFilters}
+              onToggle={() => setShowColFilters(!showColFilters)}
+              activeCount={activeColFiltersCount}
+            />
+          )}
+
           {searchTerm && (
             <Link
               href={`/requests?search=${encodeURIComponent(searchTerm)}`}
@@ -1133,6 +1184,23 @@ ${travelersLines}
             </Link>
           )}
         </div>
+
+        {/* Active Column Filters Banner (Admin only) */}
+        {role === "Admin" && activeColFiltersCount > 0 && (
+          <div className="flex items-center justify-between gap-2 p-2.5 bg-sky-50 border border-sky-200 rounded-xl text-xs text-sky-900">
+            <div className="flex items-center gap-2 font-bold">
+              <Filter className="w-4 h-4 text-sky-600" />
+              <span>فلاتر أعمدة الجدول مفعلة ({activeColFiltersCount} عمود مُفلتر)</span>
+            </div>
+            <button
+              type="button"
+              onClick={resetColFilters}
+              className="text-rose-700 hover:text-rose-900 font-bold bg-white px-2.5 py-1 rounded-lg border border-rose-200 hover:bg-rose-50 transition-colors cursor-pointer text-[11px] shadow-2xs"
+            >
+              إلغاء فلاتر الأعمدة ↺
+            </button>
+          </div>
+        )}
 
         {/* Nusuk Quick Filter Pills */}
         <div className="flex items-center gap-2 pt-1 border-t border-gray-100 overflow-x-auto text-xs">
@@ -1827,8 +1895,38 @@ ${travelersLines}
                     {(role === "SaudiAgent" || role === "SafaEmployee" || role === "Admin") && (
                       <th className="py-3 px-3">بيانات المستضيف</th>
                     )}
-                    <th className="py-3 px-3 text-center">المستندات والإجراء</th>
+                    <th className="py-3 px-3 text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <span>المستندات والإجراء</span>
+                        {role === "Admin" && (
+                          <button
+                            type="button"
+                            onClick={() => setShowColFilters(!showColFilters)}
+                            className={`p-1 rounded-lg transition-colors cursor-pointer ${
+                              showColFilters || activeColFiltersCount > 0
+                                ? "bg-sky-100 text-sky-700 ring-1 ring-sky-300"
+                                : "text-gray-400 hover:text-gray-600 hover:bg-gray-200"
+                            }`}
+                            title="إظهار / إخفاء فلاتر الأعمدة (للأدمن فقط)"
+                          >
+                            <Filter className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </th>
                   </tr>
+
+                  {/* Admin Column Filter Row */}
+                  {role === "Admin" && showColFilters && (
+                    <TableColumnFiltersRow
+                      role={role}
+                      filters={colFilters}
+                      onFilterChange={handleColFilterChange}
+                      onReset={resetColFilters}
+                      distinctSenders={distinctSenders}
+                      hasActiveFilters={activeColFiltersCount > 0}
+                    />
+                  )}
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {filteredRequests.map((r, rIdx) => {
