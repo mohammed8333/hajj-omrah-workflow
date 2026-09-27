@@ -624,6 +624,7 @@ export interface TravelReportExportRow {
   groupName: string;
   travelersCount: number;
   ticketUrl?: string;
+  flightNumber?: string;
   departureDate?: string;
   flightDepartureTime?: string;
   airportArrivalTime?: string;
@@ -632,8 +633,8 @@ export interface TravelReportExportRow {
 }
 
 /**
- * Exports Travel & Flights Report with 9 columns RTL to Excel:
- * رقم مجموعة نسك | اسم المجموعة | عدد المسافرين | رابط التذكرة | تاريخ الذهاب | وقت إقلاع طائرة الذهاب | وقت التواجد في المطار | اسم المسافر | رقم المسافر
+ * Exports Travel & Flights Report with 10 columns RTL to Excel:
+ * رقم مجموعة نسك | اسم المجموعة | عدد المسافرين | رابط التذكرة | رقم الرحلة | تاريخ الذهاب | وقت إقلاع طائرة الذهاب | وقت التواجد في المطار | اسم المسافر | رقم المسافر
  */
 export function exportTravelReportToExcel(items: TravelReportExportRow[]) {
   const workbook = XLSX.utils.book_new();
@@ -764,6 +765,7 @@ export function exportTravelReportToExcel(items: TravelReportExportRow[]) {
       "اسم المجموعة": item.groupName || "-",
       "عدد المسافرين": item.travelersCount || 1,
       "رابط التذكرة": item.ticketUrl || "لم تُرفع بعد",
+      "رقم الرحلة": item.flightNumber || "-",
       "تاريخ الذهاب": formatArabicDateFriendly(item.departureDate),
       "وقت إقلاع طائرة الذهاب": item.flightDepartureTime || "-",
       "وقت التواجد في المطار": item.airportArrivalTime || "-",
@@ -774,17 +776,18 @@ export function exportTravelReportToExcel(items: TravelReportExportRow[]) {
 
   const ws = XLSX.utils.json_to_sheet(data);
 
-  // Column widths (9 columns)
+  // Column widths (10 columns)
   ws["!cols"] = [
     { wch: 18 }, // Col 0: رقم مجموعة نسك
     { wch: 28 }, // Col 1: اسم المجموعة
     { wch: 14 }, // Col 2: عدد المسافرين
     { wch: 38 }, // Col 3: رابط التذكرة
-    { wch: 18 }, // Col 4: تاريخ الذهاب
-    { wch: 22 }, // Col 5: وقت إقلاع طائرة الذهاب
-    { wch: 22 }, // Col 6: وقت التواجد في المطار
-    { wch: 30 }, // Col 7: اسم المسافر
-    { wch: 20 }, // Col 8: رقم المسافر
+    { wch: 16 }, // Col 4: رقم الرحلة
+    { wch: 18 }, // Col 5: تاريخ الذهاب
+    { wch: 22 }, // Col 6: وقت إقلاع طائرة الذهاب
+    { wch: 22 }, // Col 7: وقت التواجد في المطار
+    { wch: 30 }, // Col 8: اسم المسافر
+    { wch: 20 }, // Col 9: رقم المسافر
   ];
 
   // Set RTL direction for the worksheet
@@ -843,13 +846,13 @@ export function exportTravelReportToExcel(items: TravelReportExportRow[]) {
           font: {
             name: "Calibri",
             sz: 10,
-            bold: C === 0 || C === 7, // Bold for nusuk number and traveler name
+            bold: C === 0 || C === 8, // Bold for nusuk number and traveler name
             color: { rgb: isLink ? "0284C7" : "0F172A" },
             underline: isLink,
           },
           alignment: {
             vertical: "center",
-            horizontal: C === 1 || C === 7 ? "right" : "center",
+            horizontal: C === 1 || C === 8 ? "right" : "center",
             wrapText: true,
           },
           border: {

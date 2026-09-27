@@ -427,6 +427,7 @@ export default function SenderReportPage() {
         groupName: p.groupName || parentReq?.groupName || "-",
         travelersCount: p.travelersCount || parentReq?.travelersCount || parentReq?.travelersList?.length || 1,
         ticketUrl: ticketLink !== "-" ? ticketLink : undefined,
+        flightNumber: p.flightNumber || parentReq?.flightNumber || "-",
         departureDate: p.departureDate || parentReq?.departureDate || parentReq?.travelDate || "-",
         flightDepartureTime: p.flightDepartureTime || parentReq?.flightDepartureTime || "-",
         airportArrivalTime: p.airportArrivalTime || parentReq?.airportArrivalTime || "-",
