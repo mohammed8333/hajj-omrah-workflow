@@ -641,7 +641,124 @@ export function exportTravelReportToExcel(items: TravelReportExportRow[]) {
   // 1. Set Workbook Views for rightToLeft XML sheetView (forces Excel to open RTL)
   (workbook as any).Workbook = { Views: [{ RTL: true }] };
 
-  const data = items.map((item) => {
+  // Helper: parse date to timestamp for chronological sorting
+  const parseDateForSort = (dateStr?: string): number => {
+    if (!dateStr || dateStr === "-" || dateStr.trim() === "") return Number.MAX_SAFE_INTEGER;
+    const clean = dateStr.trim().split("T")[0];
+    const parts = clean.split("-");
+    if (parts.length === 3) {
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      const d = parseInt(parts[2], 10);
+      if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+        return new Date(y, m - 1, d).getTime();
+      }
+    }
+    const parsed = new Date(dateStr).getTime();
+    return isNaN(parsed) ? Number.MAX_SAFE_INTEGER : parsed;
+  };
+
+  // Helper: parse departure time to minutes from midnight (0..1439)
+  const parseTimeToMinutes = (timeStr?: string): number => {
+    if (!timeStr || timeStr === "-" || timeStr.trim() === "") return Number.MAX_SAFE_INTEGER;
+    const clean = timeStr.trim();
+    const match = clean.match(/(\d{1,2}):(\d{2})/);
+    if (match) {
+      let hours = parseInt(match[1], 10);
+      const minutes = parseInt(match[2], 10);
+      if (/pm|م/i.test(clean) && hours < 12) hours += 12;
+      if (/am|ص/i.test(clean) && hours === 12) hours = 0;
+      return hours * 60 + minutes;
+    }
+    return Number.MAX_SAFE_INTEGER;
+  };
+
+  // 2. Group travelers by group to keep them contiguous together
+  interface GroupBucket {
+    groupKey: string;
+    groupId?: string;
+    groupName: string;
+    nusukGroupNumber?: string;
+    departureDate?: string;
+    flightDepartureTime?: string;
+    travelers: TravelReportExportRow[];
+  }
+
+  const groupMap = new Map<string, GroupBucket>();
+  const groupOrder: string[] = [];
+
+  items.forEach((item) => {
+    const key =
+      item.groupId ||
+      `${item.groupName}__${item.nusukGroupNumber || ""}__${item.departureDate || ""}__${item.flightDepartureTime || ""}`;
+    if (!groupMap.has(key)) {
+      groupMap.set(key, {
+        groupKey: key,
+        groupId: item.groupId,
+        groupName: item.groupName,
+        nusukGroupNumber: item.nusukGroupNumber,
+        departureDate: item.departureDate,
+        flightDepartureTime: item.flightDepartureTime,
+        travelers: [],
+      });
+      groupOrder.push(key);
+    }
+    groupMap.get(key)!.travelers.push(item);
+  });
+
+  const groupBuckets = groupOrder.map((k) => groupMap.get(k)!);
+
+  // 3. Chronological sorting: Primary = departureDate (asc), Secondary = flightDepartureTime (asc)
+  groupBuckets.sort((a, b) => {
+    const dateA = parseDateForSort(a.departureDate);
+    const dateB = parseDateForSort(b.departureDate);
+    if (dateA !== dateB) {
+      return dateA - dateB;
+    }
+    const timeA = parseTimeToMinutes(a.flightDepartureTime);
+    const timeB = parseTimeToMinutes(b.flightDepartureTime);
+    if (timeA !== timeB) {
+      return timeA - timeB;
+    }
+    return (a.groupName || "").localeCompare(b.groupName || "", "ar");
+  });
+
+  // 4. Flatten sorted groups into standalone rows with visual color designation
+  interface FlatReportRow {
+    item: TravelReportExportRow;
+    isMultiGroup: boolean;
+    bgColor: string;
+  }
+
+  const flatRows: FlatReportRow[] = [];
+  let singleToggle = false;
+  let multiToggle = false;
+
+  groupBuckets.forEach((bucket) => {
+    const isMulti = bucket.travelers.length > 1 || (bucket.travelers[0]?.travelersCount > 1);
+    let groupBg: string;
+
+    if (isMulti) {
+      // Distinct soft lime/green tone for multi-traveler groups
+      multiToggle = !multiToggle;
+      groupBg = multiToggle ? "ECFCCB" : "D9F99D"; // Soft lime 100 / lime 200
+    } else {
+      // Alternating soft sky-blue / white for single-traveler bookings
+      singleToggle = !singleToggle;
+      groupBg = singleToggle ? "F0F9FF" : "FFFFFF";
+    }
+
+    bucket.travelers.forEach((traveler) => {
+      flatRows.push({
+        item: traveler,
+        isMultiGroup: isMulti,
+        bgColor: groupBg,
+      });
+    });
+  });
+
+  // 5. Generate Excel Sheet Data: Each traveler has their complete row with their data
+  const data = flatRows.map(({ item }) => {
     return {
       "رقم مجموعة نسك": item.nusukGroupNumber || "-",
       "اسم المجموعة": item.groupName || "-",
@@ -673,54 +790,9 @@ export function exportTravelReportToExcel(items: TravelReportExportRow[]) {
   // Set RTL direction for the worksheet
   (ws as any)["!views"] = [{ rightToLeft: true }];
 
-  // Merge identical group cells (Cols 0 to 6)
-  const merges: XLSX.Range[] = [];
-  let i = 0;
-  while (i < items.length) {
-    const current = items[i];
-    const key =
-      current.groupId ||
-      `${current.groupName}_${current.nusukGroupNumber}_${current.departureDate || ""}_${current.flightDepartureTime || ""}`;
-    let j = i + 1;
-    while (j < items.length) {
-      const next = items[j];
-      const nextKey =
-        next.groupId ||
-        `${next.groupName}_${next.nusukGroupNumber}_${next.departureDate || ""}_${next.flightDepartureTime || ""}`;
-      if (nextKey === key) {
-        j++;
-      } else {
-        break;
-      }
-    }
-    const count = j - i;
-    if (count > 1) {
-      const startRow = i + 1; // 1-indexed (row 0 is header)
-      const endRow = j;
-      // Col 0: رقم مجموعة نسك
-      merges.push({ s: { r: startRow, c: 0 }, e: { r: endRow, c: 0 } });
-      // Col 1: اسم المجموعة
-      merges.push({ s: { r: startRow, c: 1 }, e: { r: endRow, c: 1 } });
-      // Col 2: عدد المسافرين
-      merges.push({ s: { r: startRow, c: 2 }, e: { r: endRow, c: 2 } });
-      // Col 3: رابط التذكرة
-      merges.push({ s: { r: startRow, c: 3 }, e: { r: endRow, c: 3 } });
-      // Col 4: تاريخ الذهاب
-      merges.push({ s: { r: startRow, c: 4 }, e: { r: endRow, c: 4 } });
-      // Col 5: وقت إقلاع طائرة الذهاب
-      merges.push({ s: { r: startRow, c: 5 }, e: { r: endRow, c: 5 } });
-      // Col 6: وقت التواجد في المطار
-      merges.push({ s: { r: startRow, c: 6 }, e: { r: endRow, c: 6 } });
-    }
-    i = j;
-  }
-  if (merges.length > 0) {
-    ws["!merges"] = merges;
-  }
-
   // Row heights
   ws["!rows"] = [{ hpt: 30 }];
-  for (let r = 0; r < items.length; r++) {
+  for (let r = 0; r < flatRows.length; r++) {
     ws["!rows"].push({ hpt: 24 });
   }
 
@@ -746,8 +818,10 @@ export function exportTravelReportToExcel(items: TravelReportExportRow[]) {
     }
 
     for (let R = range.s.r + 1; R <= range.e.r; ++R) {
-      const isEven = (R - 1) % 2 === 0;
-      const bgRgb = isEven ? "F0F9FF" : "FFFFFF";
+      const rowIndex = R - 1; // 0-indexed in flatRows
+      const rowMeta = flatRows[rowIndex];
+      const bgRgb = rowMeta ? rowMeta.bgColor : "FFFFFF";
+
       for (let C = range.s.c; C <= range.e.c; ++C) {
         const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
         if (!ws[cellAddress]) {

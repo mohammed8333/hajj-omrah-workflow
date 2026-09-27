@@ -45,6 +45,7 @@ import {
   initialColumnFilters,
   matchesColumnFilters,
 } from "@/components/requests/TableColumnFilters";
+import { getTravelArchiveCategory } from "@/lib/travelArchiveUtils";
 
 // اقتطاع الاسم الثلاثي فقط (3 مقاطع كحد أقصى)
 function getThreePartName(fullName?: string): string {
@@ -508,11 +509,19 @@ ${travelersLines}
       ? requests.filter(isRequestOwnedBySender)
       : requests;
 
-  const countWithNusuk = roleRequests.filter((r) => Boolean(r.nusukGroupNumber)).length;
-  const countWithoutNusuk = roleRequests.length - countWithNusuk;
+  // Categorize role requests into Active, Recent Archive (<=30 days past), and Old Archive (>30 days past)
+  const activeRoleRequests = roleRequests.filter((r) => getTravelArchiveCategory(r) === "ACTIVE");
+  const recentArchivedRequests = roleRequests.filter((r) => getTravelArchiveCategory(r) === "ARCHIVED_RECENT");
+  const oldArchivedRequests = roleRequests.filter((r) => getTravelArchiveCategory(r) === "ARCHIVED_OLD");
 
-  // Precomputed tab counts for all roles
-  const agentInboxCount = roleRequests.filter((r) =>
+  // For Safa and Admin who inspect across all requests:
+  const activeAllRequests = requests.filter((r) => getTravelArchiveCategory(r) === "ACTIVE");
+
+  const countWithNusuk = activeRoleRequests.filter((r) => Boolean(r.nusukGroupNumber)).length;
+  const countWithoutNusuk = activeRoleRequests.length - countWithNusuk;
+
+  // Precomputed tab counts for active tabs (excluding past/archived transactions):
+  const agentInboxCount = activeRoleRequests.filter((r) =>
     [
       "ReadyForSaudiAgent",
       "ReceivedBySaudiAgent",
@@ -524,42 +533,41 @@ ${travelersLines}
       "HostingConfirmed",
     ].includes(r.status)
   ).length;
-  const agentCompletedCount = roleRequests.filter((r) => r.status === "Completed").length;
-  const agentArchivedCount = roleRequests.filter((r) => r.status === "Archived").length;
+  const agentCompletedCount = activeRoleRequests.filter((r) => r.status === "Completed").length;
 
-  const safaNewCount = requests.filter((r) => r.status === "Submitted" || r.status === "Draft").length;
-  const safaReviewCount = requests.filter((r) => r.status === "UnderReview").length;
-  const safaIssuesCount = requests.filter(
+  const safaNewCount = activeAllRequests.filter((r) => r.status === "Submitted" || r.status === "Draft").length;
+  const safaReviewCount = activeAllRequests.filter((r) => r.status === "UnderReview").length;
+  const safaIssuesCount = activeAllRequests.filter(
     (r) =>
       r.status === "CorrectionRequired" ||
       r.status === "MissingDocuments" ||
       r.status === "SaudiAgentCorrectionRequired"
   ).length;
-  const safaReadyAgentCount = requests.filter((r) => r.status === "ReadyForSaudiAgent").length;
-  const safaCompletedCount = requests.filter(
+  const safaReadyAgentCount = activeAllRequests.filter((r) => r.status === "ReadyForSaudiAgent").length;
+  const safaCompletedCount = activeAllRequests.filter(
     (r) =>
       r.status === "Completed" ||
       r.status === "SafaRegistrationCompleted" ||
       r.status === "DocumentsCompleted"
   ).length;
 
-  const senderNewCount = roleRequests.filter((r) => r.status === "Submitted" || r.status === "Draft").length;
-  const senderHostingCount = roleRequests.filter(
+  const senderNewCount = activeRoleRequests.filter((r) => r.status === "Submitted" || r.status === "Draft").length;
+  const senderHostingCount = activeRoleRequests.filter(
     (r) =>
       r.status === "HostingAcceptanceRequested" ||
       r.status === "HostingAcceptedBySender" ||
       r.status === "HostingConfirmed"
   ).length;
-  const senderIssuesCount = roleRequests.filter(
+  const senderIssuesCount = activeRoleRequests.filter(
     (r) =>
       r.status === "CorrectionRequired" ||
       r.status === "MissingDocuments" ||
       r.status === "SaudiAgentCorrectionRequired"
   ).length;
-  const senderCompletedCount = roleRequests.filter((r) => r.status === "Completed").length;
+  const senderCompletedCount = activeRoleRequests.filter((r) => r.status === "Completed").length;
 
-  const adminNewCount = requests.filter((r) => r.status === "Submitted" || r.status === "Draft").length;
-  const adminProcessingCount = requests.filter((r) =>
+  const adminNewCount = activeAllRequests.filter((r) => r.status === "Submitted" || r.status === "Draft").length;
+  const adminProcessingCount = activeAllRequests.filter((r) =>
     [
       "UnderReview",
       "ReadyForSaudiAgent",
@@ -571,16 +579,15 @@ ${travelersLines}
       "HostingConfirmed",
     ].includes(r.status)
   ).length;
-  const adminIssuesCount = requests.filter(
+  const adminIssuesCount = activeAllRequests.filter(
     (r) =>
       r.status === "CorrectionRequired" ||
       r.status === "MissingDocuments" ||
       r.status === "SaudiAgentCorrectionRequired"
   ).length;
-  const adminCompletedCount = requests.filter((r) => r.status === "Completed").length;
-  const adminArchivedCount = requests.filter((r) => r.status === "Archived").length;
+  const adminCompletedCount = activeAllRequests.filter((r) => r.status === "Completed").length;
 
-  const urgentUpcomingRequests = roleRequests.filter((r) => {
+  const urgentUpcomingRequests = activeRoleRequests.filter((r) => {
     if (r.status === "Completed" || r.status === "Archived" || r.status === "Cancelled") return false;
     const depDateStr = r.departureDate || r.travelDate;
     if (!depDateStr) return false;
@@ -601,6 +608,21 @@ ${travelersLines}
 
     // Optional granular status dropdown filter
     if (statusFilter && r.status !== statusFilter) return false;
+
+    const category = getTravelArchiveCategory(r);
+
+    // Two-tier archive system
+    if (activeTab === "ARCHIVED") {
+      return category === "ARCHIVED_RECENT";
+    }
+    if (activeTab === "ARCHIVED_OLD") {
+      return category === "ARCHIVED_OLD";
+    }
+
+    // All active tabs (including "ALL"): only ACTIVE transactions appear
+    if (category !== "ACTIVE") {
+      return false;
+    }
 
     if (activeTab === "ALL") return true;
     if (activeTab === "NEW") return r.status === "Submitted" || r.status === "Draft";
@@ -647,7 +669,6 @@ ${travelersLines}
           (r.status === "SafaRegistrationCompleted" ||
             r.status === "DocumentsCompleted"))
       );
-    if (activeTab === "ARCHIVED") return r.status === "Archived";
 
     return true;
   });
@@ -738,7 +759,7 @@ ${travelersLines}
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
-                الكل ({roleRequests.length})
+                الكل ({activeRoleRequests.length})
               </button>
               <button
                 type="button"
@@ -771,7 +792,18 @@ ${travelersLines}
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
-                مؤرشفة ({agentArchivedCount})
+                الأرشيف ({recentArchivedRequests.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("ARCHIVED_OLD")}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                  activeTab === "ARCHIVED_OLD"
+                    ? "bg-stone-600 text-white shadow-xs"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                الأرشيف القديم ({oldArchivedRequests.length})
               </button>
             </>
           )}
@@ -787,7 +819,7 @@ ${travelersLines}
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
-                الكل ({requests.length})
+                الكل ({activeAllRequests.length})
               </button>
               <button
                 type="button"
@@ -844,6 +876,28 @@ ${travelersLines}
               >
                 مكتملة ({safaCompletedCount})
               </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("ARCHIVED")}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                  activeTab === "ARCHIVED"
+                    ? "bg-purple-600 text-white shadow-xs"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                الأرشيف ({recentArchivedRequests.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("ARCHIVED_OLD")}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                  activeTab === "ARCHIVED_OLD"
+                    ? "bg-stone-600 text-white shadow-xs"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                الأرشيف القديم ({oldArchivedRequests.length})
+              </button>
             </>
           )}
 
@@ -858,7 +912,7 @@ ${travelersLines}
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
-                الكل ({roleRequests.length})
+                الكل ({activeRoleRequests.length})
               </button>
               <button
                 type="button"
@@ -904,6 +958,28 @@ ${travelersLines}
               >
                 المكتملة ({senderCompletedCount})
               </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("ARCHIVED")}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                  activeTab === "ARCHIVED"
+                    ? "bg-purple-600 text-white shadow-xs"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                الأرشيف ({recentArchivedRequests.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("ARCHIVED_OLD")}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                  activeTab === "ARCHIVED_OLD"
+                    ? "bg-stone-600 text-white shadow-xs"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                الأرشيف القديم ({oldArchivedRequests.length})
+              </button>
             </>
           )}
 
@@ -918,7 +994,7 @@ ${travelersLines}
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
-                الكل ({requests.length})
+                الكل ({activeAllRequests.length})
               </button>
               <button
                 type="button"
@@ -995,23 +1071,58 @@ ${travelersLines}
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
-                المؤرشفة ({adminArchivedCount})
+                الأرشيف ({recentArchivedRequests.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("ARCHIVED_OLD")}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                  activeTab === "ARCHIVED_OLD"
+                    ? "bg-stone-600 text-white shadow-xs"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                الأرشيف القديم ({oldArchivedRequests.length})
               </button>
             </>
           )}
 
           {(!role || !["SaudiAgent", "SafaEmployee", "Sender", "Admin"].includes(role)) && (
-            <button
-              type="button"
-              onClick={() => setActiveTab("ALL")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
-                activeTab === "ALL"
-                  ? "bg-sky-600 text-white shadow-xs"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              الكل ({roleRequests.length})
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => setActiveTab("ALL")}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                  activeTab === "ALL"
+                    ? "bg-sky-600 text-white shadow-xs"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                الكل ({activeRoleRequests.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("ARCHIVED")}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                  activeTab === "ARCHIVED"
+                    ? "bg-purple-600 text-white shadow-xs"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                الأرشيف ({recentArchivedRequests.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("ARCHIVED_OLD")}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                  activeTab === "ARCHIVED_OLD"
+                    ? "bg-stone-600 text-white shadow-xs"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                الأرشيف القديم ({oldArchivedRequests.length})
+              </button>
+            </>
           )}
         </div>
 

@@ -31,6 +31,7 @@ import {
   Phone,
   IdCard,
   User,
+  Building2,
 } from "lucide-react";
 import { scanPassportMRZ, translateEnglishNameToArabic } from "@/lib/mrzScanner";
 import { scanHostId } from "@/lib/hostIdScanner";
@@ -162,6 +163,8 @@ export default function UnifiedNewRequestPage() {
   const [airportArrivalTime, setAirportArrivalTime] = useState("");
   const [groupName, setGroupName] = useState("");
   const [isGroupNameCustom, setIsGroupNameCustom] = useState(false);
+  const [affiliation, setAffiliation] = useState("");
+  const [notes, setNotes] = useState("");
   const [flightTicketFile, setFlightTicketFile] = useState<File | null>(null);
   const [isScanningTicket, setIsScanningTicket] = useState(false);
   const [ticketScanSuccess, setTicketScanSuccess] = useState(false);
@@ -618,6 +621,7 @@ export default function UnifiedNewRequestPage() {
       const createdGroup = await api.requests.create({
         groupName: finalGroupName,
         contactPhone,
+        notes: notes.trim() || undefined,
         hasHosting: isHostingActive,
         hostName: isHostingActive && hostName.trim() ? hostName.trim() : undefined,
         hostBirthDate: isHostingActive && hostBirthDate.trim() ? hostBirthDate.trim() : undefined,
@@ -679,8 +683,8 @@ export default function UnifiedNewRequestPage() {
           nationality: t.nationality?.trim() || undefined,
           dateOfBirth: t.dateOfBirth?.trim() || undefined,
           expiryDate: t.expiryDate?.trim() || undefined,
-          affiliation: t.affiliation?.trim() || undefined,
-          notes: t.notes?.trim() || undefined,
+          affiliation: affiliation.trim() || t.affiliation?.trim() || undefined,
+          notes: (t.notes?.trim() || notes.trim()) || undefined,
         });
 
         // Upload Passport
@@ -933,7 +937,37 @@ export default function UnifiedNewRequestPage() {
           )}
         </div>
 
-        {/* خط فاصل أنيق بين الاستضافة والمسافرين */}
+        {/* حقل التبعية / اسم المندوب التابع للمجموعة كاملة (مباشرة تحت اسم المجموعة) */}
+        <div className="bg-purple-50/40 border border-purple-200/80 rounded-2xl p-3 sm:p-3.5 space-y-1.5 transition-all">
+          <label className="text-xs sm:text-sm font-bold text-purple-950 flex items-center gap-1.5">
+            <Building2 className="w-4 h-4 text-purple-600" />
+            <span>التبعية / اسم المندوب:</span>
+          </label>
+          <input
+            type="text"
+            value={affiliation}
+            onChange={(e) => setAffiliation(e.target.value)}
+            placeholder="اكتب اسم المندوب أو العميل التابع له (مثال: أ/ أحمد، شركة النور...)"
+            className="w-full text-xs sm:text-sm py-2.5 px-3 bg-white border border-purple-200 focus:border-purple-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 font-bold text-purple-950 shadow-2xs"
+          />
+        </div>
+
+        {/* حقل الملاحظات التابع للمجموعة كاملة (مباشرة تحت التبعية) */}
+        <div className="bg-gray-50/60 border border-gray-200/80 rounded-2xl p-3 sm:p-3.5 space-y-1.5 transition-all">
+          <label className="text-xs sm:text-sm font-bold text-gray-800 flex items-center gap-1.5">
+            <FileText className="w-4 h-4 text-gray-600" />
+            <span>الملاحظات:</span>
+          </label>
+          <input
+            type="text"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="أي ملاحظات عامة تخص هذه المعاملة والمجموعة (اختياري)..."
+            className="w-full text-xs sm:text-sm py-2.5 px-3 bg-white border border-gray-300 focus:border-sky-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500/20 font-medium text-gray-900 shadow-2xs"
+          />
+        </div>
+
+        {/* خط فاصل أنيق بين بيانات المجموعة والمسافرين */}
         <div className="border-t border-gray-200/80 my-1"></div>
 
         {/* قائمة المسافرين */}
@@ -1147,47 +1181,18 @@ export default function UnifiedNewRequestPage() {
                 </div>
               </div>
 
-              {/* الصف 6: التبعية (المندوب) والملاحظات */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {/* التبعية / اسم المندوب */}
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-[11px] font-bold text-purple-900">
-                      التبعية / اسم المندوب (تابع لمن):
-                    </label>
-                    {travelers.length > 1 && traveler.affiliation?.trim() && (
-                      <button
-                        type="button"
-                        onClick={() => applyAffiliationToAll(traveler.affiliation!)}
-                        className="text-[10px] text-purple-700 hover:text-purple-900 font-bold bg-purple-50 hover:bg-purple-100 px-2 py-0.5 rounded border border-purple-200 transition-colors cursor-pointer"
-                        title="تطبيق نفس التبعية على جميع المسافرين في المعاملة"
-                      >
-                        تطبيق على الكل ⎘
-                      </button>
-                    )}
-                  </div>
-                  <input
-                    type="text"
-                    value={traveler.affiliation || ""}
-                    onChange={(e) => updateTravelerField(traveler.id, "affiliation", e.target.value)}
-                    placeholder="اكتب اسم المندوب أو العميل التابع له (مثال: أ/ أحمد، شركة النور...)"
-                    className="w-full text-xs py-2.5 px-3 bg-purple-50/30 border border-purple-200 focus:border-purple-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 font-bold text-purple-950 shadow-2xs"
-                  />
-                </div>
-
-                {/* ملاحظات المسافر */}
-                <div>
-                  <label className="block text-[11px] font-bold text-gray-700 mb-1">
-                    ملاحظات خاصة بالمعتمر:
-                  </label>
-                  <input
-                    type="text"
-                    value={traveler.notes || ""}
-                    onChange={(e) => updateTravelerField(traveler.id, "notes", e.target.value)}
-                    placeholder="أي ملاحظات تخص هذا المعتمر (اختياري)..."
-                    className="w-full text-xs py-2.5 px-3 bg-white border border-gray-300 focus:border-blue-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 shadow-2xs"
-                  />
-                </div>
+              {/* ملاحظات إضافية تخص هذا المسافر بعينه (اختياري) */}
+              <div>
+                <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                  ملاحظات خاصة بهذا المسافر (اختياري):
+                </label>
+                <input
+                  type="text"
+                  value={traveler.notes || ""}
+                  onChange={(e) => updateTravelerField(traveler.id, "notes", e.target.value)}
+                  placeholder="أي ملاحظات تخص هذا المسافر بعينه (اختياري)..."
+                  className="w-full text-xs py-2.5 px-3 bg-white border border-gray-300 focus:border-blue-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 shadow-2xs"
+                />
               </div>
             </div>
           ))}

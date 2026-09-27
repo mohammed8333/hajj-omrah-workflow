@@ -34,6 +34,7 @@ import {
 } from "@/lib/excelExport";
 import { normalizeArabicText } from "@/lib/searchUtils";
 import { getWhatsAppUrl, normalizePhone, extractEgyptianPhoneNumber } from "@/lib/phoneUtils";
+import { getTravelArchiveCategory } from "@/lib/travelArchiveUtils";
 
 export interface PilgrimReportItem {
   id: string;
@@ -151,6 +152,11 @@ export default function SenderReportPage() {
     const list: PilgrimReportItem[] = [];
 
     requests.forEach((req) => {
+      // Exclude past transactions: only active ones appear in reports and print
+      if (getTravelArchiveCategory(req) !== "ACTIVE") {
+        return;
+      }
+
       const depDate = req.departureDate || req.travelDate;
       const retDate = req.returnDate;
 
