@@ -154,6 +154,7 @@ export interface TravelerSummaryItem {
   id: string;
   fullName: string;
   passportNumber?: string;
+  phoneNumber?: string;
   expiryDate?: string;
   photoUrl?: string;
   affiliation?: string;

@@ -531,6 +531,7 @@ export const supabaseService = {
             id: t.id,
             fullName: t.full_name || "مسافر",
             passportNumber: t.passport_number || undefined,
+            phoneNumber: t.phone_number || undefined,
             photoUrl: photoUrl || undefined,
             affiliation: aff,
             notes: cleanNotes(t.notes),

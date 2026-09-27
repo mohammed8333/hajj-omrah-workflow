@@ -980,6 +980,7 @@ class LocalDatabaseEngine {
           id: t.id,
           fullName: t.fullName || "مسافر",
           passportNumber: t.passportNumber,
+          phoneNumber: t.phoneNumber,
           photoUrl: (photoDoc as any)?.storageUrl || (photoDoc as any)?.fileDataUrl,
           affiliation: t.affiliation,
           notes: t.notes,

@@ -61,6 +61,15 @@ export function isTravelerMatch(t: TravelerSummaryItem, rawTerm: string): boolea
     }
   }
 
+  // Match phone number
+  if (t.phoneNumber) {
+    const cleanPhone = t.phoneNumber.replace(/[^0-9]/g, "");
+    const cleanTermDigits = term.replace(/[^0-9]/g, "");
+    if (t.phoneNumber.includes(term) || (cleanTermDigits.length >= 4 && cleanPhone.includes(cleanTermDigits))) {
+      return true;
+    }
+  }
+
   return false;
 }
 

@@ -615,3 +615,161 @@ export function exportSenderTravelersReportToExcel(
 
   XLSX.writeFile(workbook, fileName);
 }
+
+export interface TravelReportExportRow {
+  groupId?: string;
+  nusukGroupNumber?: string;
+  groupName?: string;
+  travelersCount?: number;
+  departureDate?: string;
+  flightDepartureTime?: string;
+  airportArrivalTime?: string;
+  travelerName: string;
+  travelerPhone?: string;
+}
+
+/**
+ * Exports Travel & Flights Report with 8 columns RTL to Excel:
+ * رقم مجموعة نسك | اسم المجموعة | عدد المسافرين | تاريخ الذهاب | وقت إقلاع طائرة الذهاب | وقت التواجد في المطار | اسم المسافر | رقم المسافر
+ */
+export function exportTravelReportToExcel(items: TravelReportExportRow[]) {
+  const workbook = XLSX.utils.book_new();
+
+  const data = items.map((item) => {
+    return {
+      "رقم مجموعة نسك": item.nusukGroupNumber || "-",
+      "اسم المجموعة": item.groupName || "-",
+      "عدد المسافرين": item.travelersCount || 1,
+      "تاريخ الذهاب": formatArabicDateFriendly(item.departureDate),
+      "وقت إقلاع طائرة الذهاب": item.flightDepartureTime || "-",
+      "وقت التواجد في المطار": item.airportArrivalTime || "-",
+      "اسم المسافر": item.travelerName || "-",
+      "رقم المسافر": item.travelerPhone || "-",
+    };
+  });
+
+  const ws = XLSX.utils.json_to_sheet(data);
+
+  // Column widths (8 columns)
+  ws["!cols"] = [
+    { wch: 18 }, // رقم مجموعة نسك
+    { wch: 28 }, // اسم المجموعة
+    { wch: 14 }, // عدد المسافرين
+    { wch: 18 }, // تاريخ الذهاب
+    { wch: 22 }, // وقت إقلاع طائرة الذهاب
+    { wch: 22 }, // وقت التواجد في المطار
+    { wch: 30 }, // اسم المسافر
+    { wch: 20 }, // رقم المسافر
+  ];
+
+  // Set RTL direction
+  (ws as any)["!views"] = [{ rightToLeft: true }];
+
+  // Merge identical group cells (Cols 0 to 5)
+  const merges: XLSX.Range[] = [];
+  let i = 0;
+  while (i < items.length) {
+    const current = items[i];
+    const key = current.groupId || `${current.groupName}_${current.nusukGroupNumber || ""}_${current.departureDate || ""}_${current.flightDepartureTime || ""}`;
+    let j = i + 1;
+    while (j < items.length) {
+      const next = items[j];
+      const nextKey = next.groupId || `${next.groupName}_${next.nusukGroupNumber || ""}_${next.departureDate || ""}_${next.flightDepartureTime || ""}`;
+      if (nextKey === key) {
+        j++;
+      } else {
+        break;
+      }
+    }
+    const count = j - i;
+    if (count > 1) {
+      const startRow = i + 1; // 1-indexed (row 0 is header)
+      const endRow = j;
+      // Col 0: رقم مجموعة نسك
+      merges.push({ s: { r: startRow, c: 0 }, e: { r: endRow, c: 0 } });
+      // Col 1: اسم المجموعة
+      merges.push({ s: { r: startRow, c: 1 }, e: { r: endRow, c: 1 } });
+      // Col 2: عدد المسافرين
+      merges.push({ s: { r: startRow, c: 2 }, e: { r: endRow, c: 2 } });
+      // Col 3: تاريخ الذهاب
+      merges.push({ s: { r: startRow, c: 3 }, e: { r: endRow, c: 3 } });
+      // Col 4: وقت إقلاع طائرة الذهاب
+      merges.push({ s: { r: startRow, c: 4 }, e: { r: endRow, c: 4 } });
+      // Col 5: وقت التواجد في المطار
+      merges.push({ s: { r: startRow, c: 5 }, e: { r: endRow, c: 5 } });
+    }
+    i = j;
+  }
+  if (merges.length > 0) {
+    ws["!merges"] = merges;
+  }
+
+  // Row heights
+  ws["!rows"] = [{ hpt: 30 }];
+  for (let r = 0; r < items.length; r++) {
+    ws["!rows"].push({ hpt: 24 });
+  }
+
+  // Style header and cells
+  if (ws["!ref"]) {
+    const range = XLSX.utils.decode_range(ws["!ref"]);
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+      const headerAddress = XLSX.utils.encode_cell({ r: range.s.r, c: C });
+      const cell = ws[headerAddress];
+      if (cell) {
+        cell.s = {
+          fill: { patternType: "solid", fgColor: { rgb: "0369A1" } }, // Rich Sky 700
+          font: { name: "Calibri", sz: 11, bold: true, color: { rgb: "FFFFFF" } },
+          alignment: { vertical: "center", horizontal: "center", wrapText: true },
+          border: {
+            top: { style: "thin", color: { rgb: "075985" } },
+            bottom: { style: "medium", color: { rgb: "075985" } },
+            left: { style: "thin", color: { rgb: "075985" } },
+            right: { style: "thin", color: { rgb: "075985" } },
+          },
+        };
+      }
+    }
+
+    for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+      const isEven = (R - 1) % 2 === 0;
+      const bgRgb = isEven ? "F0F9FF" : "FFFFFF";
+      for (let C = range.s.c; C <= range.e.c; ++C) {
+        const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+        if (!ws[cellAddress]) {
+          ws[cellAddress] = { t: "s", v: "" };
+        }
+        const cell = ws[cellAddress];
+        cell.s = {
+          fill: { patternType: "solid", fgColor: { rgb: bgRgb } },
+          font: {
+            name: "Calibri",
+            sz: 10,
+            bold: C === 0 || C === 6,
+            color: { rgb: "0F172A" },
+          },
+          alignment: {
+            vertical: "center",
+            horizontal: C === 1 || C === 6 ? "right" : "center",
+            wrapText: true,
+          },
+          border: {
+            top: { style: "thin", color: { rgb: "CBD5E1" } },
+            bottom: { style: "thin", color: { rgb: "CBD5E1" } },
+            left: { style: "thin", color: { rgb: "CBD5E1" } },
+            right: { style: "thin", color: { rgb: "CBD5E1" } },
+          },
+        };
+      }
+    }
+  }
+
+  const sheetTitle = "تقارير السفر";
+  XLSX.utils.book_append_sheet(workbook, ws, sheetTitle);
+
+  const dateStr = new Date().toISOString().split("T")[0];
+  const fileName = `تقرير_السفر_ورحلات_الطيران_${dateStr}.xlsx`;
+
+  XLSX.writeFile(workbook, fileName);
+}
+

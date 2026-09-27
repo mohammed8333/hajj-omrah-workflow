@@ -23,9 +23,15 @@ import {
   AlertCircle,
   Hash,
   Share2,
+  Plane,
 } from "lucide-react";
 import Link from "next/link";
-import { exportSenderTravelersReportToExcel, SenderReportExportRow } from "@/lib/excelExport";
+import {
+  exportSenderTravelersReportToExcel,
+  SenderReportExportRow,
+  exportTravelReportToExcel,
+  TravelReportExportRow,
+} from "@/lib/excelExport";
 import { normalizeArabicText } from "@/lib/searchUtils";
 import { getWhatsAppUrl, normalizePhone } from "@/lib/phoneUtils";
 
@@ -46,6 +52,9 @@ export interface PilgrimReportItem {
   senderName?: string;
   airline?: string;
   flightNumber?: string;
+  flightDepartureTime?: string;
+  airportArrivalTime?: string;
+  travelersCount?: number;
 }
 
 const ARABIC_MONTHS: Record<number, string> = {
@@ -145,13 +154,15 @@ export default function SenderReportPage() {
       const depDate = req.departureDate || req.travelDate;
       const retDate = req.returnDate;
 
+      const totalCount = req.travelersCount || (req.travelersList && req.travelersList.length > 0 ? req.travelersList.length : 1);
+
       if (req.travelersList && req.travelersList.length > 0) {
         req.travelersList.forEach((t) => {
           list.push({
             id: t.id,
             fullName: t.fullName || "معتمر بدون اسم",
             passportNumber: t.passportNumber,
-            phoneNumber: undefined, // traveler summary might have phone in detailed view
+            phoneNumber: t.phoneNumber || req.contactPhone,
             affiliation: t.affiliation?.trim() || undefined,
             notes: t.notes?.trim() || undefined,
             groupRequestId: req.id,
@@ -164,6 +175,9 @@ export default function SenderReportPage() {
             senderName: req.senderName,
             airline: req.airline,
             flightNumber: req.flightNumber,
+            flightDepartureTime: req.flightDepartureTime,
+            airportArrivalTime: req.airportArrivalTime,
+            travelersCount: totalCount,
           });
         });
       } else {
@@ -187,6 +201,9 @@ export default function SenderReportPage() {
             senderName: req.senderName,
             airline: req.airline,
             flightNumber: req.flightNumber,
+            flightDepartureTime: req.flightDepartureTime,
+            airportArrivalTime: req.airportArrivalTime,
+            travelersCount: count,
           });
         }
       }
@@ -330,6 +347,26 @@ export default function SenderReportPage() {
     exportSenderTravelersReportToExcel(exportRows, filterName);
   };
 
+  // Handle Travel Report Export (Admin only)
+  const handleExportTravelReport = () => {
+    const exportRows: TravelReportExportRow[] = filteredPilgrims.map((p) => {
+      const parentReq = requests.find((r) => r.id === p.groupRequestId);
+      return {
+        groupId: p.groupRequestId,
+        nusukGroupNumber: p.nusukGroupNumber || parentReq?.nusukGroupNumber || "-",
+        groupName: p.groupName || parentReq?.groupName || "-",
+        travelersCount: p.travelersCount || parentReq?.travelersCount || parentReq?.travelersList?.length || 1,
+        departureDate: p.departureDate || parentReq?.departureDate || parentReq?.travelDate || "-",
+        flightDepartureTime: p.flightDepartureTime || parentReq?.flightDepartureTime || "-",
+        airportArrivalTime: p.airportArrivalTime || parentReq?.airportArrivalTime || "-",
+        travelerName: p.fullName || "-",
+        travelerPhone: p.phoneNumber || parentReq?.contactPhone || p.passportNumber || "-",
+      };
+    });
+
+    exportTravelReportToExcel(exportRows);
+  };
+
   // Handle Print
   const handlePrint = () => {
     window.print();
@@ -417,6 +454,20 @@ export default function SenderReportPage() {
             <FileSpreadsheet className="w-4 h-4" />
             <span>تصدير إكسيل ({filteredPilgrims.length})</span>
           </button>
+
+          {/* Travel Report Export Button (Admin Only) */}
+          {role === "Admin" && (
+            <button
+              type="button"
+              onClick={handleExportTravelReport}
+              disabled={loading || filteredPilgrims.length === 0}
+              className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 bg-sky-700 hover:bg-sky-800 text-white font-bold px-4 py-2.5 rounded-xl shadow-xs text-xs sm:text-sm transition-all disabled:opacity-50 cursor-pointer"
+              title="تصدير شيت إكسيل تقارير السفر بتوقيتات إقلاع الطيران وتواجد المطار وأرقام المسافرين"
+            >
+              <Plane className="w-4 h-4" />
+              <span>تقارير السفر</span>
+            </button>
+          )}
 
           {/* Print Orientation Selector */}
           <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl text-xs font-bold text-gray-700">
