@@ -14,6 +14,7 @@ import {
   X,
   Plane,
   FileSpreadsheet,
+  PhoneCall,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -60,6 +61,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       href: "/admin/audit-logs",
       label: "سجل التدقيق والأمان",
       icon: ShieldAlert,
+      roles: ["Admin"],
+    },
+    {
+      href: "/admin/whatsapp-fetcher",
+      label: "جلب أرقام الواتساب",
+      icon: PhoneCall,
       roles: ["Admin"],
     },
     {
