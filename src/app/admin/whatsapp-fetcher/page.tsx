@@ -88,6 +88,7 @@ export default function WhatsAppPhoneFetcherPage() {
     online: boolean;
     connected: boolean;
     hasQr: boolean;
+    qrImage?: string | null;
     groupsCount: number;
   } | null>(null);
   const [checkingBridge, setCheckingBridge] = useState(false);
@@ -162,6 +163,7 @@ export default function WhatsAppPhoneFetcherPage() {
           online: true,
           connected: Boolean(data.connected),
           hasQr: Boolean(data.hasQr),
+          qrImage: data.qrImage || null,
           groupsCount: Number(data.groupsCount || 0),
         });
 
@@ -173,6 +175,30 @@ export default function WhatsAppPhoneFetcherPage() {
       }
     } catch {
       setBridgeStatus({ online: false, connected: false, hasQr: false, groupsCount: 0 });
+    } finally {
+      setCheckingBridge(false);
+    }
+  };
+
+  // Reset session and generate fresh QR
+  const handleResetSession = async () => {
+    try {
+      setCheckingBridge(true);
+      const res = await fetch(`${BRIDGE_URL}/reset-session`, { method: "POST" });
+      if (res.ok) {
+        await alert({
+          title: "تمت إعادة الضبط",
+          message: "تم مسح الجلسة القديمة، وسيتم توليد كود QR جديد للمسح خلال ثوانٍ.",
+          variant: "success",
+        });
+        setTimeout(checkBridge, 1000);
+      }
+    } catch {
+      await alert({
+        title: "خطأ",
+        message: "تعذر الاتصال بالخادم لإعادة ضبط الجلسة.",
+        variant: "danger",
+      });
     } finally {
       setCheckingBridge(false);
     }
@@ -196,10 +222,17 @@ export default function WhatsAppPhoneFetcherPage() {
     loadRequests();
     checkBridge();
 
+    // Auto poll bridge status every 3 seconds while on this page
+    const interval = setInterval(() => {
+      checkBridge();
+    }, 3000);
+
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem(STORAGE_KEY_GROUP);
       if (saved) setSelectedGroup(saved);
     }
+
+    return () => clearInterval(interval);
   }, []);
 
   const handleGroupChange = (val: string) => {
@@ -734,6 +767,47 @@ export default function WhatsAppPhoneFetcherPage() {
             </span>
           )}
         </div>
+
+        {/* QR Code Presentation Box (When not connected & QR available) */}
+        {!bridgeStatus?.connected && bridgeStatus?.online && (
+          <div className="flex flex-col sm:flex-row items-center gap-5 p-4 bg-amber-50/70 border border-amber-200 rounded-xl">
+            {bridgeStatus.qrImage ? (
+              <div className="bg-white p-2 rounded-xl shadow-xs border border-amber-200 shrink-0">
+                <img
+                  src={bridgeStatus.qrImage}
+                  alt="WhatsApp QR Code"
+                  className="w-44 h-44 object-contain"
+                />
+              </div>
+            ) : (
+              <div className="w-44 h-44 bg-white rounded-xl border border-dashed border-amber-300 flex flex-col items-center justify-center p-3 text-center shrink-0">
+                <RefreshCw className="w-6 h-6 text-amber-600 animate-spin mb-2" />
+                <span className="text-[11px] text-amber-800 font-bold">جاري توليد كود QR جديد...</span>
+              </div>
+            )}
+            <div className="space-y-2">
+              <h4 className="font-bold text-sm text-amber-950 flex items-center gap-1.5">
+                <span>📲 امسح كود QR من تطبيق الواتساب بهاتفك للربط:</span>
+              </h4>
+              <ol className="text-xs text-amber-900 list-decimal list-inside space-y-1 leading-relaxed">
+                <li>افتح تطبيق <strong>الواتساب</strong> على هاتفك المحمول.</li>
+                <li>انتقل إلى <strong>الإعدادات (Settings)</strong> ثم اختر <strong>الأجهزة المرتبطة (Linked Devices)</strong>.</li>
+                <li>انقر على <strong>ربط جهاز (Link a Device)</strong> ووجّه الكاميرا نحو كود QR الظاهر هنا.</li>
+              </ol>
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleResetSession}
+                  disabled={checkingBridge}
+                  className="text-xs font-bold text-amber-900 bg-white hover:bg-amber-100 px-3 py-1.5 rounded-lg border border-amber-300 transition-colors cursor-pointer shadow-2xs inline-flex items-center gap-1"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${checkingBridge ? "animate-spin" : ""}`} />
+                  <span>توليد كود QR جديد / إعادة ضبط الجلسة 🔄</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Group Selection and Scan Controls */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">

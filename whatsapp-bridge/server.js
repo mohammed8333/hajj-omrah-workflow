@@ -3,6 +3,7 @@ const cors = require("cors");
 const path = require("path");
 const fs = require("fs");
 const qrcode = require("qrcode-terminal");
+const QRCode = require("qrcode");
 const pino = require("pino");
 
 const {
@@ -24,7 +25,47 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 let sock = null;
 let isConnected = false;
 let currentQr = null;
+let currentQrDataUrl = null;
 let cachedGroups = [];
+
+const AUTH_DIR = path.join(__dirname, "auth_info");
+if (!fs.existsSync(AUTH_DIR)) {
+  fs.mkdirSync(AUTH_DIR, { recursive: true });
+}
+
+function clearAuthDir() {
+  try {
+    if (fs.existsSync(AUTH_DIR)) {
+      const files = fs.readdirSync(AUTH_DIR);
+      for (const file of files) {
+        try {
+          fs.unlinkSync(path.join(AUTH_DIR, file));
+        } catch {}
+      }
+      console.log("🧹 تم مسح ملفات الجلسة القديمة بنجاح.");
+    }
+  } catch (e) {
+    console.warn("تعذر مسح مجلد الجلسة:", e.message);
+  }
+}
+
+// Utility delay
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Helper: parse Base64 data URL
+function parseBase64Data(dataUrl) {
+  if (!dataUrl) return null;
+  if (!dataUrl.includes(";base64,")) {
+    return {
+      buffer: Buffer.from(dataUrl, "base64"),
+      mimetype: "application/octet-stream",
+    };
+  }
+  const parts = dataUrl.split(";base64,");
+  const mimetype = parts[0].replace("data:", "");
+  const buffer = Buffer.from(parts[1], "base64");
+  return { buffer, mimetype };
+}
 
 // Group Messages Store (in memory, up to 300 messages per group)
 const groupMessageStore = new Map();
@@ -49,29 +90,6 @@ function storeGroupMessage(msg) {
   }
 }
 
-const AUTH_DIR = path.join(__dirname, "auth_info");
-if (!fs.existsSync(AUTH_DIR)) {
-  fs.mkdirSync(AUTH_DIR, { recursive: true });
-}
-
-// Utility delay
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-// Helper: parse Base64 data URL
-function parseBase64Data(dataUrl) {
-  if (!dataUrl) return null;
-  if (!dataUrl.includes(";base64,")) {
-    return {
-      buffer: Buffer.from(dataUrl, "base64"),
-      mimetype: "application/octet-stream",
-    };
-  }
-  const parts = dataUrl.split(";base64,");
-  const mimetype = parts[0].replace("data:", "");
-  const buffer = Buffer.from(parts[1], "base64");
-  return { buffer, mimetype };
-}
-
 // Initialize WhatsApp Socket
 async function startWhatsAppSocket() {
   try {
@@ -94,26 +112,32 @@ async function startWhatsAppSocket() {
       if (qr) {
         currentQr = qr;
         isConnected = false;
+        try {
+          currentQrDataUrl = await QRCode.toDataURL(qr);
+        } catch (err) {}
         console.log("\n=======================================================");
         console.log("📲 امسح كود QR التالي من تطبيق الواتساب للربط:");
         console.log("=======================================================\n");
         qrcode.generate(qr, { small: true });
-        console.log("\n(أو افتح http://localhost:5055/status لمعاينة الحالة)\n");
+        console.log("\n(أو افتح شاشة الأدمن لمعاينة كود QR)\n");
       }
 
       if (connection === "close") {
         isConnected = false;
         const statusCode = lastDisconnect?.error?.output?.statusCode;
-        const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-        console.log(`⚠️ اتصال الواتساب أُغلق (الرمز: ${statusCode}). إعادة الاتصال: ${shouldReconnect}`);
-        if (shouldReconnect) {
-          setTimeout(startWhatsAppSocket, 3000);
+        const isLoggedOut = statusCode === DisconnectReason.loggedOut || statusCode === 401;
+        console.log(`⚠️ اتصال الواتساب أُغلق (الرمز: ${statusCode}). تسجيل خروج: ${isLoggedOut}`);
+        if (isLoggedOut) {
+          console.log("🔄 تم تسجيل الخروج. جاري مسح الجلسة القديمة والبدء بكود QR جديد...");
+          clearAuthDir();
+          setTimeout(startWhatsAppSocket, 1500);
         } else {
-          console.log("❌ تم تسجيل الخروج من الواتساب. يرجى إعادة التشغيل لمسح كود QR جديد.");
+          setTimeout(startWhatsAppSocket, 3000);
         }
       } else if (connection === "open") {
         isConnected = true;
         currentQr = null;
+        currentQrDataUrl = null;
         console.log("\n✅ تم الاتصال بحساب الواتساب بنجاح! خادم الإرسال جاهز للعمل.");
         try {
           await refreshGroups();
@@ -215,9 +239,31 @@ app.get("/status", async (req, res) => {
     connected: isConnected,
     hasQr: Boolean(currentQr),
     qrRaw: currentQr,
+    qrImage: currentQrDataUrl,
     groupsCount: cachedGroups.length,
     timestamp: new Date().toISOString(),
   });
+});
+
+// Reset session & clear auth
+app.post("/reset-session", async (req, res) => {
+  try {
+    console.log("🔄 طلب إعادة ضبط جلسة الواتساب ومسح المفاتيح القديمة...");
+    isConnected = false;
+    currentQr = null;
+    currentQrDataUrl = null;
+    if (sock) {
+      try {
+        sock.end();
+      } catch (err) {}
+      sock = null;
+    }
+    clearAuthDir();
+    setTimeout(startWhatsAppSocket, 1000);
+    res.json({ success: true, message: "تمت إعادة ضبط الجلسة، جاري توليد كود QR جديد" });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // 2. Groups List
