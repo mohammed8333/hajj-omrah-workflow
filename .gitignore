@@ -9,3 +9,4 @@ yarn-error.log*
 *.traineddata
 auth_info/
 whatsapp-bridge/auth_info/
+whatsapp-bridge/group_messages_store.json

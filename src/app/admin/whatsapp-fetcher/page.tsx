@@ -215,16 +215,23 @@ export default function WhatsAppPhoneFetcherPage() {
 
       if (res.ok) {
         const data = await res.json();
+        const isConn = Boolean(data.connected);
         setBridgeStatus({
           online: true,
-          connected: Boolean(data.connected),
+          connected: isConn,
           hasQr: Boolean(data.hasQr),
           qrImage: data.qrImage || null,
           groupsCount: Number(data.groupsCount || 0),
         });
 
-        if (data.connected) {
-          fetchGroups();
+        // Only fetch groups once if connected and not yet loaded!
+        if (isConn) {
+          setAvailableGroups((prev) => {
+            if (prev.length === 0) {
+              fetchGroups(false);
+            }
+            return prev;
+          });
         }
       } else {
         setBridgeStatus({ online: false, connected: false, hasQr: false, groupsCount: 0 });
@@ -238,13 +245,24 @@ export default function WhatsAppPhoneFetcherPage() {
 
   // Reset session and generate fresh QR
   const handleResetSession = async () => {
+    const ok = await confirm({
+      title: "تأكيد إعادة ضبط جلسة الواتساب",
+      message: "سيتم مسح الجلسة وتوليد كود QR جديد لمسحه بالهاتف. هذا الإجراء يحل أي أخطاء في فك التشفير (Bad MAC) أو مشاكل الاتصال.\n\nهل ترغب في المتابعة؟",
+      confirmText: "نعم، أعد ضبط الجلسة 🔄",
+      cancelText: "إلغاء",
+      variant: "warning",
+    });
+    if (!ok) return;
+
     try {
       setCheckingBridge(true);
       const res = await fetch(`${BRIDGE_URL}/reset-session`, { method: "POST" });
       if (res.ok) {
+        setAvailableGroups([]);
+        setSelectedGroup("");
         await alert({
-          title: "تمت إعادة الضبط",
-          message: "تم مسح الجلسة القديمة، وسيتم توليد كود QR جديد للمسح خلال ثوانٍ.",
+          title: "تمت إعادة الضبط بنجاح",
+          message: "تم مسح الجلسة القديمة، وسيتم توليد كود QR جديد للمسح بالهاتف خلال ثوانٍ.",
           variant: "success",
         });
         setTimeout(checkBridge, 1000);
@@ -260,9 +278,9 @@ export default function WhatsAppPhoneFetcherPage() {
     }
   };
 
-  const fetchGroups = async () => {
+  const fetchGroups = async (force = false) => {
     try {
-      const res = await fetch(`${BRIDGE_URL}/groups`);
+      const res = await fetch(`${BRIDGE_URL}/groups${force ? "?force=true" : ""}`);
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data.groups)) {
@@ -278,10 +296,10 @@ export default function WhatsAppPhoneFetcherPage() {
     loadRequests();
     checkBridge();
 
-    // Auto poll bridge status every 3 seconds while on this page
+    // Auto poll bridge status every 5 seconds while on this page
     const interval = setInterval(() => {
       checkBridge();
-    }, 3000);
+    }, 5000);
 
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem(STORAGE_KEY_GROUP);
@@ -885,6 +903,7 @@ export default function WhatsAppPhoneFetcherPage() {
             type="button"
             onClick={() => {
               checkBridge();
+              fetchGroups(true);
               loadRequests();
             }}
             disabled={checkingBridge || loadingRequests}
@@ -935,9 +954,19 @@ export default function WhatsAppPhoneFetcherPage() {
           </div>
 
           {bridgeStatus?.connected && (
-            <span className="text-xs text-gray-500 font-medium bg-white px-2.5 py-1 rounded-lg border border-gray-200">
-              عدد الجروبات المتاحة: <strong className="text-gray-900">{availableGroups.length || bridgeStatus.groupsCount}</strong>
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500 font-medium bg-white px-2.5 py-1 rounded-lg border border-gray-200">
+                عدد الجروبات المتاحة: <strong className="text-gray-900">{availableGroups.length || bridgeStatus.groupsCount}</strong>
+              </span>
+              <button
+                type="button"
+                onClick={handleResetSession}
+                className="text-[11px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded-lg border border-rose-200 transition-colors cursor-pointer shadow-2xs"
+                title="إعادة ضبط الجلسة وتوليد QR جديد لحل أخطاء فك التشفير (Bad MAC)"
+              >
+                إعادة ربط الواتساب 🔄
+              </button>
+            </div>
           )}
         </div>
 

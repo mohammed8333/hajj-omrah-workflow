@@ -142,8 +142,8 @@ async function startWhatsAppSocket() {
       printQRInTerminal: false,
       auth: state,
       browser: ["HajjOmrahWorkflow", "Chrome", "1.0.0"],
-      syncFullHistory: true,
-      shouldSyncHistoryMessage: () => true,
+      syncFullHistory: false,
+      markOnlineOnConnect: false,
       getMessage: async (key) => {
         if (!key?.remoteJid) return undefined;
         const list = groupMessageStore.get(key.remoteJid) || [];
@@ -219,9 +219,20 @@ async function startWhatsAppSocket() {
   }
 }
 
+let lastGroupsFetchTime = 0;
+const GROUPS_CACHE_TTL = 120000; // 2 minutes cache to prevent rate-overlimit
+
 // Fetch list of groups
-async function refreshGroups() {
-  if (!sock || !isConnected) return [];
+async function refreshGroups(force = false) {
+  if (!sock || !isConnected) return cachedGroups;
+  const now = Date.now();
+  if (!force && cachedGroups.length > 0 && now - lastGroupsFetchTime < GROUPS_CACHE_TTL) {
+    return cachedGroups.map((g) => ({
+      ...g,
+      storedMessagesCount: (groupMessageStore.get(g.id) || []).length,
+    }));
+  }
+
   try {
     const groups = await sock.groupFetchAllParticipating();
     cachedGroups = Object.values(groups).map((g) => ({
@@ -230,10 +241,18 @@ async function refreshGroups() {
       participantsCount: g.participants?.length || 0,
       storedMessagesCount: (groupMessageStore.get(g.id) || []).length,
     }));
+    lastGroupsFetchTime = now;
     return cachedGroups;
   } catch (e) {
-    console.warn("تعذر جلب المجموعات:", e?.message);
-    return cachedGroups;
+    if (e?.message?.includes("rate-overlimit")) {
+      console.warn("⚠️ تم الوصول للحد المؤقت لاستعلام المجموعات من واتساب، تم استخدام النسخة المحفوظة.");
+    } else {
+      console.warn("تعذر جلب المجموعات:", e?.message);
+    }
+    return cachedGroups.map((g) => ({
+      ...g,
+      storedMessagesCount: (groupMessageStore.get(g.id) || []).length,
+    }));
   }
 }
 
@@ -321,7 +340,8 @@ app.get("/groups", async (req, res) => {
   if (!isConnected) {
     return res.status(400).json({ error: "الواتساب غير متصل حالياً" });
   }
-  const groups = await refreshGroups();
+  const force = req.query.force === "true";
+  const groups = await refreshGroups(force);
   res.json({ groups });
 });
 
