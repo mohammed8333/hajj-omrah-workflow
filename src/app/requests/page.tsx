@@ -39,11 +39,13 @@ import { getWhatsAppUrl } from "@/lib/phoneUtils";
 import { WhatsAppModal } from "@/components/ui/WhatsAppModal";
 import { matchesRequestSearch, getMatchingTravelers, isTravelerMatch } from "@/lib/searchUtils";
 import {
-  TableColumnFiltersRow,
-  TableColumnFiltersToggle,
+  HeaderColumnFilter,
   TableColumnFiltersState,
   initialColumnFilters,
   matchesColumnFilters,
+  SAUDI_AGENT_STATUS_OPTIONS,
+  DEFAULT_STATUS_OPTIONS,
+  HOSTING_OPTIONS,
 } from "@/components/requests/TableColumnFilters";
 import { getTravelArchiveCategory } from "@/lib/travelArchiveUtils";
 
@@ -187,16 +189,19 @@ export default function RequestsListPage() {
     loading: false,
   });
 
-  // Admin Interactive Column Filters
+  // Interactive Column Filters
   const [colFilters, setColFilters] = useState<TableColumnFiltersState>(initialColumnFilters);
-  const [showColFilters, setShowColFilters] = useState<boolean>(true);
 
   const handleColFilterChange = (key: keyof TableColumnFiltersState, val: string) => {
     setColFilters((prev) => ({ ...prev, [key]: val }));
+    if (key === "status") {
+      setStatusFilter(val);
+    }
   };
 
   const resetColFilters = () => {
     setColFilters(initialColumnFilters);
+    setStatusFilter("");
   };
 
   const distinctSenders = React.useMemo(() => {
@@ -600,8 +605,8 @@ ${travelersLines}
   const filtered = roleRequests.filter((r) => {
     if (!matchesRequestSearch(r, search)) return false;
 
-    // Admin Column Filters
-    if (role === "Admin" && !matchesColumnFilters(r, colFilters)) return false;
+    // Interactive Column Filters
+    if (!matchesColumnFilters(r, colFilters)) return false;
 
     if (nusukFilter === "WITH_NUSUK" && !r.nusukGroupNumber) return false;
     if (nusukFilter === "WITHOUT_NUSUK" && r.nusukGroupNumber) return false;
@@ -1148,65 +1153,10 @@ ${travelersLines}
             )}
           </div>
 
-          {/* Status Filter Dropdown */}
-          <div className="flex items-center gap-2 shrink-0">
-            <Filter className="w-4 h-4 text-gray-400 shrink-0" />
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full sm:w-48 px-3 py-2.5 text-xs rounded-xl border border-gray-300 focus:outline-hidden focus:ring-1 focus:ring-sky-500 bg-white cursor-pointer"
-            >
-              {role === "SaudiAgent" ? (
-                <>
-                  <option value="">الكل (جميع الحالات)</option>
-                  <option value="ReadyForSaudiAgent">جديد محال من صفا</option>
-                  <option value="ReceivedBySaudiAgent">مستلم من الوكيل</option>
-                  <option value="SaudiAgentProcessing">قيد المعالجة</option>
-                  <option value="ProgramLinked">تم ربط البرنامج</option>
-                  <option value="HostingAcceptanceRequested">بانتظار قبول الاستضافة</option>
-                  <option value="HostingAcceptedBySender">تم قبول الاستضافة</option>
-                  <option value="HostingConfirmed">تم تأكيد الاستضافة</option>
-                  <option value="SaudiAgentCorrectionRequired">مطلوب تصحيح</option>
-                  <option value="Completed">(تم) - مكتمل</option>
-                  <option value="Archived">معاملات مؤرشفة</option>
-                </>
-              ) : (
-                <>
-                  <option value="">الكل (جميع الحالات)</option>
-                  <option value="Draft">مسودة</option>
-                  <option value="Submitted">تم التقديم</option>
-                  <option value="UnderReview">قيد المراجعة</option>
-                  <option value="MissingDocuments">مستندات ناقصة</option>
-                  <option value="CorrectionRequired">مطلوب تصحيح</option>
-                  <option value="DocumentsCompleted">المستندات مكتملة</option>
-                  <option value="SafaRegistrationCompleted">اكتمل تسجيل صفا</option>
-                  <option value="ReadyForSaudiAgent">جاهز للوكيل السعودي</option>
-                  <option value="ReceivedBySaudiAgent">مستلم من الوكيل</option>
-                  <option value="ProgramLinked">تم ربط البرنامج</option>
-                  <option value="HostingAcceptanceRequested">بانتظار قبول الاستضافة</option>
-                  <option value="HostingAcceptedBySender">تم قبول الاستضافة</option>
-                  <option value="HostingConfirmed">تم تأكيد الاستضافة</option>
-                  <option value="SaudiAgentProcessing">قيد المعالجة</option>
-                  <option value="Completed">(تم) - مكتمل</option>
-                  <option value="Cancelled">ملغي</option>
-                  <option value="Archived">معاملات مؤرشفة</option>
-                </>
-              )}
-            </select>
-          </div>
-
-          {role === "Admin" && (
-            <TableColumnFiltersToggle
-              role={role}
-              isOpen={showColFilters}
-              onToggle={() => setShowColFilters(!showColFilters)}
-              activeCount={activeColFiltersCount}
-            />
-          )}
         </div>
 
-        {/* Active Column Filters Banner (Admin only) */}
-        {role === "Admin" && activeColFiltersCount > 0 && (
+        {/* Active Column Filters Banner */}
+        {activeColFiltersCount > 0 && (
           <div className="flex items-center justify-between gap-2 p-2.5 bg-sky-50 border border-sky-200 rounded-xl text-xs text-sky-900">
             <div className="flex items-center gap-2 font-bold">
               <Filter className="w-4 h-4 text-sky-600" />
@@ -1278,12 +1228,13 @@ ${travelersLines}
           <p className="text-xs text-gray-500 mt-1">
             لم نجد معاملات مطابقة لمعايير البحث أو رقم نسك الحالي.
           </p>
-          {(search || statusFilter || nusukFilter !== "ALL") && (
+          {(search || statusFilter || nusukFilter !== "ALL" || activeColFiltersCount > 0) && (
             <button
               onClick={() => {
                 setSearch("");
                 setStatusFilter("");
                 setNusukFilter("ALL");
+                resetColFilters();
               }}
               className="mt-4 text-xs font-bold text-sky-600 hover:text-sky-800 bg-sky-50 px-3 py-1.5 rounded-lg cursor-pointer inline-block"
             >
@@ -1912,55 +1863,147 @@ ${travelersLines}
 
           {/* Desktop Table View (صفحات الكمبيوتر) */}
           <div className="hidden md:block bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto min-h-[360px]">
               <table className="w-full text-right text-xs border-collapse">
                 <thead className="bg-gray-50/90 border-b border-gray-200 text-gray-700 font-bold">
                   <tr>
-                    <th className="py-3 px-3">رقم مجموعة نسك</th>
-                    <th className="py-3 px-2 text-center">الحالة</th>
+                    {/* 1. رقم مجموعة نسك */}
+                    <th className="py-3 px-3">
+                      <div className="flex items-center justify-between gap-1.5">
+                        <span>رقم مجموعة نسك</span>
+                        <HeaderColumnFilter
+                          title="رقم نسك"
+                          type="text"
+                          value={colFilters.nusuk}
+                          onChange={(v) => handleColFilterChange("nusuk", v)}
+                          onClear={() => handleColFilterChange("nusuk", "")}
+                          placeholder="بحث برقم نسك..."
+                          align="right"
+                        />
+                      </div>
+                    </th>
+
+                    {/* 2. الحالة */}
+                    <th className="py-3 px-2 text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <span>الحالة</span>
+                        <HeaderColumnFilter
+                          title="الحالة"
+                          type="select"
+                          value={colFilters.status}
+                          onChange={(v) => handleColFilterChange("status", v)}
+                          onClear={() => handleColFilterChange("status", "")}
+                          options={role === "SaudiAgent" ? SAUDI_AGENT_STATUS_OPTIONS : DEFAULT_STATUS_OPTIONS}
+                          align="right"
+                        />
+                      </div>
+                    </th>
+
+                    {/* 3. المرسل */}
                     {(role === "SafaEmployee" || role === "Admin") && (
-                      <th className="py-3 px-2 text-center">المرسل</th>
+                      <th className="py-3 px-2 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <span>المرسل</span>
+                          <HeaderColumnFilter
+                            title="المرسل"
+                            type="select"
+                            value={colFilters.sender}
+                            onChange={(v) => handleColFilterChange("sender", v)}
+                            onClear={() => handleColFilterChange("sender", "")}
+                            options={[
+                              { value: "", label: `جميع المرسلين (${distinctSenders.length})` },
+                              ...distinctSenders.map((s) => ({ value: s, label: s })),
+                            ]}
+                            align="right"
+                          />
+                        </div>
+                      </th>
                     )}
-                    <th className="py-3 px-3">رحلة الذهاب</th>
-                    <th className="py-3 px-3">رحلة العودة</th>
+
+                    {/* 4. رحلة الذهاب */}
+                    <th className="py-3 px-3">
+                      <div className="flex items-center justify-between gap-1.5">
+                        <span>رحلة الذهاب</span>
+                        <HeaderColumnFilter
+                          title="تاريخ الذهاب"
+                          type="date"
+                          value={colFilters.departureDate}
+                          onChange={(v) => handleColFilterChange("departureDate", v)}
+                          onClear={() => handleColFilterChange("departureDate", "")}
+                          align="right"
+                        />
+                      </div>
+                    </th>
+
+                    {/* 5. رحلة العودة */}
+                    <th className="py-3 px-3">
+                      <div className="flex items-center justify-between gap-1.5">
+                        <span>رحلة العودة</span>
+                        <HeaderColumnFilter
+                          title="تاريخ العودة"
+                          type="date"
+                          value={colFilters.returnDate}
+                          onChange={(v) => handleColFilterChange("returnDate", v)}
+                          onClear={() => handleColFilterChange("returnDate", "")}
+                          align="right"
+                        />
+                      </div>
+                    </th>
+
+                    {/* 6. بيانات المسافرين */}
                     {(role === "Sender" || role === "SafaEmployee" || role === "Admin") && (
-                      <th className="py-3 px-3">بيانات المسافرين</th>
+                      <th className="py-3 px-3">
+                        <div className="flex items-center justify-between gap-1.5">
+                          <span>بيانات المسافرين</span>
+                          <HeaderColumnFilter
+                            title="المسافرين"
+                            type="text"
+                            value={colFilters.traveler}
+                            onChange={(v) => handleColFilterChange("traveler", v)}
+                            onClear={() => handleColFilterChange("traveler", "")}
+                            placeholder="اسم المعتمر / الجواز..."
+                            align="right"
+                          />
+                        </div>
+                      </th>
                     )}
+
+                    {/* 7. بيانات المستضيف */}
                     {(role === "SaudiAgent" || role === "SafaEmployee" || role === "Admin") && (
-                      <th className="py-3 px-3">بيانات المستضيف</th>
+                      <th className="py-3 px-3">
+                        <div className="flex items-center justify-between gap-1.5">
+                          <span>بيانات المستضيف</span>
+                          <HeaderColumnFilter
+                            title="المستضيف"
+                            type="select"
+                            value={colFilters.hosting}
+                            onChange={(v) => handleColFilterChange("hosting", v)}
+                            onClear={() => handleColFilterChange("hosting", "ALL")}
+                            options={HOSTING_OPTIONS}
+                            align="left"
+                          />
+                        </div>
+                      </th>
                     )}
+
+                    {/* 8. المستندات والإجراء */}
                     <th className="py-3 px-3 text-center">
                       <div className="flex items-center justify-center gap-1.5">
                         <span>المستندات والإجراء</span>
-                        {role === "Admin" && (
+                        {activeColFiltersCount > 0 && (
                           <button
                             type="button"
-                            onClick={() => setShowColFilters(!showColFilters)}
-                            className={`p-1 rounded-lg transition-colors cursor-pointer ${
-                              showColFilters || activeColFiltersCount > 0
-                                ? "bg-sky-100 text-sky-700 ring-1 ring-sky-300"
-                                : "text-gray-400 hover:text-gray-600 hover:bg-gray-200"
-                            }`}
-                            title="إظهار / إخفاء فلاتر الأعمدة (للأدمن فقط)"
+                            onClick={resetColFilters}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-300 rounded-lg cursor-pointer transition-colors shadow-2xs"
+                            title="مسح جميع فلاتر الأعمدة"
                           >
-                            <Filter className="w-3.5 h-3.5" />
+                            <RotateCcw className="w-3 h-3" />
+                            <span>مسح ({activeColFiltersCount})</span>
                           </button>
                         )}
                       </div>
                     </th>
                   </tr>
-
-                  {/* Admin Column Filter Row */}
-                  {role === "Admin" && showColFilters && (
-                    <TableColumnFiltersRow
-                      role={role}
-                      filters={colFilters}
-                      onFilterChange={handleColFilterChange}
-                      onReset={resetColFilters}
-                      distinctSenders={distinctSenders}
-                      hasActiveFilters={activeColFiltersCount > 0}
-                    />
-                  )}
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {filtered.map((r, rIdx) => {
