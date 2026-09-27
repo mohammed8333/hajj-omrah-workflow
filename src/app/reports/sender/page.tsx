@@ -33,7 +33,7 @@ import {
   TravelReportExportRow,
 } from "@/lib/excelExport";
 import { normalizeArabicText } from "@/lib/searchUtils";
-import { getWhatsAppUrl, normalizePhone } from "@/lib/phoneUtils";
+import { getWhatsAppUrl, normalizePhone, extractEgyptianPhoneNumber } from "@/lib/phoneUtils";
 
 export interface PilgrimReportItem {
   id: string;
@@ -347,24 +347,91 @@ export default function SenderReportPage() {
     exportSenderTravelersReportToExcel(exportRows, filterName);
   };
 
+  // Helper to extract Egyptian phone only (rejects Saudi)
+  const resolveTravelerEgyptianPhone = (p: PilgrimReportItem, parentReq?: GroupRequestSummary): string => {
+    // 1. Traveler's phone
+    const eg1 = extractEgyptianPhoneNumber(p.phoneNumber);
+    if (eg1) return eg1;
+
+    // 2. Traveler's notes
+    const eg2 = extractEgyptianPhoneNumber(p.notes);
+    if (eg2) return eg2;
+
+    // 3. Request contact phone (only if Egyptian!)
+    const eg3 = extractEgyptianPhoneNumber(parentReq?.contactPhone);
+    if (eg3) return eg3;
+
+    // 4. Request notes
+    const eg4 = extractEgyptianPhoneNumber(parentReq?.notes);
+    if (eg4) return eg4;
+
+    // No Egyptian phone found -> DO NOT show Saudi phone
+    return "-";
+  };
+
+  // Helper to resolve ticket URL
+  const resolveTicketUrl = (req?: GroupRequestSummary): string => {
+    if (!req) return "-";
+    if (req.flightTicketDocumentUrl && (req.flightTicketDocumentUrl.startsWith("http://") || req.flightTicketDocumentUrl.startsWith("https://"))) {
+      return req.flightTicketDocumentUrl;
+    }
+    if (typeof window !== "undefined") {
+      const origin = window.location.origin;
+      if (req.flightTicketDocumentId) {
+        return `${origin}/requests/${encodeURIComponent(req.id)}?docId=${encodeURIComponent(req.flightTicketDocumentId)}`;
+      }
+      return `${origin}/requests/${encodeURIComponent(req.id)}`;
+    }
+    return "-";
+  };
+
   // Handle Travel Report Export (Admin only)
   const handleExportTravelReport = () => {
-    const exportRows: TravelReportExportRow[] = filteredPilgrims.map((p) => {
+    // 1. Only include transactions that have a Nusuk group number!
+    const nusukEligiblePilgrims = filteredPilgrims.filter((p) => {
       const parentReq = requests.find((r) => r.id === p.groupRequestId);
+      const rawNusuk = p.nusukGroupNumber || parentReq?.nusukGroupNumber;
+      if (!rawNusuk) return false;
+      const clean = rawNusuk.trim();
+      return (
+        clean !== "" &&
+        clean !== "-" &&
+        clean !== "لم يُسجل بعد" &&
+        clean !== "لم يسجل بعد" &&
+        clean.toLowerCase() !== "null" &&
+        clean.toLowerCase() !== "undefined"
+      );
+    });
+
+    if (nusukEligiblePilgrims.length === 0) {
+      setError("لم يتم العثور على أي معاملات مسجلة برقم نسك لتصديرها. تقارير السفر تشترط وجود رقم نسك.");
+      setTimeout(() => setError(null), 5000);
+      return;
+    }
+
+    const exportRows: TravelReportExportRow[] = nusukEligiblePilgrims.map((p) => {
+      const parentReq = requests.find((r) => r.id === p.groupRequestId);
+      const nusukNum = (p.nusukGroupNumber || parentReq?.nusukGroupNumber || "").trim();
+      const egPhone = resolveTravelerEgyptianPhone(p, parentReq);
+      const ticketLink = resolveTicketUrl(parentReq);
+
       return {
         groupId: p.groupRequestId,
-        nusukGroupNumber: p.nusukGroupNumber || parentReq?.nusukGroupNumber || "-",
+        nusukGroupNumber: nusukNum,
         groupName: p.groupName || parentReq?.groupName || "-",
         travelersCount: p.travelersCount || parentReq?.travelersCount || parentReq?.travelersList?.length || 1,
+        ticketUrl: ticketLink !== "-" ? ticketLink : undefined,
         departureDate: p.departureDate || parentReq?.departureDate || parentReq?.travelDate || "-",
         flightDepartureTime: p.flightDepartureTime || parentReq?.flightDepartureTime || "-",
         airportArrivalTime: p.airportArrivalTime || parentReq?.airportArrivalTime || "-",
         travelerName: p.fullName || "-",
-        travelerPhone: p.phoneNumber || parentReq?.contactPhone || p.passportNumber || "-",
+        travelerPhone: egPhone,
       };
     });
 
     exportTravelReportToExcel(exportRows);
+    setSuccessMessage(`تم تصدير تقرير السفر بنجاح لعدد (${exportRows.length}) مسافر بالمعاملات المعتمدة برقم نسك.`);
+    setTimeout(() => setSuccessMessage(null), 4000);
   };
 
   // Handle Print

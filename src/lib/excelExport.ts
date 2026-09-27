@@ -244,6 +244,7 @@ export function exportRequestsToExcel(requests: GroupRequestDetail[]) {
 
   // Create new Workbook
   const workbook = XLSX.utils.book_new();
+  (workbook as any).Workbook = { Views: [{ RTL: true }] };
 
   // Create Worksheet 1: Transactions
   const wsTransactions = XLSX.utils.json_to_sheet(
@@ -475,6 +476,7 @@ export function exportSenderTravelersReportToExcel(
   filterDelegateName?: string
 ) {
   const workbook = XLSX.utils.book_new();
+  (workbook as any).Workbook = { Views: [{ RTL: true }] };
 
   const data = items.map((item, idx) => {
     let travelDatesStr = "-";
@@ -618,9 +620,10 @@ export function exportSenderTravelersReportToExcel(
 
 export interface TravelReportExportRow {
   groupId?: string;
-  nusukGroupNumber?: string;
-  groupName?: string;
-  travelersCount?: number;
+  nusukGroupNumber: string;
+  groupName: string;
+  travelersCount: number;
+  ticketUrl?: string;
   departureDate?: string;
   flightDepartureTime?: string;
   airportArrivalTime?: string;
@@ -629,17 +632,21 @@ export interface TravelReportExportRow {
 }
 
 /**
- * Exports Travel & Flights Report with 8 columns RTL to Excel:
- * رقم مجموعة نسك | اسم المجموعة | عدد المسافرين | تاريخ الذهاب | وقت إقلاع طائرة الذهاب | وقت التواجد في المطار | اسم المسافر | رقم المسافر
+ * Exports Travel & Flights Report with 9 columns RTL to Excel:
+ * رقم مجموعة نسك | اسم المجموعة | عدد المسافرين | رابط التذكرة | تاريخ الذهاب | وقت إقلاع طائرة الذهاب | وقت التواجد في المطار | اسم المسافر | رقم المسافر
  */
 export function exportTravelReportToExcel(items: TravelReportExportRow[]) {
   const workbook = XLSX.utils.book_new();
+
+  // 1. Set Workbook Views for rightToLeft XML sheetView (forces Excel to open RTL)
+  (workbook as any).Workbook = { Views: [{ RTL: true }] };
 
   const data = items.map((item) => {
     return {
       "رقم مجموعة نسك": item.nusukGroupNumber || "-",
       "اسم المجموعة": item.groupName || "-",
       "عدد المسافرين": item.travelersCount || 1,
+      "رابط التذكرة": item.ticketUrl || "لم تُرفع بعد",
       "تاريخ الذهاب": formatArabicDateFriendly(item.departureDate),
       "وقت إقلاع طائرة الذهاب": item.flightDepartureTime || "-",
       "وقت التواجد في المطار": item.airportArrivalTime || "-",
@@ -650,31 +657,36 @@ export function exportTravelReportToExcel(items: TravelReportExportRow[]) {
 
   const ws = XLSX.utils.json_to_sheet(data);
 
-  // Column widths (8 columns)
+  // Column widths (9 columns)
   ws["!cols"] = [
-    { wch: 18 }, // رقم مجموعة نسك
-    { wch: 28 }, // اسم المجموعة
-    { wch: 14 }, // عدد المسافرين
-    { wch: 18 }, // تاريخ الذهاب
-    { wch: 22 }, // وقت إقلاع طائرة الذهاب
-    { wch: 22 }, // وقت التواجد في المطار
-    { wch: 30 }, // اسم المسافر
-    { wch: 20 }, // رقم المسافر
+    { wch: 18 }, // Col 0: رقم مجموعة نسك
+    { wch: 28 }, // Col 1: اسم المجموعة
+    { wch: 14 }, // Col 2: عدد المسافرين
+    { wch: 38 }, // Col 3: رابط التذكرة
+    { wch: 18 }, // Col 4: تاريخ الذهاب
+    { wch: 22 }, // Col 5: وقت إقلاع طائرة الذهاب
+    { wch: 22 }, // Col 6: وقت التواجد في المطار
+    { wch: 30 }, // Col 7: اسم المسافر
+    { wch: 20 }, // Col 8: رقم المسافر
   ];
 
-  // Set RTL direction
+  // Set RTL direction for the worksheet
   (ws as any)["!views"] = [{ rightToLeft: true }];
 
-  // Merge identical group cells (Cols 0 to 5)
+  // Merge identical group cells (Cols 0 to 6)
   const merges: XLSX.Range[] = [];
   let i = 0;
   while (i < items.length) {
     const current = items[i];
-    const key = current.groupId || `${current.groupName}_${current.nusukGroupNumber || ""}_${current.departureDate || ""}_${current.flightDepartureTime || ""}`;
+    const key =
+      current.groupId ||
+      `${current.groupName}_${current.nusukGroupNumber}_${current.departureDate || ""}_${current.flightDepartureTime || ""}`;
     let j = i + 1;
     while (j < items.length) {
       const next = items[j];
-      const nextKey = next.groupId || `${next.groupName}_${next.nusukGroupNumber || ""}_${next.departureDate || ""}_${next.flightDepartureTime || ""}`;
+      const nextKey =
+        next.groupId ||
+        `${next.groupName}_${next.nusukGroupNumber}_${next.departureDate || ""}_${next.flightDepartureTime || ""}`;
       if (nextKey === key) {
         j++;
       } else {
@@ -691,12 +703,14 @@ export function exportTravelReportToExcel(items: TravelReportExportRow[]) {
       merges.push({ s: { r: startRow, c: 1 }, e: { r: endRow, c: 1 } });
       // Col 2: عدد المسافرين
       merges.push({ s: { r: startRow, c: 2 }, e: { r: endRow, c: 2 } });
-      // Col 3: تاريخ الذهاب
+      // Col 3: رابط التذكرة
       merges.push({ s: { r: startRow, c: 3 }, e: { r: endRow, c: 3 } });
-      // Col 4: وقت إقلاع طائرة الذهاب
+      // Col 4: تاريخ الذهاب
       merges.push({ s: { r: startRow, c: 4 }, e: { r: endRow, c: 4 } });
-      // Col 5: وقت التواجد في المطار
+      // Col 5: وقت إقلاع طائرة الذهاب
       merges.push({ s: { r: startRow, c: 5 }, e: { r: endRow, c: 5 } });
+      // Col 6: وقت التواجد في المطار
+      merges.push({ s: { r: startRow, c: 6 }, e: { r: endRow, c: 6 } });
     }
     i = j;
   }
@@ -740,17 +754,28 @@ export function exportTravelReportToExcel(items: TravelReportExportRow[]) {
           ws[cellAddress] = { t: "s", v: "" };
         }
         const cell = ws[cellAddress];
+
+        // Handle Ticket Link (Col 3)
+        const isTicketCol = C === 3;
+        const ticketVal = String(cell.v || "").trim();
+        const isLink = isTicketCol && ticketVal.startsWith("http");
+
+        if (isLink) {
+          cell.l = { Target: ticketVal, Tooltip: "فتح رابط تذكرة الطيران" };
+        }
+
         cell.s = {
           fill: { patternType: "solid", fgColor: { rgb: bgRgb } },
           font: {
             name: "Calibri",
             sz: 10,
-            bold: C === 0 || C === 6,
-            color: { rgb: "0F172A" },
+            bold: C === 0 || C === 7, // Bold for nusuk number and traveler name
+            color: { rgb: isLink ? "0284C7" : "0F172A" },
+            underline: isLink,
           },
           alignment: {
             vertical: "center",
-            horizontal: C === 1 || C === 6 ? "right" : "center",
+            horizontal: C === 1 || C === 7 ? "right" : "center",
             wrapText: true,
           },
           border: {
@@ -772,4 +797,5 @@ export function exportTravelReportToExcel(items: TravelReportExportRow[]) {
 
   XLSX.writeFile(workbook, fileName);
 }
+
 

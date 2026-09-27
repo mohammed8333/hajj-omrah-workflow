@@ -275,3 +275,51 @@ export function getTelUrl(phone: string): string {
   if (!norm.whatsappDigits) return "";
   return `tel:+${norm.whatsappDigits}`;
 }
+
+/**
+ * يستخرج الرقم المصري للمسافر بصيغة واضحة (11 رقماً محلياً مثل 01012345678).
+ * ويرفض رفضاً تاماً الأرقام السعودية (+966 أو 05...) أو أي أرقام غير مصرية مع إعادة نص فارغ.
+ */
+export function extractEgyptianPhoneNumber(phone?: string | null): string {
+  if (!phone || !phone.trim() || phone === "-") return "";
+  const raw = phone.trim();
+
+  // التحقق المباشر عبر دالة فحص رقم المسافر
+  const v = validateTravelerPhone(raw);
+  if (v.isValid) {
+    return v.cleanDigits; // 01xxxxxxxxx
+  }
+
+  // رفض الأرقام السعودية بوضوح (+966 أو 00966 أو 966 أو 05xxxxxxxx أو 5xxxxxxxx)
+  const digits = raw.replace(/\D/g, "");
+  if (
+    raw.startsWith("+966") ||
+    raw.startsWith("00966") ||
+    digits.startsWith("966") ||
+    (digits.length === 10 && digits.startsWith("05")) ||
+    (digits.length === 9 && digits.startsWith("5"))
+  ) {
+    return "";
+  }
+
+  // فحص الكود الدولي 20 متبوعاً بـ 10 أو 11 أو 12 أو 15 ثم 8 أرقام
+  const m20 = digits.match(/20(1[0125]\d{8})/);
+  if (m20) return "0" + m20[1];
+
+  // فحص صيغة 010 أو 011 أو 012 أو 015 في النص
+  const m01 = raw.match(/(?:^|[^\d])(01[0125]\d{8})(?:[^\d]|$)/);
+  if (m01) return m01[1];
+
+  // فحص 10 أرقام تبدأ بـ 1[0125]
+  if (digits.length === 10 && /^1[0125]\d{8}$/.test(digits)) {
+    return "0" + digits;
+  }
+
+  // فحص 11 رقم تبدأ بـ 01[0125]
+  if (digits.length === 11 && /^01[0125]\d{8}$/.test(digits)) {
+    return digits;
+  }
+
+  return "";
+}
+
