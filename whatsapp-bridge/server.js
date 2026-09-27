@@ -11,10 +11,6 @@ const {
   useMultiFileAuthState,
   DisconnectReason,
   fetchLatestBaileysVersion,
-  downloadMediaMessage,
-  extractMessageContent,
-  jidNormalizedUser,
-  areJidsSameUser,
 } = require("@whiskeysockets/baileys");
 
 const app = express();
@@ -30,6 +26,8 @@ let isConnected = false;
 let currentQr = null;
 let currentQrDataUrl = null;
 let cachedGroups = [];
+let lastGroupsFetchTime = 0;
+const GROUPS_CACHE_TTL = 120000; // 2 minutes cache
 
 const AUTH_DIR = path.join(__dirname, "auth_info");
 if (!fs.existsSync(AUTH_DIR)) {
@@ -70,66 +68,6 @@ function parseBase64Data(dataUrl) {
   return { buffer, mimetype };
 }
 
-// Group Messages Store (persisted to disk, up to 500 messages per group)
-const groupMessageStore = new Map();
-const MAX_MESSAGES_PER_GROUP = 500;
-const MESSAGES_FILE = path.join(__dirname, "group_messages_store.json");
-
-function loadGroupMessagesFromDisk() {
-  try {
-    if (fs.existsSync(MESSAGES_FILE)) {
-      const data = JSON.parse(fs.readFileSync(MESSAGES_FILE, "utf8"));
-      for (const [jid, msgs] of Object.entries(data)) {
-        if (Array.isArray(msgs)) {
-          groupMessageStore.set(jid, msgs);
-        }
-      }
-      console.log(`📂 تم استرجاع (${groupMessageStore.size}) محادثة مجموعة مخزنة من القرص.`);
-    }
-  } catch (err) {
-    console.warn("تعذر تحميل الرسائل من القرص:", err.message);
-  }
-}
-
-let saveDiskTimeout = null;
-function persistGroupMessagesToDisk() {
-  if (saveDiskTimeout) clearTimeout(saveDiskTimeout);
-  saveDiskTimeout = setTimeout(() => {
-    try {
-      const obj = {};
-      for (const [jid, msgs] of groupMessageStore.entries()) {
-        obj[jid] = msgs.slice(-MAX_MESSAGES_PER_GROUP);
-      }
-      fs.writeFileSync(MESSAGES_FILE, JSON.stringify(obj, null, 2), "utf8");
-    } catch (e) {
-      console.warn("تعذر حفظ الرسائل على القرص:", e.message);
-    }
-  }, 1000);
-}
-
-// Load existing stored messages
-loadGroupMessagesFromDisk();
-
-function storeGroupMessage(msg) {
-  if (!msg || !msg.key) return;
-  const groupJid = msg.key.remoteJid;
-  if (!groupJid || !groupJid.endsWith("@g.us")) return;
-
-  if (!groupMessageStore.has(groupJid)) {
-    groupMessageStore.set(groupJid, []);
-  }
-
-  const list = groupMessageStore.get(groupJid);
-  const msgId = msg.key.id;
-  if (list.some((m) => m.key && m.key.id === msgId)) return;
-
-  list.push(msg);
-  if (list.length > MAX_MESSAGES_PER_GROUP) {
-    list.shift();
-  }
-  persistGroupMessagesToDisk();
-}
-
 // Initialize WhatsApp Socket
 async function startWhatsAppSocket() {
   try {
@@ -144,12 +82,6 @@ async function startWhatsAppSocket() {
       browser: ["HajjOmrahWorkflow", "Chrome", "1.0.0"],
       syncFullHistory: false,
       markOnlineOnConnect: false,
-      getMessage: async (key) => {
-        if (!key?.remoteJid) return undefined;
-        const list = groupMessageStore.get(key.remoteJid) || [];
-        const found = list.find((m) => m.key && m.key.id === key.id);
-        return found?.message || undefined;
-      },
     });
 
     sock.ev.on("creds.update", saveCreds);
@@ -167,7 +99,7 @@ async function startWhatsAppSocket() {
         console.log("📲 امسح كود QR التالي من تطبيق الواتساب للربط:");
         console.log("=======================================================\n");
         qrcode.generate(qr, { small: true });
-        console.log("\n(أو افتح شاشة الأدمن لمعاينة كود QR)\n");
+        console.log("\n(أو افتح شاشة النظام لمعاينة كود QR)\n");
       }
 
       if (connection === "close") {
@@ -194,43 +126,18 @@ async function startWhatsAppSocket() {
         }
       }
     });
-
-    // Listen to incoming messages to buffer group chats
-    sock.ev.on("messages.upsert", async ({ messages }) => {
-      if (Array.isArray(messages)) {
-        for (const msg of messages) {
-          storeGroupMessage(msg);
-        }
-      }
-    });
-
-    // Listen to synced history
-    sock.ev.on("messaging-history.set", ({ messages }) => {
-      console.log(`📥 تم استلام مزامنة سجل الرسائل: ${messages?.length || 0} رسالة.`);
-      if (Array.isArray(messages)) {
-        for (const msg of messages) {
-          storeGroupMessage(msg);
-        }
-      }
-    });
   } catch (err) {
     console.error("فشل بدء اتصال الواتساب:", err);
     setTimeout(startWhatsAppSocket, 5000);
   }
 }
 
-let lastGroupsFetchTime = 0;
-const GROUPS_CACHE_TTL = 120000; // 2 minutes cache to prevent rate-overlimit
-
 // Fetch list of groups
 async function refreshGroups(force = false) {
   if (!sock || !isConnected) return cachedGroups;
   const now = Date.now();
   if (!force && cachedGroups.length > 0 && now - lastGroupsFetchTime < GROUPS_CACHE_TTL) {
-    return cachedGroups.map((g) => ({
-      ...g,
-      storedMessagesCount: (groupMessageStore.get(g.id) || []).length,
-    }));
+    return cachedGroups;
   }
 
   try {
@@ -239,7 +146,6 @@ async function refreshGroups(force = false) {
       id: g.id,
       subject: g.subject || "مجموعة بدون اسم",
       participantsCount: g.participants?.length || 0,
-      storedMessagesCount: (groupMessageStore.get(g.id) || []).length,
     }));
     lastGroupsFetchTime = now;
     return cachedGroups;
@@ -249,10 +155,7 @@ async function refreshGroups(force = false) {
     } else {
       console.warn("تعذر جلب المجموعات:", e?.message);
     }
-    return cachedGroups.map((g) => ({
-      ...g,
-      storedMessagesCount: (groupMessageStore.get(g.id) || []).length,
-    }));
+    return cachedGroups;
   }
 }
 
@@ -488,458 +391,8 @@ app.post("/send-group-package", async (req, res) => {
   } catch (err) {
     console.error("خطأ أثناء إرسال حزمة المجموعة:", err);
     res.status(500).json({
-      error: err.message || "حدث خطأ غير متوقع أثناء إرسال الرسائل إلى مجموعة الواتساب",
+      error: err.message || "حدث خطأ أثناء إرسال الرسائل إلى مجموعة الواتساب",
     });
-  }
-});
-
-// --- Helper Functions for Phone & Passport Extraction ---
-
-// --- Helper Functions for Phone & Passport Extraction ---
-
-function extractPhoneNumbers(text) {
-  if (!text || typeof text !== "string") return [];
-  const easternDigits = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"];
-  let normalized = text.replace(/[٠-٩]/g, (w) => easternDigits.indexOf(w).toString());
-  normalized = normalized.replace(/[\u200B-\u200D\uFEFF]/g, "");
-
-  const results = new Set();
-
-  // Egyptian phones: 010, 011, 012, 015 with optional +20/0020 and optional spaces, dots, dashes
-  const egRegex = /(?:(?:\+|00)?20[\s.-]?)?0?1[0125](?:[\s.-]?\d){8}\b/g;
-  let match;
-  while ((match = egRegex.exec(normalized)) !== null) {
-    const raw = match[0];
-    const digitsOnly = raw.replace(/\D/g, "");
-    const clean = digitsOnly.replace(/^00/, "").replace(/^0+/, "");
-    if (clean.startsWith("20") && clean.length === 12) {
-      results.add("+" + clean);
-    } else if (clean.startsWith("1") && clean.length === 10) {
-      results.add("+20" + clean);
-    }
-  }
-
-  // Saudi phones: 05... with optional +966/00966 and optional spaces, dots, dashes
-  const saRegex = /(?:(?:\+|00)?966[\s.-]?)?0?5(?:[\s.-]?\d){8}\b/g;
-  while ((match = saRegex.exec(normalized)) !== null) {
-    const raw = match[0];
-    const digitsOnly = raw.replace(/\D/g, "");
-    const clean = digitsOnly.replace(/^00/, "").replace(/^0+/, "");
-    if (clean.startsWith("966") && clean.length === 12) {
-      results.add("+" + clean);
-    } else if (clean.startsWith("5") && clean.length === 9) {
-      results.add("+966" + clean);
-    }
-  }
-
-  // General international phones:
-  const genRegex = /(?:\+|00)\d(?:[\s.-]?\d){7,14}\b/g;
-  while ((match = genRegex.exec(normalized)) !== null) {
-    const raw = match[0];
-    const digitsOnly = raw.replace(/\D/g, "");
-    if (digitsOnly.length >= 9 && digitsOnly.length <= 15) {
-      results.add("+" + digitsOnly.replace(/^00/, ""));
-    }
-  }
-
-  return Array.from(results);
-}
-
-function getUnwrappedMessage(msg) {
-  if (!msg || !msg.message) return null;
-  return extractMessageContent(msg.message) || msg.message;
-}
-
-function getMessageImage(msg) {
-  const m = getUnwrappedMessage(msg);
-  if (!m) return null;
-  if (m.imageMessage) return m.imageMessage;
-  if (m.viewOnceMessage?.message?.imageMessage) return m.viewOnceMessage.message.imageMessage;
-  if (m.viewOnceMessageV2?.message?.imageMessage) return m.viewOnceMessageV2.message.imageMessage;
-
-  // Document messages (passport photos sent as uncompressed files or images)
-  const doc = m.documentMessage || m.documentWithCaptionMessage?.message?.documentMessage;
-  if (doc) {
-    const mime = (doc.mimetype || "").toLowerCase();
-    const fn = (doc.fileName || "").toLowerCase();
-    if (mime.startsWith("image/") || /\.(jpe?g|png|webp|heic)$/i.test(fn)) {
-      return doc;
-    }
-  }
-  return null;
-}
-
-function getMessageText(msg) {
-  const m = getUnwrappedMessage(msg);
-  if (!m) return "";
-  return (
-    m.conversation ||
-    m.extendedTextMessage?.text ||
-    m.imageMessage?.caption ||
-    m.videoMessage?.caption ||
-    m.documentMessage?.caption ||
-    m.documentWithCaptionMessage?.message?.documentMessage?.caption ||
-    ""
-  );
-}
-
-function getQuotedMessageStanzaId(msg) {
-  const m = getUnwrappedMessage(msg);
-  if (!m) return null;
-  const context =
-    m.extendedTextMessage?.contextInfo ||
-    m.imageMessage?.contextInfo ||
-    m.documentMessage?.contextInfo ||
-    m.documentWithCaptionMessage?.message?.documentMessage?.contextInfo ||
-    m.videoMessage?.contextInfo;
-  return context?.stanzaId || null;
-}
-
-async function downloadImageAsBase64(msg) {
-  try {
-    let buffer = null;
-    try {
-      buffer = await downloadMediaMessage(
-        msg,
-        "buffer",
-        {},
-        {
-          logger: pino({ level: "silent" }),
-          reuploadRequest: sock?.updateMediaMessage,
-        }
-      );
-    } catch (e1) {
-      const unwrapped = getUnwrappedMessage(msg);
-      if (unwrapped) {
-        buffer = await downloadMediaMessage(
-          { key: msg.key, message: unwrapped },
-          "buffer",
-          {},
-          {
-            logger: pino({ level: "silent" }),
-            reuploadRequest: sock?.updateMediaMessage,
-          }
-        );
-      }
-    }
-    if (!buffer) return null;
-    const imgObj = getMessageImage(msg);
-    const mimetype = imgObj?.mimetype || "image/jpeg";
-    return `data:${mimetype};base64,${buffer.toString("base64")}`;
-  } catch (err) {
-    console.warn("فشل تنزيل صورة الميديا:", err.message);
-    return null;
-  }
-}
-
-// Compare two sender JIDs safely handling multi-device prefixes
-function isSameSender(jid1, jid2) {
-  if (!jid1 || !jid2) return false;
-  try {
-    if (typeof areJidsSameUser === "function" && areJidsSameUser(jid1, jid2)) return true;
-  } catch {}
-  return jidNormalizedUser(jid1) === jidNormalizedUser(jid2);
-}
-
-async function scanAndPairGroupMessages(groupJid, limit = 200) {
-  const allMsgs = groupMessageStore.get(groupJid) || [];
-  const msgs = allMsgs.slice(-limit);
-
-  const images = [];
-  const textPhones = [];
-
-  for (const m of msgs) {
-    const timestamp = Number(m.messageTimestamp || Date.now() / 1000);
-    const rawSender = m.key?.participant || m.participant || m.key?.remoteJid || "";
-    const sender = jidNormalizedUser(rawSender);
-    const pushName = m.pushName || "";
-    const msgId = m.key?.id;
-
-    const img = getMessageImage(m);
-    const text = getMessageText(m);
-    const phones = extractPhoneNumbers(text);
-    const quotedStanzaId = getQuotedMessageStanzaId(m);
-
-    if (img) {
-      images.push({
-        id: msgId,
-        rawMsg: m,
-        sender,
-        pushName,
-        timestamp,
-        caption: text,
-        phonesInCaption: phones,
-        quotedStanzaId,
-      });
-    }
-
-    if (phones.length > 0) {
-      textPhones.push({
-        id: msgId,
-        sender,
-        pushName,
-        timestamp,
-        text,
-        phones,
-        quotedStanzaId,
-      });
-    }
-  }
-
-  const pairs = [];
-  const usedImageIds = new Set();
-  const usedPhoneIds = new Set();
-
-  // 1. Direct Caption: Image has phone in caption
-  for (const img of images) {
-    if (img.phonesInCaption.length > 0) {
-      const imgBase64 = await downloadImageAsBase64(img.rawMsg);
-      if (imgBase64) {
-        pairs.push({
-          id: `pair_${img.id}`,
-          sender: img.sender,
-          senderName: img.pushName,
-          timestamp: img.timestamp,
-          phoneNumber: img.phonesInCaption[0],
-          additionalPhones: img.phonesInCaption.slice(1),
-          imageBase64: imgBase64,
-          matchedBy: "caption",
-          details: "تم التقاط الرقم مباشرة من وصف صورة الجواز",
-        });
-        usedImageIds.add(img.id);
-      }
-    }
-  }
-
-  // 2. Reply / Quoted: Text replied to image OR image replied to text
-  for (const img of images) {
-    if (usedImageIds.has(img.id)) continue;
-
-    const replyingPhone = textPhones.find(
-      (tp) => !usedPhoneIds.has(tp.id) && tp.quotedStanzaId === img.id
-    );
-    if (replyingPhone) {
-      const imgBase64 = await downloadImageAsBase64(img.rawMsg);
-      if (imgBase64) {
-        pairs.push({
-          id: `pair_${img.id}_${replyingPhone.id}`,
-          sender: replyingPhone.sender || img.sender,
-          senderName: replyingPhone.pushName || img.pushName,
-          timestamp: Math.max(img.timestamp, replyingPhone.timestamp),
-          phoneNumber: replyingPhone.phones[0],
-          additionalPhones: replyingPhone.phones.slice(1),
-          imageBase64: imgBase64,
-          matchedBy: "reply",
-          details: "تم ربط الرقم بالرد المباشر (Reply) على صورة الجواز",
-        });
-        usedImageIds.add(img.id);
-        usedPhoneIds.add(replyingPhone.id);
-        continue;
-      }
-    }
-
-    if (img.quotedStanzaId) {
-      const quotedPhone = textPhones.find(
-        (tp) => !usedPhoneIds.has(tp.id) && tp.id === img.quotedStanzaId
-      );
-      if (quotedPhone) {
-        const imgBase64 = await downloadImageAsBase64(img.rawMsg);
-        if (imgBase64) {
-          pairs.push({
-            id: `pair_${img.id}_${quotedPhone.id}`,
-            sender: img.sender,
-            senderName: img.pushName,
-            timestamp: Math.max(img.timestamp, quotedPhone.timestamp),
-            phoneNumber: quotedPhone.phones[0],
-            additionalPhones: quotedPhone.phones.slice(1),
-            imageBase64: imgBase64,
-            matchedBy: "reply",
-            details: "تم ربط صورة الجواز كاقتباس لرسالة رقم التليفون",
-          });
-          usedImageIds.add(img.id);
-          usedPhoneIds.add(quotedPhone.id);
-          continue;
-        }
-      }
-    }
-  }
-
-  // 3. Proximity: Same Sender within 30 minutes window (1800s)
-  for (const img of images) {
-    if (usedImageIds.has(img.id)) continue;
-
-    let bestPhone = null;
-    let minDiff = Infinity;
-
-    for (const tp of textPhones) {
-      if (usedPhoneIds.has(tp.id)) continue;
-      if (isSameSender(tp.sender, img.sender)) {
-        const timeDiff = Math.abs(tp.timestamp - img.timestamp);
-        if (timeDiff <= 1800 && timeDiff < minDiff) {
-          minDiff = timeDiff;
-          bestPhone = tp;
-        }
-      }
-    }
-
-    if (bestPhone) {
-      const imgBase64 = await downloadImageAsBase64(img.rawMsg);
-      if (imgBase64) {
-        const timeText =
-          bestPhone.timestamp >= img.timestamp
-            ? `أُرسل الرقم بعد الجواز بـ ${Math.round(minDiff)} ثانية`
-            : `أُرسل الجواز بعد الرقم بـ ${Math.round(minDiff)} ثانية`;
-
-        pairs.push({
-          id: `pair_${img.id}_${bestPhone.id}`,
-          sender: img.sender,
-          senderName: img.pushName || bestPhone.pushName,
-          timestamp: Math.max(img.timestamp, bestPhone.timestamp),
-          phoneNumber: bestPhone.phones[0],
-          additionalPhones: bestPhone.phones.slice(1),
-          imageBase64: imgBase64,
-          matchedBy: "proximity",
-          details: `ربط ذكي لنفس المرسل (${timeText})`,
-        });
-        usedImageIds.add(img.id);
-        usedPhoneIds.add(bestPhone.id);
-      }
-    }
-  }
-
-  // 4. Sequence Proximity: Any sender within 10 minutes (600s)
-  for (const img of images) {
-    if (usedImageIds.has(img.id)) continue;
-
-    let bestPhone = null;
-    let minDiff = Infinity;
-
-    for (const tp of textPhones) {
-      if (usedPhoneIds.has(tp.id)) continue;
-      const timeDiff = Math.abs(tp.timestamp - img.timestamp);
-      if (timeDiff <= 600 && timeDiff < minDiff) {
-        minDiff = timeDiff;
-        bestPhone = tp;
-      }
-    }
-
-    if (bestPhone) {
-      const imgBase64 = await downloadImageAsBase64(img.rawMsg);
-      if (imgBase64) {
-        pairs.push({
-          id: `pair_${img.id}_${bestPhone.id}`,
-          sender: img.sender,
-          senderName: img.pushName || bestPhone.pushName,
-          timestamp: Math.max(img.timestamp, bestPhone.timestamp),
-          phoneNumber: bestPhone.phones[0],
-          additionalPhones: bestPhone.phones.slice(1),
-          imageBase64: imgBase64,
-          matchedBy: "proximity",
-          details: `ربط بتسلسل الرسائل المتجاورة في المحادثة`,
-        });
-        usedImageIds.add(img.id);
-        usedPhoneIds.add(bestPhone.id);
-      }
-    }
-  }
-
-  // 5. Unpaired images (passport arrived, phone pending or to be entered manually)
-  for (const img of images) {
-    if (usedImageIds.has(img.id)) continue;
-    const imgBase64 = await downloadImageAsBase64(img.rawMsg);
-    if (imgBase64) {
-      pairs.push({
-        id: `pair_${img.id}_unpaired`,
-        sender: img.sender,
-        senderName: img.pushName,
-        timestamp: img.timestamp,
-        phoneNumber: "",
-        additionalPhones: [],
-        imageBase64: imgBase64,
-        matchedBy: "unpaired",
-        details: "جواز سفر في انتظار إرسال رقم التليفون أو كتابته يدوياً",
-      });
-      usedImageIds.add(img.id);
-    }
-  }
-
-  pairs.sort((a, b) => b.timestamp - a.timestamp);
-  return {
-    totalMessagesStored: allMsgs.length,
-    totalImagesFound: images.length,
-    totalPhonesFound: textPhones.length,
-    pairs,
-  };
-}
-
-// 4. Scan Group for Passports & Phone Numbers
-app.post("/scan-group-phones", async (req, res) => {
-  try {
-    if (!sock || !isConnected) {
-      return res.status(503).json({
-        error: "خدمة الواتساب غير متصلة حالياً. يرجى مسح كود QR أولاً.",
-      });
-    }
-
-    const { targetGroup, groupLink, limit = 200 } = req.body;
-    let groupJid = await resolveGroupJid(targetGroup || groupLink);
-
-    if (!groupJid && targetGroup && targetGroup.includes("@g.us")) {
-      groupJid = targetGroup;
-    }
-
-    if (!groupJid) {
-      return res.status(404).json({
-        error: "تعذر العثور على المجموعة المحددة في الواتساب. تأكد من أن الحساب متواجد في هذه المجموعة.",
-      });
-    }
-
-    console.log(`\n🔍 فحص رسائل المجموعة (${groupJid}) لجلب صور الجوازات وأرقام الهواتف...`);
-    const scanResult = await scanAndPairGroupMessages(groupJid, Number(limit) || 200);
-
-    res.json({
-      success: true,
-      groupJid,
-      count: scanResult.pairs.length,
-      pairs: scanResult.pairs,
-      totalMessagesStored: scanResult.totalMessagesStored,
-      totalImagesFound: scanResult.totalImagesFound,
-      totalPhonesFound: scanResult.totalPhonesFound,
-    });
-  } catch (err) {
-    console.error("خطأ أثناء فحص أرقام المجموعة:", err);
-    res.status(500).json({
-      error: err.message || "حدث خطأ أثناء فحص أرقام الهواتف والجوازات من المجموعة",
-    });
-  }
-});
-
-// 5. Test / Simulation endpoint: add mock passport + phone for Admin testing
-app.post("/simulate-incoming-passport", (req, res) => {
-  try {
-    const { targetGroup, phoneNumber, imageBase64, senderName } = req.body;
-    if (!phoneNumber || !imageBase64) {
-      return res.status(400).json({ error: "رقم الهاتف وصورة الجواز مطلوبان للتجربة" });
-    }
-
-    const simPair = {
-      id: `sim_${Date.now()}`,
-      sender: "simulated_user",
-      senderName: senderName || "مرسل تجريبي",
-      timestamp: Math.floor(Date.now() / 1000),
-      phoneNumber,
-      additionalPhones: [],
-      imageBase64,
-      matchedBy: "simulation",
-      details: "إدخال تجريبي لاختبار الربط والاعتماد",
-    };
-
-    res.json({
-      success: true,
-      pair: simPair,
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
   }
 });
 

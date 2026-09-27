@@ -706,16 +706,6 @@ ${travelersLines}
         </div>
 
         <div className="flex flex-wrap items-center gap-2 shrink-0">
-          {role === "Admin" && (
-            <Link
-              href="/admin/whatsapp-fetcher"
-              className="inline-flex items-center gap-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-100 border border-emerald-400/40 font-bold px-3.5 py-2.5 rounded-xl shadow-xs transition-all text-xs sm:text-sm backdrop-blur-xs"
-              title="نظام جلب أرقام التليفونات من الواتساب"
-            >
-              <PhoneCall className="w-4 h-4 text-emerald-300" />
-              <span>جلب أرقام الواتساب 📱</span>
-            </Link>
-          )}
 
           {(role === "Sender" || role === "Admin") && (
             <Link

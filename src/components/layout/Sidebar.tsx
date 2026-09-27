@@ -64,12 +64,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       roles: ["Admin"],
     },
     {
-      href: "/admin/whatsapp-fetcher",
-      label: "جلب أرقام الواتساب",
-      icon: PhoneCall,
-      roles: ["Admin"],
-    },
-    {
       href: "/admin/settings",
       label: "إعدادات النظام",
       icon: Settings,
