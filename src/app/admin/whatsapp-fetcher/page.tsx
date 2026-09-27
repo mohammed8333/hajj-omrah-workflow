@@ -31,6 +31,8 @@ import {
   Square,
   UploadCloud,
   IdCard,
+  Trash2,
+  Plus,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -40,6 +42,54 @@ import { formatPhoneForWhatsApp, getWhatsAppUrl } from "@/lib/phoneUtils";
 
 const BRIDGE_URL = "http://localhost:5055";
 const STORAGE_KEY_GROUP = "safa_whatsapp_fetcher_group";
+
+function extractAllPhonesFromText(text: string): string[] {
+  if (!text || typeof text !== "string") return [];
+  const easternDigits = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"];
+  let normalized = text.replace(/[٠-٩]/g, (w) => easternDigits.indexOf(w).toString());
+  normalized = normalized.replace(/[\u200B-\u200D\uFEFF]/g, "");
+
+  const results = new Set<string>();
+
+  // Egyptian phones:
+  const egRegex = /(?:(?:\+|00)?20[\s.-]?)?0?1[0125](?:[\s.-]?\d){8}\b/g;
+  let match;
+  while ((match = egRegex.exec(normalized)) !== null) {
+    const raw = match[0];
+    const digitsOnly = raw.replace(/\D/g, "");
+    const clean = digitsOnly.replace(/^00/, "").replace(/^0+/, "");
+    if (clean.startsWith("20") && clean.length === 12) {
+      results.add("+" + clean);
+    } else if (clean.startsWith("1") && clean.length === 10) {
+      results.add("+20" + clean);
+    }
+  }
+
+  // Saudi phones:
+  const saRegex = /(?:(?:\+|00)?966[\s.-]?)?0?5(?:[\s.-]?\d){8}\b/g;
+  while ((match = saRegex.exec(normalized)) !== null) {
+    const raw = match[0];
+    const digitsOnly = raw.replace(/\D/g, "");
+    const clean = digitsOnly.replace(/^00/, "").replace(/^0+/, "");
+    if (clean.startsWith("966") && clean.length === 12) {
+      results.add("+" + clean);
+    } else if (clean.startsWith("5") && clean.length === 9) {
+      results.add("+966" + clean);
+    }
+  }
+
+  // General phones with plus:
+  const genRegex = /(?:\+|00)\d(?:[\s.-]?\d){7,14}\b/g;
+  while ((match = genRegex.exec(normalized)) !== null) {
+    const raw = match[0];
+    const digitsOnly = raw.replace(/\D/g, "");
+    if (digitsOnly.length >= 9 && digitsOnly.length <= 15) {
+      results.add("+" + digitsOnly.replace(/^00/, ""));
+    }
+  }
+
+  return Array.from(results);
+}
 
 interface ExtractedPhonePair {
   id: string;
@@ -95,10 +145,16 @@ export default function WhatsAppPhoneFetcherPage() {
 
   // Available groups from WhatsApp
   const [availableGroups, setAvailableGroups] = useState<
-    Array<{ id: string; subject: string; participantsCount?: number }>
+    Array<{ id: string; subject: string; participantsCount?: number; storedMessagesCount?: number }>
   >([]);
   const [selectedGroup, setSelectedGroup] = useState<string>("");
   const [scanLimit, setScanLimit] = useState<number>(100);
+
+  // Batch direct upload states
+  const [batchFiles, setBatchFiles] = useState<File[]>([]);
+  const [batchPhoneText, setBatchPhoneText] = useState("");
+  const [isProcessingBatch, setIsProcessingBatch] = useState(false);
+  const [batchStep, setBatchStep] = useState("");
 
   // Scanning & Extracted data
   const [isScanning, setIsScanning] = useState(false);
@@ -426,12 +482,30 @@ export default function WhatsAppPhoneFetcherPage() {
         isApplied: false,
       }));
 
+      const totalStored = data.totalMessagesStored ?? 0;
+      const imagesFound = data.totalImagesFound ?? 0;
+      const phonesFound = data.totalPhonesFound ?? 0;
+
       if (rawPairs.length === 0) {
-        await alert({
-          title: "لا توجد نتائج",
-          message: "تم فحص المجموعة بنجاح، ولكن لم يتم العثور على صور جوازات أو أرقام هواتف في الرسائل الأخيرة.",
-          variant: "info",
-        });
+        if (totalStored === 0) {
+          await alert({
+            title: "سجل رسائل المجموعة فارغ في السيرفر",
+            message: `خادم الواتساب متصل بنجاح، ولكن سجل هذه المجموعة يحتوي على (0) رسالة مسجلة حالياً في السيرفر.
+
+💡 سبب ذلك: تطبيق واتساب ويب لا يقوم بتنزيل الرسائل القديمة السابقة للمجموعات تلقائياً عند الربط لأول مرة.
+
+الخيارات المتاحة للبدء فوراً:
+1) قم بعمل إعادة توجيه (Forward) لصور الجوازات وأرقام الهواتف داخل المجموعة، وسيلتقطها السيرفر في التو واللحظة.
+2) أو استخدم قسم (الرفع السريع المباشر للجوازات والأرقام) الموجود أدناه لمعالجة الجوازات فوراً دون انتظار الواتساب.`,
+            variant: "warning",
+          });
+        } else {
+          await alert({
+            title: "لم يتم العثور على جوازات أو أرقام",
+            message: `تم فحص (${totalStored}) رسالة مسجلة في المجموعة، ولكن لم تكن هناك صور جوازات أو أرقام هواتف مطابقة فيها. (تم رصد ${imagesFound} صور و ${phonesFound} أرقام في المجموعة).`,
+            variant: "info",
+          });
+        }
         setExtractedPairs([]);
         return;
       }
@@ -465,6 +539,105 @@ export default function WhatsAppPhoneFetcherPage() {
     } finally {
       setIsScanning(false);
       setScanStep("");
+    }
+  };
+
+  // Batch upload handlers
+  const detectedPhonesInBatch = useMemo(() => {
+    return extractAllPhonesFromText(batchPhoneText);
+  }, [batchPhoneText]);
+
+  const handleBatchFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const newFiles = Array.from(e.target.files);
+      setBatchFiles((prev) => [...prev, ...newFiles]);
+    }
+  };
+
+  const handleRemoveBatchFile = (index: number) => {
+    setBatchFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleProcessBatchUpload = async () => {
+    if (batchFiles.length === 0) {
+      await alert({
+        title: "تنبيه",
+        message: "يرجى اختيار صورة جواز سفر واحدة على الأقل للبدء.",
+        variant: "warning",
+      });
+      return;
+    }
+
+    try {
+      setIsProcessingBatch(true);
+      setBatchStep("جاري قراءة وتحضير صور الجوازات...");
+
+      const phones = [...detectedPhonesInBatch];
+      const newPairs: ExtractedPhonePair[] = [];
+
+      for (let i = 0; i < batchFiles.length; i++) {
+        const file = batchFiles[i];
+        setBatchStep(`جاري تحويل الصورة (${i + 1} من ${batchFiles.length}): ${file.name}...`);
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+        const assignedPhone = phones[i] || "";
+        newPairs.push({
+          id: `batch_${Date.now()}_${i}`,
+          sender: "direct_upload",
+          senderName: "رفع مباشر سريع",
+          timestamp: Math.floor(Date.now() / 1000),
+          phoneNumber: assignedPhone,
+          additionalPhones: i === 0 && phones.length > batchFiles.length ? phones.slice(batchFiles.length) : [],
+          imageBase64: base64,
+          matchedBy: assignedPhone ? "caption" : "unpaired",
+          details: assignedPhone
+            ? `رفع مباشر تم ربطه بالرقم (${assignedPhone})`
+            : "رفع مباشر بدون رقم - بانتظار كتابة الرقم",
+          ocrStatus: "idle",
+          matchType: "none",
+          isApplied: false,
+        });
+      }
+
+      setExtractedPairs((prev) => [...newPairs, ...prev]);
+      setBatchFiles([]);
+      setBatchPhoneText("");
+
+      setBatchStep(`تم تجهيز (${newPairs.length}) جواز. جاري التحليل بالذكاء الاصطناعي...`);
+
+      // Run OCR sequentially on new pairs
+      const updatedPairs: ExtractedPhonePair[] = [];
+      for (let i = 0; i < newPairs.length; i++) {
+        setBatchStep(`جاري فحص الجواز بالذكاء الاصطناعي (${i + 1} من ${newPairs.length})...`);
+        const p = newPairs[i];
+        const processed = await processPairOCR(p);
+        updatedPairs.push(processed);
+        setExtractedPairs((prev) =>
+          prev.map((item) => (item.id === p.id ? processed : item))
+        );
+      }
+
+      setBatchStep("اكتمل التحليل والمطابقة بنجاح!");
+      await alert({
+        title: "اكتمل الرفع والمطابقة بنجاح!",
+        message: `تمت معالجة (${updatedPairs.length}) جواز سفر، وربطها بالمعاملات في النظام. يمكنك الآن مراجعة الجدول والضغط على (اعتماد وتحديث الكل بنقرة واحدة).`,
+        variant: "success",
+      });
+    } catch (err: unknown) {
+      console.error(err);
+      await alert({
+        title: "خطأ أثناء المعالجة",
+        message: err instanceof Error ? err.message : "فشلت معالجة الصور المرفوعة",
+        variant: "danger",
+      });
+    } finally {
+      setIsProcessingBatch(false);
+      setBatchStep("");
     }
   };
 
@@ -825,7 +998,7 @@ export default function WhatsAppPhoneFetcherPage() {
                   <option value="">-- اختر مجموعة من قائمة الواتساب --</option>
                   {availableGroups.map((g) => (
                     <option key={g.id} value={g.id}>
-                      {g.subject} ({g.participantsCount || 0} عضو)
+                      {g.subject} ({g.participantsCount || 0} عضو{typeof g.storedMessagesCount === "number" ? ` - ${g.storedMessagesCount} رسالة مسجلة` : ""})
                     </option>
                   ))}
                 </select>
@@ -837,6 +1010,32 @@ export default function WhatsAppPhoneFetcherPage() {
                   placeholder="اكتب اسم المجموعة أو ضع رابطها أو معرفها (@g.us)..."
                   className="w-full px-3 py-2.5 text-xs rounded-xl border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-emerald-500 bg-white"
                 />
+              )}
+              {selectedGroup && (
+                <div className="mt-1.5 text-[11px]">
+                  {(() => {
+                    const g = availableGroups.find(
+                      (item) => item.id === selectedGroup || item.subject === selectedGroup
+                    );
+                    const stored = g?.storedMessagesCount || 0;
+                    if (stored > 0) {
+                      return (
+                        <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                          <span>يوجد ({stored}) رسالة مسجلة في ذاكرة السيرفر لهذه المجموعة جاهزة للفحص.</span>
+                        </span>
+                      );
+                    }
+                    return (
+                      <span className="text-amber-800 bg-amber-50 px-2.5 py-1 rounded-md border border-amber-200 flex items-center gap-1.5 leading-relaxed">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0 text-amber-600" />
+                        <span>
+                          السيرفر لم يسجل رسائل لهذه المجموعة بعد. أرسل أو أعد توجيه (Forward) الجوازات في المجموعة، أو استخدم الرفع المباشر أدناه.
+                        </span>
+                      </span>
+                    );
+                  })()}
+                </div>
               )}
             </div>
           </div>
@@ -875,6 +1074,168 @@ export default function WhatsAppPhoneFetcherPage() {
             <span className="font-semibold">{scanStep}</span>
           </div>
         )}
+      </div>
+
+      {/* Direct Batch Upload & Text Paste Section */}
+      <div className="bg-white p-5 rounded-2xl border border-indigo-100 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="p-1.5 rounded-lg bg-indigo-50 text-indigo-700">
+                <UploadCloud className="w-5 h-5 text-indigo-600" />
+              </span>
+              <h2 className="font-bold text-base text-gray-900">
+                الرفع السريع المباشر (صور الجوازات + أرقام الهواتف) ⚡
+              </h2>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              إذا كانت صور الجوازات وأرقام الهواتف لديك وترغب في معالجتها فوراً دون انتظار مزامنة الواتساب: حدد الصور والصق الأرقام هنا وسيقوم الذكاء الاصطناعي بربطها بالمعاملات في ثوانٍ.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-[11px] font-bold text-gray-500 bg-gray-50 px-2.5 py-1 rounded-lg border border-gray-200">
+              الصور المحددة: <strong className="text-indigo-700">{batchFiles.length}</strong>
+            </span>
+            <span className="text-[11px] font-bold text-gray-500 bg-gray-50 px-2.5 py-1 rounded-lg border border-gray-200">
+              الأرقام المكتشفة: <strong className="text-emerald-700">{detectedPhonesInBatch.length}</strong>
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Step 1: Upload Passports */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
+                <span className="w-5 h-5 rounded-full bg-indigo-600 text-white text-[10px] flex items-center justify-center font-bold">1</span>
+                <span>اختر أو اسحب صور جوازات السفر:</span>
+              </label>
+              {batchFiles.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setBatchFiles([])}
+                  className="text-[11px] font-bold text-rose-600 hover:text-rose-700 cursor-pointer"
+                >
+                  مسح الكل
+                </button>
+              )}
+            </div>
+
+            <div className="relative border-2 border-dashed border-indigo-200 hover:border-indigo-400 bg-indigo-50/20 hover:bg-indigo-50/40 rounded-xl p-4 text-center transition-colors cursor-pointer">
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={handleBatchFileSelect}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              />
+              <UploadCloud className="w-8 h-8 text-indigo-500 mx-auto mb-2" />
+              <p className="text-xs font-bold text-indigo-950">
+                انقر لاختيار صور الجوازات أو اسحبها وأفلتها هنا
+              </p>
+              <p className="text-[11px] text-gray-400 mt-1">
+                يمكنك تحديد صورة واحدة أو عدة صور معاً (JPG, PNG, WebP)
+              </p>
+            </div>
+
+            {/* Selected files preview */}
+            {batchFiles.length > 0 && (
+              <div className="flex flex-wrap gap-2 max-h-36 overflow-y-auto p-1.5 bg-gray-50 rounded-xl border border-gray-200">
+                {batchFiles.map((file, idx) => (
+                  <div
+                    key={`${file.name}_${idx}`}
+                    className="flex items-center gap-1.5 px-2 py-1 bg-white rounded-lg border border-gray-200 text-[11px] shadow-2xs"
+                  >
+                    <FileText className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                    <span className="truncate max-w-[120px]" title={file.name}>
+                      {file.name}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveBatchFile(idx)}
+                      className="text-gray-400 hover:text-rose-600 p-0.5 cursor-pointer"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Step 2: Paste Phone Numbers from WhatsApp */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
+                <span className="w-5 h-5 rounded-full bg-indigo-600 text-white text-[10px] flex items-center justify-center font-bold">2</span>
+                <span>الصق رسائل وأرقام التليفونات من الواتساب:</span>
+              </label>
+              {batchPhoneText && (
+                <button
+                  type="button"
+                  onClick={() => setBatchPhoneText("")}
+                  className="text-[11px] font-bold text-gray-400 hover:text-gray-600 cursor-pointer"
+                >
+                  تفريغ النص
+                </button>
+              )}
+            </div>
+
+            <textarea
+              rows={4}
+              value={batchPhoneText}
+              onChange={(e) => setBatchPhoneText(e.target.value)}
+              placeholder="انسخ الرسائل من الواتساب والصقها هنا، وسيقوم النظام باستخراج الأرقام المصرية (010, 011, 012, 015) والسعودية تلقائياً...&#10;مثال:&#10;أحمد مصطفى 01012345678&#10;محمد علي 01123456789"
+              className="w-full p-2.5 text-xs rounded-xl border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 bg-white"
+            />
+
+            {/* Detected Phones Pills */}
+            {detectedPhonesInBatch.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                <span className="text-[10px] font-bold text-gray-500">الأرقام الملتقطة:</span>
+                {detectedPhonesInBatch.map((phone, i) => (
+                  <span
+                    key={i}
+                    className="font-mono text-[10px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md"
+                  >
+                    {phone}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Batch Action button & step */}
+        <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-gray-100">
+          <div className="text-xs text-gray-500">
+            {batchStep ? (
+              <span className="text-indigo-700 font-bold flex items-center gap-1.5 animate-pulse">
+                <RefreshCw className="w-4 h-4 animate-spin text-indigo-600" />
+                <span>{batchStep}</span>
+              </span>
+            ) : (
+              <span>
+                سيتم تشغيل قارئ الجوازات (MRZ / Gemini) ومطابقة الأسماء والأرقام بالمعاملات في قاعدة البيانات تلقائياً.
+              </span>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={handleProcessBatchUpload}
+            disabled={isProcessingBatch || batchFiles.length === 0}
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shrink-0"
+          >
+            <Sparkles className={`w-4 h-4 ${isProcessingBatch ? "animate-spin" : ""}`} />
+            <span>
+              {isProcessingBatch
+                ? "جاري التحليل والمطابقة..."
+                : `⚡ بدء المعالجة والمطابقة الفورية (${batchFiles.length} جواز)`}
+            </span>
+          </button>
+        </div>
       </div>
 
       {/* Summary KPI Cards & Bulk Action Toolbar */}

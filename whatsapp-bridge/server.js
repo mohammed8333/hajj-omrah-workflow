@@ -12,6 +12,9 @@ const {
   DisconnectReason,
   fetchLatestBaileysVersion,
   downloadMediaMessage,
+  extractMessageContent,
+  jidNormalizedUser,
+  areJidsSameUser,
 } = require("@whiskeysockets/baileys");
 
 const app = express();
@@ -67,9 +70,45 @@ function parseBase64Data(dataUrl) {
   return { buffer, mimetype };
 }
 
-// Group Messages Store (in memory, up to 300 messages per group)
+// Group Messages Store (persisted to disk, up to 500 messages per group)
 const groupMessageStore = new Map();
-const MAX_MESSAGES_PER_GROUP = 300;
+const MAX_MESSAGES_PER_GROUP = 500;
+const MESSAGES_FILE = path.join(__dirname, "group_messages_store.json");
+
+function loadGroupMessagesFromDisk() {
+  try {
+    if (fs.existsSync(MESSAGES_FILE)) {
+      const data = JSON.parse(fs.readFileSync(MESSAGES_FILE, "utf8"));
+      for (const [jid, msgs] of Object.entries(data)) {
+        if (Array.isArray(msgs)) {
+          groupMessageStore.set(jid, msgs);
+        }
+      }
+      console.log(`📂 تم استرجاع (${groupMessageStore.size}) محادثة مجموعة مخزنة من القرص.`);
+    }
+  } catch (err) {
+    console.warn("تعذر تحميل الرسائل من القرص:", err.message);
+  }
+}
+
+let saveDiskTimeout = null;
+function persistGroupMessagesToDisk() {
+  if (saveDiskTimeout) clearTimeout(saveDiskTimeout);
+  saveDiskTimeout = setTimeout(() => {
+    try {
+      const obj = {};
+      for (const [jid, msgs] of groupMessageStore.entries()) {
+        obj[jid] = msgs.slice(-MAX_MESSAGES_PER_GROUP);
+      }
+      fs.writeFileSync(MESSAGES_FILE, JSON.stringify(obj, null, 2), "utf8");
+    } catch (e) {
+      console.warn("تعذر حفظ الرسائل على القرص:", e.message);
+    }
+  }, 1000);
+}
+
+// Load existing stored messages
+loadGroupMessagesFromDisk();
 
 function storeGroupMessage(msg) {
   if (!msg || !msg.key) return;
@@ -88,6 +127,7 @@ function storeGroupMessage(msg) {
   if (list.length > MAX_MESSAGES_PER_GROUP) {
     list.shift();
   }
+  persistGroupMessagesToDisk();
 }
 
 // Initialize WhatsApp Socket
@@ -102,6 +142,14 @@ async function startWhatsAppSocket() {
       printQRInTerminal: false,
       auth: state,
       browser: ["HajjOmrahWorkflow", "Chrome", "1.0.0"],
+      syncFullHistory: true,
+      shouldSyncHistoryMessage: () => true,
+      getMessage: async (key) => {
+        if (!key?.remoteJid) return undefined;
+        const list = groupMessageStore.get(key.remoteJid) || [];
+        const found = list.find((m) => m.key && m.key.id === key.id);
+        return found?.message || undefined;
+      },
     });
 
     sock.ev.on("creds.update", saveCreds);
@@ -158,6 +206,7 @@ async function startWhatsAppSocket() {
 
     // Listen to synced history
     sock.ev.on("messaging-history.set", ({ messages }) => {
+      console.log(`📥 تم استلام مزامنة سجل الرسائل: ${messages?.length || 0} رسالة.`);
       if (Array.isArray(messages)) {
         for (const msg of messages) {
           storeGroupMessage(msg);
@@ -179,6 +228,7 @@ async function refreshGroups() {
       id: g.id,
       subject: g.subject || "مجموعة بدون اسم",
       participantsCount: g.participants?.length || 0,
+      storedMessagesCount: (groupMessageStore.get(g.id) || []).length,
     }));
     return cachedGroups;
   } catch (e) {
@@ -425,6 +475,8 @@ app.post("/send-group-package", async (req, res) => {
 
 // --- Helper Functions for Phone & Passport Extraction ---
 
+// --- Helper Functions for Phone & Passport Extraction ---
+
 function extractPhoneNumbers(text) {
   if (!text || typeof text !== "string") return [];
   const easternDigits = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"];
@@ -433,50 +485,73 @@ function extractPhoneNumbers(text) {
 
   const results = new Set();
 
-  // Egyptian phones: 010, 011, 012, 015
-  const egRegex = /(?:(?:\+|00)?20)?0?1[0125]\d{8}\b/g;
+  // Egyptian phones: 010, 011, 012, 015 with optional +20/0020 and optional spaces, dots, dashes
+  const egRegex = /(?:(?:\+|00)?20[\s.-]?)?0?1[0125](?:[\s.-]?\d){8}\b/g;
   let match;
   while ((match = egRegex.exec(normalized)) !== null) {
-    let clean = match[0].replace(/^[+0]+/, "");
-    if (!clean.startsWith("20")) clean = "20" + clean;
-    results.add("+" + clean);
+    const raw = match[0];
+    const digitsOnly = raw.replace(/\D/g, "");
+    const clean = digitsOnly.replace(/^00/, "").replace(/^0+/, "");
+    if (clean.startsWith("20") && clean.length === 12) {
+      results.add("+" + clean);
+    } else if (clean.startsWith("1") && clean.length === 10) {
+      results.add("+20" + clean);
+    }
   }
 
-  // Saudi phones: 05...
-  const saRegex = /(?:(?:\+|00)?966)?0?5\d{8}\b/g;
+  // Saudi phones: 05... with optional +966/00966 and optional spaces, dots, dashes
+  const saRegex = /(?:(?:\+|00)?966[\s.-]?)?0?5(?:[\s.-]?\d){8}\b/g;
   while ((match = saRegex.exec(normalized)) !== null) {
-    let clean = match[0].replace(/^[+0]+/, "");
-    if (!clean.startsWith("966")) clean = "966" + clean;
-    results.add("+" + clean);
+    const raw = match[0];
+    const digitsOnly = raw.replace(/\D/g, "");
+    const clean = digitsOnly.replace(/^00/, "").replace(/^0+/, "");
+    if (clean.startsWith("966") && clean.length === 12) {
+      results.add("+" + clean);
+    } else if (clean.startsWith("5") && clean.length === 9) {
+      results.add("+966" + clean);
+    }
   }
 
-  // General international phones: 9 to 15 digits
-  const genRegex = /(?:\+|00)\d{9,14}\b/g;
+  // General international phones:
+  const genRegex = /(?:\+|00)\d(?:[\s.-]?\d){7,14}\b/g;
   while ((match = genRegex.exec(normalized)) !== null) {
-    let clean = match[0].replace(/^[+0]+/, "");
-    results.add("+" + clean);
+    const raw = match[0];
+    const digitsOnly = raw.replace(/\D/g, "");
+    if (digitsOnly.length >= 9 && digitsOnly.length <= 15) {
+      results.add("+" + digitsOnly.replace(/^00/, ""));
+    }
   }
 
   return Array.from(results);
 }
 
-function getMessageImage(msg) {
+function getUnwrappedMessage(msg) {
   if (!msg || !msg.message) return null;
-  const m = msg.message;
-  return (
-    m.imageMessage ||
-    m.viewOnceMessage?.message?.imageMessage ||
-    m.viewOnceMessageV2?.message?.imageMessage ||
-    (m.documentWithCaptionMessage?.message?.documentMessage?.mimetype?.startsWith("image/")
-      ? m.documentWithCaptionMessage.message.documentMessage
-      : null) ||
-    (m.documentMessage?.mimetype?.startsWith("image/") ? m.documentMessage : null)
-  );
+  return extractMessageContent(msg.message) || msg.message;
+}
+
+function getMessageImage(msg) {
+  const m = getUnwrappedMessage(msg);
+  if (!m) return null;
+  if (m.imageMessage) return m.imageMessage;
+  if (m.viewOnceMessage?.message?.imageMessage) return m.viewOnceMessage.message.imageMessage;
+  if (m.viewOnceMessageV2?.message?.imageMessage) return m.viewOnceMessageV2.message.imageMessage;
+
+  // Document messages (passport photos sent as uncompressed files or images)
+  const doc = m.documentMessage || m.documentWithCaptionMessage?.message?.documentMessage;
+  if (doc) {
+    const mime = (doc.mimetype || "").toLowerCase();
+    const fn = (doc.fileName || "").toLowerCase();
+    if (mime.startsWith("image/") || /\.(jpe?g|png|webp|heic)$/i.test(fn)) {
+      return doc;
+    }
+  }
+  return null;
 }
 
 function getMessageText(msg) {
-  if (!msg || !msg.message) return "";
-  const m = msg.message;
+  const m = getUnwrappedMessage(msg);
+  if (!m) return "";
   return (
     m.conversation ||
     m.extendedTextMessage?.text ||
@@ -489,27 +564,44 @@ function getMessageText(msg) {
 }
 
 function getQuotedMessageStanzaId(msg) {
-  if (!msg || !msg.message) return null;
-  const m = msg.message;
+  const m = getUnwrappedMessage(msg);
+  if (!m) return null;
   const context =
     m.extendedTextMessage?.contextInfo ||
     m.imageMessage?.contextInfo ||
     m.documentMessage?.contextInfo ||
-    m.documentWithCaptionMessage?.message?.documentMessage?.contextInfo;
+    m.documentWithCaptionMessage?.message?.documentMessage?.contextInfo ||
+    m.videoMessage?.contextInfo;
   return context?.stanzaId || null;
 }
 
 async function downloadImageAsBase64(msg) {
   try {
-    const buffer = await downloadMediaMessage(
-      msg,
-      "buffer",
-      {},
-      {
-        logger: pino({ level: "silent" }),
-        reuploadRequest: sock?.updateMediaMessage,
+    let buffer = null;
+    try {
+      buffer = await downloadMediaMessage(
+        msg,
+        "buffer",
+        {},
+        {
+          logger: pino({ level: "silent" }),
+          reuploadRequest: sock?.updateMediaMessage,
+        }
+      );
+    } catch (e1) {
+      const unwrapped = getUnwrappedMessage(msg);
+      if (unwrapped) {
+        buffer = await downloadMediaMessage(
+          { key: msg.key, message: unwrapped },
+          "buffer",
+          {},
+          {
+            logger: pino({ level: "silent" }),
+            reuploadRequest: sock?.updateMediaMessage,
+          }
+        );
       }
-    );
+    }
     if (!buffer) return null;
     const imgObj = getMessageImage(msg);
     const mimetype = imgObj?.mimetype || "image/jpeg";
@@ -520,7 +612,16 @@ async function downloadImageAsBase64(msg) {
   }
 }
 
-async function scanAndPairGroupMessages(groupJid, limit = 100) {
+// Compare two sender JIDs safely handling multi-device prefixes
+function isSameSender(jid1, jid2) {
+  if (!jid1 || !jid2) return false;
+  try {
+    if (typeof areJidsSameUser === "function" && areJidsSameUser(jid1, jid2)) return true;
+  } catch {}
+  return jidNormalizedUser(jid1) === jidNormalizedUser(jid2);
+}
+
+async function scanAndPairGroupMessages(groupJid, limit = 200) {
   const allMsgs = groupMessageStore.get(groupJid) || [];
   const msgs = allMsgs.slice(-limit);
 
@@ -529,7 +630,8 @@ async function scanAndPairGroupMessages(groupJid, limit = 100) {
 
   for (const m of msgs) {
     const timestamp = Number(m.messageTimestamp || Date.now() / 1000);
-    const sender = m.key?.participant || m.participant || m.key?.remoteJid || "";
+    const rawSender = m.key?.participant || m.participant || m.key?.remoteJid || "";
+    const sender = jidNormalizedUser(rawSender);
     const pushName = m.pushName || "";
     const msgId = m.key?.id;
 
@@ -642,7 +744,7 @@ async function scanAndPairGroupMessages(groupJid, limit = 100) {
     }
   }
 
-  // 3. Proximity / Same Sender within 15 minutes window (any order: photo first or phone first)
+  // 3. Proximity: Same Sender within 30 minutes window (1800s)
   for (const img of images) {
     if (usedImageIds.has(img.id)) continue;
 
@@ -651,9 +753,9 @@ async function scanAndPairGroupMessages(groupJid, limit = 100) {
 
     for (const tp of textPhones) {
       if (usedPhoneIds.has(tp.id)) continue;
-      if (tp.sender === img.sender) {
+      if (isSameSender(tp.sender, img.sender)) {
         const timeDiff = Math.abs(tp.timestamp - img.timestamp);
-        if (timeDiff <= 900 && timeDiff < minDiff) {
+        if (timeDiff <= 1800 && timeDiff < minDiff) {
           minDiff = timeDiff;
           bestPhone = tp;
         }
@@ -685,7 +787,43 @@ async function scanAndPairGroupMessages(groupJid, limit = 100) {
     }
   }
 
-  // 4. Unpaired images (e.g. passport arrived but phone is pending)
+  // 4. Sequence Proximity: Any sender within 10 minutes (600s)
+  for (const img of images) {
+    if (usedImageIds.has(img.id)) continue;
+
+    let bestPhone = null;
+    let minDiff = Infinity;
+
+    for (const tp of textPhones) {
+      if (usedPhoneIds.has(tp.id)) continue;
+      const timeDiff = Math.abs(tp.timestamp - img.timestamp);
+      if (timeDiff <= 600 && timeDiff < minDiff) {
+        minDiff = timeDiff;
+        bestPhone = tp;
+      }
+    }
+
+    if (bestPhone) {
+      const imgBase64 = await downloadImageAsBase64(img.rawMsg);
+      if (imgBase64) {
+        pairs.push({
+          id: `pair_${img.id}_${bestPhone.id}`,
+          sender: img.sender,
+          senderName: img.pushName || bestPhone.pushName,
+          timestamp: Math.max(img.timestamp, bestPhone.timestamp),
+          phoneNumber: bestPhone.phones[0],
+          additionalPhones: bestPhone.phones.slice(1),
+          imageBase64: imgBase64,
+          matchedBy: "proximity",
+          details: `ربط بتسلسل الرسائل المتجاورة في المحادثة`,
+        });
+        usedImageIds.add(img.id);
+        usedPhoneIds.add(bestPhone.id);
+      }
+    }
+  }
+
+  // 5. Unpaired images (passport arrived, phone pending or to be entered manually)
   for (const img of images) {
     if (usedImageIds.has(img.id)) continue;
     const imgBase64 = await downloadImageAsBase64(img.rawMsg);
@@ -706,7 +844,12 @@ async function scanAndPairGroupMessages(groupJid, limit = 100) {
   }
 
   pairs.sort((a, b) => b.timestamp - a.timestamp);
-  return pairs;
+  return {
+    totalMessagesStored: allMsgs.length,
+    totalImagesFound: images.length,
+    totalPhonesFound: textPhones.length,
+    pairs,
+  };
 }
 
 // 4. Scan Group for Passports & Phone Numbers
@@ -718,7 +861,7 @@ app.post("/scan-group-phones", async (req, res) => {
       });
     }
 
-    const { targetGroup, groupLink, limit = 100 } = req.body;
+    const { targetGroup, groupLink, limit = 200 } = req.body;
     let groupJid = await resolveGroupJid(targetGroup || groupLink);
 
     if (!groupJid && targetGroup && targetGroup.includes("@g.us")) {
@@ -727,18 +870,21 @@ app.post("/scan-group-phones", async (req, res) => {
 
     if (!groupJid) {
       return res.status(404).json({
-        error: "تعذر العثور على المجموعة المحددة في الواتساب.",
+        error: "تعذر العثور على المجموعة المحددة في الواتساب. تأكد من أن الحساب متواجد في هذه المجموعة.",
       });
     }
 
     console.log(`\n🔍 فحص رسائل المجموعة (${groupJid}) لجلب صور الجوازات وأرقام الهواتف...`);
-    const pairs = await scanAndPairGroupMessages(groupJid, Number(limit) || 100);
+    const scanResult = await scanAndPairGroupMessages(groupJid, Number(limit) || 200);
 
     res.json({
       success: true,
       groupJid,
-      count: pairs.length,
-      pairs,
+      count: scanResult.pairs.length,
+      pairs: scanResult.pairs,
+      totalMessagesStored: scanResult.totalMessagesStored,
+      totalImagesFound: scanResult.totalImagesFound,
+      totalPhonesFound: scanResult.totalPhonesFound,
     });
   } catch (err) {
     console.error("خطأ أثناء فحص أرقام المجموعة:", err);
