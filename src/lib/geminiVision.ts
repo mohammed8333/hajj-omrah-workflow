@@ -137,18 +137,40 @@ async function pingGeminiModel(
     }
 
     const errData = await res.json().catch(() => ({}));
-    const errMsg: string = errData?.error?.message || `HTTP ${res.status}`;
+    const rawErrMsg: string = errData?.error?.message || `HTTP ${res.status}`;
+    const errMsg = formatGeminiErrorMessage(rawErrMsg);
 
     // Extract any model suggestion from Google's response
     // e.g. "Please update your code to use models/gemini-3.6-flash"
-    const suggestedMatch = errMsg.match(/models\/([a-zA-Z0-9\.\-_]+)/);
+    const suggestedMatch = rawErrMsg.match(/models\/([a-zA-Z0-9\.\-_]+)/);
     const suggestedModel = suggestedMatch ? suggestedMatch[1] : undefined;
 
     return { ok: false, suggestedModel, error: errMsg };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "فشل الاتصال";
-    return { ok: false, error: msg };
+    return { ok: false, error: formatGeminiErrorMessage(msg) };
   }
+}
+
+/**
+ * Translates Google Gemini API error messages to clear, actionable Arabic instructions
+ */
+export function formatGeminiErrorMessage(rawMsg: string): string {
+  if (!rawMsg) return "فشل الاتصال بخادم الذكاء الاصطناعي.";
+  const lower = rawMsg.toLowerCase();
+  if (lower.includes("denied access") || lower.includes("permission_denied")) {
+    return "تم إيقاف أو حظر مشروع Google المرتبط بمفتاح Gemini الحالي من قِبل جوجل (Your project has been denied access). يرجى استخراج مفتاح API جديد ومجاني من Google AI Studio (aistudio.google.com) وحفظه في الإعدادات.";
+  }
+  if (lower.includes("api key not valid") || lower.includes("api_key_invalid")) {
+    return "مفتاح Google Gemini API غير صالح، يرجى التأكد من نسخه بشكل صحيح من Google AI Studio.";
+  }
+  if (lower.includes("quota") || lower.includes("429") || lower.includes("resource_exhausted")) {
+    return "تم تجاوز حد الطلبات المسموح به لمفتاح Gemini مؤقتاً (429 Rate Limit). يرجى الانتظار دقيقة والمحاولة مجدداً.";
+  }
+  if (lower.includes("high demand") || lower.includes("503") || lower.includes("unavailable")) {
+    return "تشهد خوادم Google Gemini ضغطاً مؤقتاً في الوقت الحالي (503 High Demand). يرجى إعادة المحاولة بعد قليل.";
+  }
+  return rawMsg;
 }
 
 // Dynamically discover and resolve the available Gemini model for the user's API key
@@ -441,15 +463,7 @@ async function callGeminiVision(
   }
 
   // Format user-friendly error if all models exhausted
-  let friendlyMsg = lastErrorMsg;
-  if (lastErrorMsg.includes("high demand") || lastErrorMsg.includes("503")) {
-    friendlyMsg =
-      "تشهد خوادم Google Gemini ضغطاً مؤقتاً في الوقت الحالي (503 High Demand). تم التحويل التلقائي للقارئ البديل، يرجى إعادة المحاولة بعد لحظات.";
-  } else if (lastErrorMsg.includes("quota") || lastErrorMsg.includes("429")) {
-    friendlyMsg =
-      "تم تجاوز حد الطلبات لمفتاح Gemini مؤقتاً (429 Rate Limit). يرجى الانتظار نصف دقيقة والمحاولة مجدداً.";
-  }
-
+  const friendlyMsg = formatGeminiErrorMessage(lastErrorMsg);
   throw new Error(friendlyMsg || "فشل فحص المستند بالذكاء الاصطناعي عبر كافة موديلات Gemini المتاحة.");
 }
 
