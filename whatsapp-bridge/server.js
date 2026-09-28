@@ -1,3 +1,19 @@
+// Filter out noisy libsignal decryption warnings for incoming messages from unrelated chats/groups.
+// Since this bridge is dedicated strictly to OUTBOUND sending, incoming decryption failures are completely harmless.
+const originalConsoleError = console.error;
+console.error = function (...args) {
+  const combined = args.map((a) => (typeof a === "object" ? (a?.stack || a?.message || "") : String(a))).join(" ");
+  if (
+    combined.includes("Failed to decrypt message") ||
+    combined.includes("Session error:") ||
+    combined.includes("Bad MAC") ||
+    combined.includes("MessageCounterError")
+  ) {
+    return; // Suppress harmless incoming session decryption noise
+  }
+  originalConsoleError.apply(console, args);
+};
+
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
