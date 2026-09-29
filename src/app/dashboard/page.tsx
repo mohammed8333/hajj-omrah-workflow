@@ -50,8 +50,7 @@ import {
   TableColumnFiltersState,
   initialColumnFilters,
   matchesColumnFilters,
-  SAUDI_AGENT_STATUS_OPTIONS,
-  DEFAULT_STATUS_OPTIONS,
+  getDistinctStatusOptions,
   HOSTING_OPTIONS,
 } from "@/components/requests/TableColumnFilters";
 import { getTravelArchiveCategory } from "@/lib/travelArchiveUtils";
@@ -556,6 +555,64 @@ ${travelersLines}
   const activeRoleRequests = roleRequests.filter((r) => getTravelArchiveCategory(r) === "ACTIVE");
   const recentArchivedRequests = roleRequests.filter((r) => getTravelArchiveCategory(r) === "ARCHIVED_RECENT");
   const oldArchivedRequests = roleRequests.filter((r) => getTravelArchiveCategory(r) === "ARCHIVED_OLD");
+
+  // Determine the baseline requests for the current tab (for dynamic status filters)
+  const currentTabBaseRequests = React.useMemo(() => {
+    if (activeTab === "ARCHIVED") return recentArchivedRequests;
+    if (activeTab === "ARCHIVED_OLD") return oldArchivedRequests;
+    if (activeTab === "ALL") return activeRoleRequests;
+    return activeRoleRequests.filter((r) => {
+      if (activeTab === "NEW") return r.status === "Submitted" || r.status === "Draft";
+      if (activeTab === "REVIEW") return r.status === "UnderReview";
+      if (activeTab === "ISSUES")
+        return (
+          r.status === "CorrectionRequired" ||
+          r.status === "MissingDocuments" ||
+          r.status === "SaudiAgentCorrectionRequired"
+        );
+      if (activeTab === "READY_AGENT") return r.status === "ReadyForSaudiAgent";
+      if (activeTab === "HOSTING")
+        return (
+          r.status === "HostingAcceptanceRequested" ||
+          r.status === "HostingAcceptedBySender" ||
+          r.status === "HostingConfirmed"
+        );
+      if (activeTab === "AGENT_INBOX")
+        return (
+          r.status === "ReadyForSaudiAgent" ||
+          r.status === "ReceivedBySaudiAgent" ||
+          r.status === "SaudiAgentProcessing" ||
+          r.status === "SaudiAgentCorrectionRequired" ||
+          r.status === "ProgramLinked" ||
+          r.status === "HostingAcceptanceRequested" ||
+          r.status === "HostingAcceptedBySender" ||
+          r.status === "HostingConfirmed"
+        );
+      if (activeTab === "PROCESSING")
+        return (
+          r.status === "UnderReview" ||
+          r.status === "ReadyForSaudiAgent" ||
+          r.status === "ReceivedBySaudiAgent" ||
+          r.status === "SaudiAgentProcessing" ||
+          r.status === "ProgramLinked" ||
+          r.status === "HostingAcceptanceRequested" ||
+          r.status === "HostingAcceptedBySender" ||
+          r.status === "HostingConfirmed"
+        );
+      if (activeTab === "COMPLETED")
+        return (
+          r.status === "Completed" ||
+          ((role === "SafaEmployee" || role === "Admin") &&
+            (r.status === "SafaRegistrationCompleted" ||
+              r.status === "DocumentsCompleted"))
+        );
+      return true;
+    });
+  }, [activeTab, recentArchivedRequests, oldArchivedRequests, activeRoleRequests, role]);
+
+  const distinctStatusOptions = React.useMemo(() => {
+    return getDistinctStatusOptions(currentTabBaseRequests, role, colFilters.status);
+  }, [currentTabBaseRequests, role, colFilters.status]);
 
   // For Safa and Admin who inspect across all requests:
   const activeAllRequests = requests.filter((r) => getTravelArchiveCategory(r) === "ACTIVE");
@@ -1973,7 +2030,7 @@ ${travelersLines}
                           value={colFilters.status}
                           onChange={(v) => handleColFilterChange("status", v)}
                           onClear={() => handleColFilterChange("status", "")}
-                          options={role === "SaudiAgent" ? SAUDI_AGENT_STATUS_OPTIONS : DEFAULT_STATUS_OPTIONS}
+                          options={distinctStatusOptions}
                           align="right"
                         />
                       </div>

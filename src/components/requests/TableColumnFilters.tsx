@@ -60,6 +60,103 @@ export const DEFAULT_STATUS_OPTIONS = [
   { value: "Archived", label: "معاملات مؤرشفة" },
 ];
 
+export const STATUS_DISPLAY_NAMES: Record<string, string> = {
+  Draft: "مسودة",
+  Submitted: "تم التقديم",
+  UnderReview: "قيد المراجعة",
+  MissingDocuments: "مستندات ناقصة",
+  CorrectionRequired: "مطلوب تصحيح",
+  DocumentsCompleted: "المستندات مكتملة",
+  SafaRegistrationCompleted: "اكتمل تسجيل صفا",
+  ReadyForSaudiAgent: "جاهز للوكيل السعودي",
+  ReceivedBySaudiAgent: "مستلم من الوكيل",
+  SaudiAgentProcessing: "قيد المعالجة",
+  SaudiAgentCorrectionRequired: "مطلوب تصحيح من الوكيل",
+  ProgramLinked: "تم ربط البرنامج",
+  HostingAcceptanceRequested: "بانتظار قبول الاستضافة",
+  HostingAcceptedBySender: "تم قبول الاستضافة",
+  HostingConfirmed: "تم تأكيد الاستضافة",
+  Completed: "(تم) - مكتمل",
+  Cancelled: "ملغي",
+  Archived: "معاملات مؤرشفة",
+};
+
+export const SAUDI_AGENT_STATUS_DISPLAY_NAMES: Record<string, string> = {
+  ...STATUS_DISPLAY_NAMES,
+  ReadyForSaudiAgent: "جديد محال من صفا",
+  SaudiAgentCorrectionRequired: "مطلوب تصحيح",
+};
+
+export const STATUS_WORKFLOW_ORDER: string[] = [
+  "Draft",
+  "Submitted",
+  "UnderReview",
+  "MissingDocuments",
+  "CorrectionRequired",
+  "DocumentsCompleted",
+  "SafaRegistrationCompleted",
+  "ReadyForSaudiAgent",
+  "ReceivedBySaudiAgent",
+  "SaudiAgentProcessing",
+  "SaudiAgentCorrectionRequired",
+  "ProgramLinked",
+  "HostingAcceptanceRequested",
+  "HostingAcceptedBySender",
+  "HostingConfirmed",
+  "Completed",
+  "Cancelled",
+  "Archived",
+];
+
+/**
+ * Returns dynamic status filter options containing ONLY the statuses present
+ * in the current requests dataset, plus the "جميع الحالات" (All) option.
+ */
+export function getDistinctStatusOptions(
+  requests: GroupRequestSummary[],
+  role?: string,
+  selectedStatus?: string
+): Array<{ value: string; label: string }> {
+  const labelMap = role === "SaudiAgent" ? SAUDI_AGENT_STATUS_DISPLAY_NAMES : STATUS_DISPLAY_NAMES;
+  const presentStatuses = new Set<string>();
+
+  (requests || []).forEach((r) => {
+    if (r.status && typeof r.status === "string" && r.status.trim()) {
+      presentStatuses.add(r.status.trim());
+    }
+  });
+
+  // Preserve the currently selected status if any, so user doesn't get an orphan state
+  if (selectedStatus && selectedStatus.trim()) {
+    presentStatuses.add(selectedStatus.trim());
+  }
+
+  const options: Array<{ value: string; label: string }> = [
+    { value: "", label: "جميع الحالات" },
+  ];
+
+  // Add present statuses in natural workflow order
+  STATUS_WORKFLOW_ORDER.forEach((st) => {
+    if (presentStatuses.has(st)) {
+      options.push({
+        value: st,
+        label: labelMap[st] || st,
+      });
+      presentStatuses.delete(st);
+    }
+  });
+
+  // If there are any non-standard or custom statuses present, append them
+  presentStatuses.forEach((st) => {
+    options.push({
+      value: st,
+      label: labelMap[st] || st,
+    });
+  });
+
+  return options;
+}
+
 export const HOSTING_OPTIONS = [
   { value: "ALL", label: "الكل (استضافة / بدون)" },
   { value: "WITH_HOST", label: "مع استضافة" },
