@@ -13,6 +13,7 @@ import UsersManagementPage from "@/app/admin/users/page";
 import AuditLogsPage from "@/app/admin/audit-logs/page";
 import AdminSettingsPage from "@/app/admin/settings/page";
 import SenderReportPage from "@/app/reports/sender/page";
+import TravelReportPage from "@/app/reports/travel/page";
 import { syncGeminiApiKeyFromDatabase } from "@/lib/geminiVision";
 
 interface ErrorBoundaryState {
@@ -138,6 +139,7 @@ export default function App() {
                 <Route path="/requests/new" element={<UnifiedNewRequestPage />} />
                 <Route path="/requests/:id" element={<RequestDetailWrapper />} />
                 <Route path="/reports/sender" element={<SenderReportPage />} />
+                <Route path="/reports/travel" element={<TravelReportPage />} />
                 <Route path="/reports" element={<Navigate to="/reports/sender" replace />} />
                 <Route path="/admin/users" element={<UsersManagementPage />} />
                 <Route path="/admin/audit-logs" element={<AuditLogsPage />} />

@@ -52,6 +52,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       roles: ["Sender", "SafaEmployee", "SaudiAgent", "Admin"],
     },
     {
+      href: "/reports/travel",
+      label: "تقرير السفر",
+      icon: Plane,
+      roles: ["Admin"],
+    },
+    {
       href: "/admin/users",
       label: "إدارة المستخدمين",
       icon: Users,
