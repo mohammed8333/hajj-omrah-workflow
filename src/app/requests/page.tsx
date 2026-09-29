@@ -45,6 +45,7 @@ import {
   initialColumnFilters,
   matchesColumnFilters,
   getDistinctStatusOptions,
+  getDistinctDateOptions,
   HOSTING_OPTIONS,
 } from "@/components/requests/TableColumnFilters";
 import { getTravelArchiveCategory } from "@/lib/travelArchiveUtils";
@@ -550,6 +551,14 @@ ${travelersLines}
   const distinctStatusOptions = React.useMemo(() => {
     return getDistinctStatusOptions(currentTabBaseRequests, role, colFilters.status);
   }, [currentTabBaseRequests, role, colFilters.status]);
+
+  const distinctDepartureDates = React.useMemo(() => {
+    return getDistinctDateOptions(currentTabBaseRequests, "departure", colFilters.departureDate);
+  }, [currentTabBaseRequests, colFilters.departureDate]);
+
+  const distinctReturnDates = React.useMemo(() => {
+    return getDistinctDateOptions(currentTabBaseRequests, "return", colFilters.returnDate);
+  }, [currentTabBaseRequests, colFilters.returnDate]);
 
   // For Safa and Admin who inspect across all requests:
   const activeAllRequests = requests.filter((r) => getTravelArchiveCategory(r) === "ACTIVE");
@@ -1894,6 +1903,7 @@ ${travelersLines}
                           value={colFilters.departureDate}
                           onChange={(v) => handleColFilterChange("departureDate", v)}
                           onClear={() => handleColFilterChange("departureDate", "")}
+                          options={distinctDepartureDates}
                           align="right"
                         />
                       </div>
@@ -1909,6 +1919,7 @@ ${travelersLines}
                           value={colFilters.returnDate}
                           onChange={(v) => handleColFilterChange("returnDate", v)}
                           onClear={() => handleColFilterChange("returnDate", "")}
+                          options={distinctReturnDates}
                           align="right"
                         />
                       </div>

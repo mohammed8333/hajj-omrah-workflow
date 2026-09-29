@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Filter, X, RotateCcw } from "lucide-react";
+import { Filter, X, RotateCcw, Calendar } from "lucide-react";
 import { GroupRequestSummary } from "@/types";
 import { normalizeArabicText, isTravelerMatch } from "@/lib/searchUtils";
 
@@ -136,6 +136,109 @@ export const HOSTING_OPTIONS = [
 ];
 
 /**
+ * Normalizes date string into YYYY-MM-DD
+ */
+export function normalizeDateStr(d?: string): string {
+  if (!d) return "";
+  const trimmed = d.trim().split("T")[0].split(" ")[0];
+  const parts = trimmed.split(/[-/]/);
+  if (parts.length === 3) {
+    const y = parts[0].padStart(4, "0");
+    const m = parts[1].padStart(2, "0");
+    const day = parts[2].padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+  return trimmed;
+}
+
+/**
+ * Formats YYYY-MM-DD date into friendly Arabic string (e.g. الأربعاء، 30 سبتمبر 2026)
+ */
+export function formatArabicDateFriendly(dateStr?: string): string {
+  if (!dateStr || dateStr === "-") return "-";
+  try {
+    const norm = normalizeDateStr(dateStr);
+    const parts = norm.split("-");
+    if (parts.length === 3) {
+      const y = Number(parts[0]);
+      const m = Number(parts[1]);
+      const d = Number(parts[2]);
+      if (y && m && d) {
+        const dateObj = new Date(y, m - 1, d);
+        if (!isNaN(dateObj.getTime())) {
+          return dateObj.toLocaleDateString("ar-EG-u-nu-latn", {
+            weekday: "short",
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+          });
+        }
+      }
+    }
+    const fallback = new Date(dateStr);
+    if (!isNaN(fallback.getTime())) {
+      return fallback.toLocaleDateString("ar-EG-u-nu-latn", {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
+    }
+    return dateStr;
+  } catch {
+    return dateStr;
+  }
+}
+
+/**
+ * Extracts distinct dates with counts from requests for departure or return dates
+ */
+export function getDistinctDateOptions(
+  requests: GroupRequestSummary[],
+  dateType: "departure" | "return",
+  selectedDate?: string
+): Array<{ value: string; label: string; count?: number }> {
+  const countsMap = new Map<string, number>();
+
+  (requests || []).forEach((r) => {
+    const raw = dateType === "departure" ? (r.departureDate || r.travelDate) : r.returnDate;
+    if (raw && typeof raw === "string" && raw.trim()) {
+      const norm = normalizeDateStr(raw);
+      if (norm && /^\d{4}-\d{2}-\d{2}$/.test(norm)) {
+        countsMap.set(norm, (countsMap.get(norm) || 0) + 1);
+      }
+    }
+  });
+
+  // Preserve the currently selected date if any, so user doesn't lose their selection
+  if (selectedDate && selectedDate.trim()) {
+    const normSel = normalizeDateStr(selectedDate);
+    if (normSel && !countsMap.has(normSel)) {
+      countsMap.set(normSel, 0);
+    }
+  }
+
+  // Sort dates chronologically (earliest first)
+  const sortedDates = Array.from(countsMap.keys()).sort((a, b) => a.localeCompare(b));
+
+  const options: Array<{ value: string; label: string; count?: number }> = [
+    { value: "", label: "جميع التواريخ (عرض الكل)" },
+  ];
+
+  sortedDates.forEach((d) => {
+    const count = countsMap.get(d) || 0;
+    const formatted = formatArabicDateFriendly(d);
+    options.push({
+      value: d,
+      label: formatted,
+      count,
+    });
+  });
+
+  return options;
+}
+
+/**
  * Checks whether a request matches the active column filters
  */
 export function matchesColumnFilters(
@@ -163,17 +266,23 @@ export function matchesColumnFilters(
     }
   }
 
-  // 4. Departure Date Filter (matches YYYY-MM-DD prefix)
+  // 4. Departure Date Filter (matches YYYY-MM-DD)
   if (filters.departureDate) {
     const dep = r.departureDate || r.travelDate;
-    if (!dep || !dep.startsWith(filters.departureDate)) {
+    if (!dep) return false;
+    const normDep = normalizeDateStr(dep);
+    const normFilter = normalizeDateStr(filters.departureDate);
+    if (!normDep.startsWith(normFilter) && !dep.trim().startsWith(filters.departureDate.trim())) {
       return false;
     }
   }
 
-  // 5. Return Date Filter (matches YYYY-MM-DD prefix)
+  // 5. Return Date Filter (matches YYYY-MM-DD)
   if (filters.returnDate) {
-    if (!r.returnDate || !r.returnDate.startsWith(filters.returnDate)) {
+    if (!r.returnDate) return false;
+    const normRet = normalizeDateStr(r.returnDate);
+    const normFilter = normalizeDateStr(filters.returnDate);
+    if (!normRet.startsWith(normFilter) && !r.returnDate.trim().startsWith(filters.returnDate.trim())) {
       return false;
     }
   }
@@ -257,8 +366,8 @@ export function HeaderColumnFilter({
     document.addEventListener("mousedown", handleClickOutside);
     document.addEventListener("keydown", handleKeyDown);
 
-    // Auto-focus input when opening
-    if (inputRef.current) {
+    // Auto-focus input when opening (text only)
+    if (inputRef.current && type === "text") {
       inputRef.current.focus();
     }
 
@@ -266,7 +375,7 @@ export function HeaderColumnFilter({
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isOpen]);
+  }, [isOpen, type]);
 
   const alignmentClass =
     align === "left"
@@ -300,7 +409,9 @@ export function HeaderColumnFilter({
         <div
           ref={popoverRef}
           onClick={(e) => e.stopPropagation()}
-          className={`absolute top-full mt-1.5 z-50 bg-white rounded-xl shadow-2xl border border-gray-200 p-3 min-w-[220px] max-w-xs text-right font-normal text-xs text-gray-800 ${alignmentClass}`}
+          className={`absolute top-full mt-1.5 z-50 bg-white rounded-xl shadow-2xl border border-gray-200 p-3 ${
+            type === "date" ? "min-w-[270px] max-w-sm" : "min-w-[220px] max-w-xs"
+          } text-right font-normal text-xs text-gray-800 ${alignmentClass}`}
           dir="rtl"
         >
           {/* Header */}
@@ -345,14 +456,102 @@ export function HeaderColumnFilter({
             )}
 
             {type === "date" && (
-              <div className="relative">
-                <input
-                  ref={inputRef}
-                  type="date"
-                  value={value}
-                  onChange={(e) => onChange(e.target.value)}
-                  className="w-full px-2 py-1.5 text-xs rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-sky-500 bg-white font-mono"
-                />
+              <div className="space-y-2">
+                {/* Available Dates List from Transactions */}
+                <div className="space-y-1">
+                  <div className="text-[11px] font-bold text-gray-700 px-1 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-sky-600" />
+                      <span>التواريخ المتاحة:</span>
+                    </span>
+                    {options && options.length > 1 && (
+                      <span className="text-[10px] text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded-full font-medium">
+                        {options.length - 1} تاريخ
+                      </span>
+                    )}
+                  </div>
+
+                  {options && options.length > 0 ? (
+                    <div className="space-y-1 max-h-48 overflow-y-auto pr-0.5">
+                      {options.map((opt) => {
+                        const isSelected =
+                          value === opt.value ||
+                          (!value && opt.value === "");
+                        const isAll = opt.value === "";
+
+                        return (
+                          <button
+                            key={opt.value || "all-dates"}
+                            type="button"
+                            onClick={() => {
+                              onChange(opt.value);
+                              setIsOpen(false);
+                            }}
+                            className={`w-full text-right px-2.5 py-1.5 rounded-lg text-xs transition-colors flex items-center justify-between cursor-pointer ${
+                              isSelected
+                                ? "bg-sky-50 text-sky-800 font-bold border border-sky-200 shadow-2xs"
+                                : "text-gray-700 hover:bg-gray-100"
+                            }`}
+                          >
+                            <div className="flex flex-col text-right leading-tight truncate">
+                              <span className="truncate">{opt.label}</span>
+                              {!isAll && (
+                                <span className="text-[10px] text-gray-400 font-mono">
+                                  {opt.value}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0 mr-1.5">
+                              {typeof opt.count === "number" && opt.count > 0 && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">
+                                  {opt.count}
+                                </span>
+                              )}
+                              {isSelected && (
+                                <span className="text-sky-600 font-bold text-xs">✓</span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-[11px] text-gray-400 py-2 text-center">
+                      لا توجد تواريخ مسجلة بالمعاملات
+                    </div>
+                  )}
+                </div>
+
+                {/* Custom Date Input Picker with LTR to prevent year typing freeze */}
+                <div className="pt-2 border-t border-gray-100 space-y-1">
+                  <div className="flex items-center justify-between text-[11px] text-gray-500 font-medium px-1">
+                    <span>أو اختر تاريخاً محدداً:</span>
+                    {value && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onClear();
+                          setIsOpen(false);
+                        }}
+                        className="text-rose-600 hover:text-rose-800 text-[10px] font-bold cursor-pointer hover:underline"
+                      >
+                        مسح التصفية
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    type="date"
+                    dir="ltr"
+                    value={value}
+                    onChange={(e) => {
+                      onChange(e.target.value);
+                      if (e.target.value) {
+                        setIsOpen(false);
+                      }
+                    }}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-sky-500 bg-white font-mono text-center cursor-pointer"
+                  />
+                </div>
               </div>
             )}
 
