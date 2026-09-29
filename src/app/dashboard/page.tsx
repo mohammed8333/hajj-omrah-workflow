@@ -522,13 +522,6 @@ ${travelersLines}
   // Saudi Agent isolation: strictly only transactions referred to the agent or beyond
   const agentEligibleStatuses = [
     "ReadyForSaudiAgent",
-    "ReceivedBySaudiAgent",
-    "SaudiAgentProcessing",
-    "SaudiAgentCorrectionRequired",
-    "ProgramLinked",
-    "HostingAcceptanceRequested",
-    "HostingAcceptedBySender",
-    "HostingConfirmed",
     "Completed",
     "Archived",
   ];
@@ -567,37 +560,15 @@ ${travelersLines}
       if (activeTab === "ISSUES")
         return (
           r.status === "CorrectionRequired" ||
-          r.status === "MissingDocuments" ||
-          r.status === "SaudiAgentCorrectionRequired"
+          r.status === "MissingDocuments"
         );
       if (activeTab === "READY_AGENT") return r.status === "ReadyForSaudiAgent";
-      if (activeTab === "HOSTING")
-        return (
-          r.status === "HostingAcceptanceRequested" ||
-          r.status === "HostingAcceptedBySender" ||
-          r.status === "HostingConfirmed"
-        );
       if (activeTab === "AGENT_INBOX")
-        return (
-          r.status === "ReadyForSaudiAgent" ||
-          r.status === "ReceivedBySaudiAgent" ||
-          r.status === "SaudiAgentProcessing" ||
-          r.status === "SaudiAgentCorrectionRequired" ||
-          r.status === "ProgramLinked" ||
-          r.status === "HostingAcceptanceRequested" ||
-          r.status === "HostingAcceptedBySender" ||
-          r.status === "HostingConfirmed"
-        );
+        return r.status === "ReadyForSaudiAgent";
       if (activeTab === "PROCESSING")
         return (
           r.status === "UnderReview" ||
-          r.status === "ReadyForSaudiAgent" ||
-          r.status === "ReceivedBySaudiAgent" ||
-          r.status === "SaudiAgentProcessing" ||
-          r.status === "ProgramLinked" ||
-          r.status === "HostingAcceptanceRequested" ||
-          r.status === "HostingAcceptedBySender" ||
-          r.status === "HostingConfirmed"
+          r.status === "ReadyForSaudiAgent"
         );
       if (activeTab === "COMPLETED")
         return (
@@ -621,17 +592,8 @@ ${travelersLines}
   const countWithoutNusuk = activeRoleRequests.length - countWithNusuk;
 
   // Precomputed tab counts for active tabs (excluding past/archived transactions):
-  const agentInboxCount = activeRoleRequests.filter((r) =>
-    [
-      "ReadyForSaudiAgent",
-      "ReceivedBySaudiAgent",
-      "SaudiAgentProcessing",
-      "SaudiAgentCorrectionRequired",
-      "ProgramLinked",
-      "HostingAcceptanceRequested",
-      "HostingAcceptedBySender",
-      "HostingConfirmed",
-    ].includes(r.status)
+  const agentInboxCount = activeRoleRequests.filter(
+    (r) => r.status === "ReadyForSaudiAgent"
   ).length;
   const agentCompletedCount = activeRoleRequests.filter((r) => r.status === "Completed").length;
 
@@ -640,8 +602,7 @@ ${travelersLines}
   const safaIssuesCount = activeAllRequests.filter(
     (r) =>
       r.status === "CorrectionRequired" ||
-      r.status === "MissingDocuments" ||
-      r.status === "SaudiAgentCorrectionRequired"
+      r.status === "MissingDocuments"
   ).length;
   const safaReadyAgentCount = activeAllRequests.filter((r) => r.status === "ReadyForSaudiAgent").length;
   const safaCompletedCount = activeAllRequests.filter(
@@ -652,17 +613,10 @@ ${travelersLines}
   ).length;
 
   const senderNewCount = activeRoleRequests.filter((r) => r.status === "Submitted" || r.status === "Draft").length;
-  const senderHostingCount = activeRoleRequests.filter(
-    (r) =>
-      r.status === "HostingAcceptanceRequested" ||
-      r.status === "HostingAcceptedBySender" ||
-      r.status === "HostingConfirmed"
-  ).length;
   const senderIssuesCount = activeRoleRequests.filter(
     (r) =>
       r.status === "CorrectionRequired" ||
-      r.status === "MissingDocuments" ||
-      r.status === "SaudiAgentCorrectionRequired"
+      r.status === "MissingDocuments"
   ).length;
   const senderCompletedCount = activeRoleRequests.filter((r) => r.status === "Completed").length;
 
@@ -671,19 +625,12 @@ ${travelersLines}
     [
       "UnderReview",
       "ReadyForSaudiAgent",
-      "ReceivedBySaudiAgent",
-      "SaudiAgentProcessing",
-      "ProgramLinked",
-      "HostingAcceptanceRequested",
-      "HostingAcceptedBySender",
-      "HostingConfirmed",
     ].includes(r.status)
   ).length;
   const adminIssuesCount = activeAllRequests.filter(
     (r) =>
       r.status === "CorrectionRequired" ||
-      r.status === "MissingDocuments" ||
-      r.status === "SaudiAgentCorrectionRequired"
+      r.status === "MissingDocuments"
   ).length;
   const adminCompletedCount = activeAllRequests.filter((r) => r.status === "Completed").length;
 
@@ -730,37 +677,15 @@ ${travelersLines}
     if (activeTab === "ISSUES")
       return (
         r.status === "CorrectionRequired" ||
-        r.status === "MissingDocuments" ||
-        r.status === "SaudiAgentCorrectionRequired"
+        r.status === "MissingDocuments"
       );
     if (activeTab === "READY_AGENT") return r.status === "ReadyForSaudiAgent";
-    if (activeTab === "HOSTING")
-      return (
-        r.status === "HostingAcceptanceRequested" ||
-        r.status === "HostingAcceptedBySender" ||
-        r.status === "HostingConfirmed"
-      );
     if (activeTab === "AGENT_INBOX")
-      return (
-        r.status === "ReadyForSaudiAgent" ||
-        r.status === "ReceivedBySaudiAgent" ||
-        r.status === "SaudiAgentProcessing" ||
-        r.status === "SaudiAgentCorrectionRequired" ||
-        r.status === "ProgramLinked" ||
-        r.status === "HostingAcceptanceRequested" ||
-        r.status === "HostingAcceptedBySender" ||
-        r.status === "HostingConfirmed"
-      );
+      return r.status === "ReadyForSaudiAgent";
     if (activeTab === "PROCESSING")
       return (
         r.status === "UnderReview" ||
-        r.status === "ReadyForSaudiAgent" ||
-        r.status === "ReceivedBySaudiAgent" ||
-        r.status === "SaudiAgentProcessing" ||
-        r.status === "ProgramLinked" ||
-        r.status === "HostingAcceptanceRequested" ||
-        r.status === "HostingAcceptedBySender" ||
-        r.status === "HostingConfirmed"
+        r.status === "ReadyForSaudiAgent"
       );
     if (activeTab === "COMPLETED")
       return (
@@ -1075,17 +1000,6 @@ ${travelersLines}
               </button>
               <button
                 type="button"
-                onClick={() => setActiveTab("HOSTING")}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
-                  activeTab === "HOSTING"
-                    ? "bg-amber-600 text-white shadow-xs"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                طلبات الاستضافة ({senderHostingCount})
-              </button>
-              <button
-                type="button"
                 onClick={() => setActiveTab("ISSUES")}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
                   activeTab === "ISSUES"
@@ -1176,17 +1090,6 @@ ${travelersLines}
                 }`}
               >
                 جاهزة للوكيل ({safaReadyAgentCount})
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("HOSTING")}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
-                  activeTab === "HOSTING"
-                    ? "bg-amber-700 text-white shadow-xs"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                طلبات الاستضافة ({senderHostingCount})
               </button>
               <button
                 type="button"
