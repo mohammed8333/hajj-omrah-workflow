@@ -510,15 +510,6 @@ ${travelersLines}
     }
   }, [user, role, authLoading, router]);
 
-  if (authLoading || loading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-gray-500">
-        <div className="w-10 h-10 border-4 border-sky-600 border-t-transparent rounded-full animate-spin mb-3"></div>
-        <span className="text-sm">جاري تحميل لوحة التحكم...</span>
-      </div>
-    );
-  }
-
   // Saudi Agent isolation: strictly only transactions referred to the agent or beyond
   const agentEligibleStatuses = [
     "ReadyForSaudiAgent",
@@ -697,6 +688,15 @@ ${travelersLines}
 
     return true;
   });
+
+  if (authLoading || loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-gray-500">
+        <div className="w-10 h-10 border-4 border-sky-600 border-t-transparent rounded-full animate-spin mb-3"></div>
+        <span className="text-sm">جاري تحميل لوحة التحكم...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
