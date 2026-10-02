@@ -2,10 +2,10 @@
 
 import React, { useEffect, useState } from "react";
 import { RequestStatus } from "@/types";
-import { Clock, ShieldCheck, Plane, Archive } from "lucide-react";
+import { Clock, Plane, Archive } from "lucide-react";
 
 interface RequestLifecycleTimerProps {
-  createdAt: string;
+  createdAt?: string;
   travelDate?: string;
   departureDate?: string;
   flightDepartureTime?: string;
@@ -14,7 +14,6 @@ interface RequestLifecycleTimerProps {
 }
 
 export function RequestLifecycleTimer({
-  createdAt,
   travelDate,
   departureDate,
   flightDepartureTime,
@@ -83,131 +82,78 @@ export function RequestLifecycleTimer({
 
   // --- COMPACT VIEW (For tables and card lists) ---
   if (mode === "compact") {
+    if (!effectiveTravelDate) return null;
     return (
       <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
-        {/* Permanent Retention Badge */}
         <span
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border font-medium bg-emerald-50 text-emerald-800 border-emerald-200"
-          title="المعاملة ووثائقها محفوظة بشكل دائم دون أي حذف تلقائي"
+          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border font-medium ${archiveColor}`}
+          title={
+            isArchived
+              ? "المعاملة مؤرشفة حالياً"
+              : `تتأرشف تلقائياً فور انتهاء موعد السفر (${new Date(
+                  travelEpoch || 0
+                ).toLocaleString("ar-SA")})`
+          }
         >
-          <ShieldCheck className="w-3 h-3 shrink-0 text-emerald-600" />
-          <span>حفظ دائم</span>
+          {isArchived ? (
+            <Archive className="w-3 h-3 shrink-0" />
+          ) : (
+            <Plane className="w-3 h-3 shrink-0" />
+          )}
+          <span>{archiveText}</span>
         </span>
-
-        {/* Archival Timer Badge */}
-        {effectiveTravelDate && (
-          <span
-            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border font-medium ${archiveColor}`}
-            title={
-              isArchived
-                ? "المعاملة مؤرشفة حالياً"
-                : `تتأرشف تلقائياً فور انتهاء موعد السفر (${new Date(
-                    travelEpoch || 0
-                  ).toLocaleString("ar-SA")})`
-            }
-          >
-            {isArchived ? (
-              <Archive className="w-3 h-3 shrink-0" />
-            ) : (
-              <Plane className="w-3 h-3 shrink-0" />
-            )}
-            <span>{archiveText}</span>
-          </span>
-        )}
       </div>
     );
   }
 
   // --- DETAILED VIEW (For Request Details Page) ---
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-xs space-y-4">
+    <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-xs space-y-3">
       <div className="flex items-center justify-between border-b border-gray-100 pb-3">
         <div className="flex items-center gap-2">
           <Clock className="w-5 h-5 text-indigo-600" />
           <h2 className="text-base font-bold text-gray-900">
-            متابعة موعد السفر وحالة حفظ المعاملة
+            مؤقت الأرشفة التلقائية (موعد السفر)
           </h2>
         </div>
-        <span className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-md font-medium">
-          الحفظ الدائم مفعّل (بدون حذف تلقائي)
+        <span
+          className={`px-2.5 py-0.5 rounded-full font-bold text-[11px] border ${archiveColor}`}
+        >
+          {isArchived
+            ? "مؤرشفة حالياً"
+            : isTravelPassed
+            ? "انتهى وقت السفر"
+            : travelEpoch
+            ? `متبقي ${trvDays} يوم و ${trvHours} س`
+            : "غير محدد"}
         </span>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-        {/* Card 1: Permanent Retention (Auto-Deletion Disabled) */}
-        <div className="bg-emerald-50/40 rounded-xl p-4 border border-emerald-200 space-y-2.5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 font-bold text-gray-800">
-              <ShieldCheck className="w-4 h-4 text-emerald-600" />
-              <span>حالة الحفظ (دائم للأبد)</span>
-            </div>
-            <span className="px-2.5 py-0.5 rounded-full font-bold text-[11px] border bg-emerald-50 text-emerald-800 border-emerald-200">
-              محفوظة بشكل دائم ✓
-            </span>
-          </div>
+      <div className="bg-gray-50/80 rounded-xl p-4 border border-gray-200 space-y-2.5 text-xs">
+        <p className="text-[11px] text-gray-500 leading-relaxed">
+          تتحول المعاملة تلقائياً إلى حالة «مؤرشف» فور انقضاء موعد وتاريخ الرحلة لحفظها في الأرشيف التاريخي للنظام وتفادي تكدس المعاملات النشطة.
+        </p>
 
-          <p className="text-[11px] text-gray-600 leading-relaxed">
-            خاصية الحذف التلقائي معطّلة. يتم الاحتفاظ بكافة بيانات المعاملة ووثائقها وملفات المعتمرين التابعة لها بشكل دائم للأبد في النظام دون أي حذف.
-          </p>
-
-          <div className="pt-2 text-[11px] flex items-center justify-between bg-white/80 p-2.5 rounded-lg border border-emerald-100">
-            <span className="text-gray-500">تاريخ إنشاء المعاملة:</span>
-            <span className="font-bold text-gray-800">
-              {new Date(createdAt).toLocaleDateString("ar-EG-u-nu-latn", {
-                weekday: "short",
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}
-            </span>
-          </div>
-        </div>
-
-        {/* Card 2: Travel Date Auto-Archival */}
-        <div className="bg-gray-50/80 rounded-xl p-4 border border-gray-200 space-y-2.5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 font-bold text-gray-800">
-              <Archive className="w-4 h-4 text-slate-600" />
-              <span>مؤقت الأرشفة التلقائية (موعد السفر)</span>
-            </div>
-            <span
-              className={`px-2.5 py-0.5 rounded-full font-bold text-[11px] border ${archiveColor}`}
-            >
-              {isArchived
-                ? "مؤرشفة حالياً"
-                : isTravelPassed
-                ? "انتهى وقت السفر"
-                : travelEpoch
-                ? `متبقي ${trvDays} يوم و ${trvHours} س`
-                : "غير محدد"}
-            </span>
-          </div>
-
-          <p className="text-[11px] text-gray-500 leading-relaxed">
-            تتحول المعاملة تلقائياً إلى حالة «مؤرشف» فور انقضاء موعد وتاريخ الرحلة لحفظها في الأرشيف التاريخي للنظام وتفادي تكدس المعاملات النشطة.
-          </p>
-
-          <div className="pt-2 text-[11px] flex items-center justify-between bg-white p-2.5 rounded-lg border border-gray-100">
-            <span className="text-gray-500">موعد وتوقيت السفر:</span>
-            <span className="font-bold text-gray-800 flex items-center gap-1">
-              {effectiveTravelDate ? (
-                <>
-                  <Plane className="w-3.5 h-3.5 text-sky-600" />
-                  <span>
-                    {new Date(effectiveTravelDate).toLocaleDateString("ar-EG-u-nu-latn", {
-                      weekday: "short",
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                    })}{" "}
-                    {flightDepartureTime ? `• الساعة ${flightDepartureTime}` : ""}
-                  </span>
-                </>
-              ) : (
-                <span className="text-gray-400">لم يتم تحديد تاريخ الذهاب بعد</span>
-              )}
-            </span>
-          </div>
+        <div className="pt-1 text-[11px] flex items-center justify-between bg-white p-3 rounded-lg border border-gray-100">
+          <span className="text-gray-500 font-medium">موعد وتوقيت السفر:</span>
+          <span className="font-bold text-gray-800 flex items-center gap-1.5">
+            {effectiveTravelDate ? (
+              <>
+                <Plane className="w-4 h-4 text-sky-600" />
+                <span>
+                  {new Date(effectiveTravelDate).toLocaleDateString("ar-EG-u-nu-latn", {
+                    weekday: "short",
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })}{" "}
+                  {flightDepartureTime ? `• الساعة ${flightDepartureTime}` : ""}
+                </span>
+              </>
+            ) : (
+              <span className="text-gray-400">لم يتم تحديد تاريخ الذهاب بعد</span>
+            )}
+          </span>
         </div>
       </div>
     </div>
