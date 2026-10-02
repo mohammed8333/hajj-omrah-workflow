@@ -271,8 +271,11 @@ export default function RequestDetailPage({
           if (!foundDoc) {
             if (targetDocId === "HostId" || targetDocId === "host") {
               foundDoc =
+                (data.hostingInfo?.hostIdDocumentId
+                  ? data.groupDocuments?.find((d) => d.id === data.hostingInfo.hostIdDocumentId)
+                  : undefined) ||
                 data.hostingInfo?.hostIdDocument ||
-                data.groupDocuments?.find((d) => d.documentType === "HostId");
+                data.groupDocuments?.filter((d) => d.documentType === "HostId").slice(-1)[0];
             } else if (targetDocId === "Passport" || targetDocId === "pass") {
               foundDoc =
                 data.travelers?.[0]?.documents?.find((d) => d.documentType === "Passport") ||
@@ -806,8 +809,11 @@ export default function RequestDetailPage({
 
       // 1. Host ID Document
       const hostDoc =
+        (request.hostingInfo?.hostIdDocumentId
+          ? request.groupDocuments?.find((d) => d.id === request.hostingInfo.hostIdDocumentId)
+          : undefined) ||
         request.hostingInfo?.hostIdDocument ||
-        request.groupDocuments?.find((d) => d.documentType === "HostId");
+        request.groupDocuments?.filter((d) => d.documentType === "HostId").slice(-1)[0];
       if (hostDoc) {
         const ext =
           hostDoc.originalFileName?.split(".").pop() ||
@@ -820,8 +826,11 @@ export default function RequestDetailPage({
 
       // 2. Shared Flight Ticket Document
       const ticketDoc =
+        (request.flightTicketDocumentId
+          ? request.groupDocuments?.find((d) => d.id === request.flightTicketDocumentId)
+          : undefined) ||
         request.flightTicketDocument ||
-        request.groupDocuments?.find((d) => d.documentType === "FlightTicket");
+        request.groupDocuments?.filter((d) => d.documentType === "FlightTicket").slice(-1)[0];
       if (ticketDoc) {
         const ext =
           ticketDoc.originalFileName?.split(".").pop() ||
@@ -1262,8 +1271,11 @@ export default function RequestDetailPage({
     // 1. Check hosting document if hasHosting is true
     if (request.hasHosting) {
       const hostDoc =
+        (request.hostingInfo?.hostIdDocumentId
+          ? request.groupDocuments?.find((d) => d.id === request.hostingInfo.hostIdDocumentId)
+          : undefined) ||
         request.hostingInfo?.hostIdDocument ||
-        request.groupDocuments?.find((d) => d.documentType === "HostId");
+        request.groupDocuments?.filter((d) => d.documentType === "HostId").slice(-1)[0];
       if (!hostDoc) {
         return { isAllAccepted: false, reason: "مستند هوية المستضيف غير مرفوع في المعاملة." };
       }
@@ -1647,11 +1659,17 @@ export default function RequestDetailPage({
     canEditAnyData;
 
   const hostDoc =
+    (request.hostingInfo?.hostIdDocumentId
+      ? request.groupDocuments?.find((d) => d.id === request.hostingInfo.hostIdDocumentId)
+      : undefined) ||
     request.hostingInfo?.hostIdDocument ||
-    request.groupDocuments?.find((d) => d.documentType === "HostId");
+    request.groupDocuments?.filter((d) => d.documentType === "HostId").slice(-1)[0];
   const ticketDoc =
+    (request.flightTicketDocumentId
+      ? request.groupDocuments?.find((d) => d.id === request.flightTicketDocumentId)
+      : undefined) ||
     request.flightTicketDocument ||
-    request.groupDocuments?.find((d) => d.documentType === "FlightTicket");
+    request.groupDocuments?.filter((d) => d.documentType === "FlightTicket").slice(-1)[0];
 
   let totalDocsCount = (hostDoc ? 1 : 0) + (ticketDoc ? 1 : 0);
   request.travelers?.forEach((t) => {
@@ -1943,12 +1961,19 @@ export default function RequestDetailPage({
             <WhatsAppGroupSendButton
               request={request}
               ticketDoc={
-                request.groupDocuments?.find((d) => d.documentType === "FlightTicket") ||
+                (request.flightTicketDocumentId
+                  ? request.groupDocuments?.find((d) => d.id === request.flightTicketDocumentId)
+                  : undefined) ||
+                request.flightTicketDocument ||
+                request.groupDocuments?.filter((d) => d.documentType === "FlightTicket").slice(-1)[0] ||
                 request.travelers?.[0]?.documents?.find((d) => d.documentType === "FlightTicket")
               }
               hostDoc={
+                (request.hostingInfo?.hostIdDocumentId
+                  ? request.groupDocuments?.find((d) => d.id === request.hostingInfo.hostIdDocumentId)
+                  : undefined) ||
                 request.hostingInfo?.hostIdDocument ||
-                request.groupDocuments?.find((d) => d.documentType === "HostId")
+                request.groupDocuments?.filter((d) => d.documentType === "HostId").slice(-1)[0]
               }
             />
           )}
@@ -2405,8 +2430,11 @@ export default function RequestDetailPage({
 
             {(() => {
               const hostDoc =
+                (request.hostingInfo?.hostIdDocumentId
+                  ? request.groupDocuments?.find((d) => d.id === request.hostingInfo.hostIdDocumentId)
+                  : undefined) ||
                 request.hostingInfo?.hostIdDocument ||
-                request.groupDocuments?.find((d) => d.documentType === "HostId");
+                request.groupDocuments?.filter((d) => d.documentType === "HostId").slice(-1)[0];
 
               return (
                 <FileDropArea
@@ -2855,8 +2883,11 @@ export default function RequestDetailPage({
 
           {(() => {
             const ticketDoc =
+              (request.flightTicketDocumentId
+                ? request.groupDocuments?.find((d) => d.id === request.flightTicketDocumentId)
+                : undefined) ||
               request.flightTicketDocument ||
-              request.groupDocuments?.find((d) => d.documentType === "FlightTicket");
+              request.groupDocuments?.filter((d) => d.documentType === "FlightTicket").slice(-1)[0];
 
             return (
               <FileDropArea

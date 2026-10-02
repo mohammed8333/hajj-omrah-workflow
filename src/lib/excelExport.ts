@@ -14,8 +14,11 @@ function buildDocUrl(requestId: string, doc?: { id: string; storageUrl?: string 
 // Helpers to extract documents from a request
 function getHostDocument(r: GroupRequestDetail) {
   return (
+    (r.hostingInfo?.hostIdDocumentId
+      ? r.groupDocuments?.find((d) => d.id === r.hostingInfo.hostIdDocumentId)
+      : undefined) ||
     r.hostingInfo?.hostIdDocument ||
-    r.groupDocuments?.find((d) => d.documentType === "HostId")
+    r.groupDocuments?.filter((d) => d.documentType === "HostId").slice(-1)[0]
   );
 }
 
@@ -40,8 +43,12 @@ function getPhotoDocument(r: GroupRequestDetail) {
 }
 
 function getTicketDocument(r: GroupRequestDetail) {
+  if (r.flightTicketDocumentId) {
+    const doc = r.groupDocuments?.find((d) => d.id === r.flightTicketDocumentId);
+    if (doc) return doc;
+  }
   if (r.flightTicketDocument) return r.flightTicketDocument;
-  const groupTicket = r.groupDocuments?.find((d) => d.documentType === "FlightTicket");
+  const groupTicket = r.groupDocuments?.filter((d) => d.documentType === "FlightTicket").slice(-1)[0];
   if (groupTicket) return groupTicket;
   if (r.travelers) {
     for (const t of r.travelers) {

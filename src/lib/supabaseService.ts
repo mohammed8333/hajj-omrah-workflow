@@ -460,11 +460,12 @@ export const supabaseService = {
         travelers = trvWithAff || [];
       }
 
-      // Fetch document counts & traveler photos
+      // Fetch document counts & traveler photos (newest first)
       const { data: docs } = await client
         .from("documents")
-        .select("id, group_request_id, traveler_id, document_type, storage_url, storage_path, original_file_name")
-        .in("group_request_id", requestIds);
+        .select("id, group_request_id, traveler_id, document_type, storage_url, storage_path, original_file_name, uploaded_at")
+        .in("group_request_id", requestIds)
+        .order("uploaded_at", { ascending: false });
 
       // Fetch pending corrections count
       const { data: corrections } = await client
@@ -490,14 +491,23 @@ export const supabaseService = {
         const hostNationalId = hostRow?.host_national_id || undefined;
         const hostBirthDate = hostRow?.host_birth_date || undefined;
 
-        const ticketDoc = docs?.find(
-          (d) => d.group_request_id === r.id && d.document_type === "FlightTicket"
-        );
-        const hostDoc = docs?.find(
-          (d) =>
-            d.group_request_id === r.id &&
-            (d.document_type === "HostId" || d.id === hostRow?.host_id_document_id)
-        );
+        // Resolve exact flight ticket document (prioritize explicitly linked ID, fallback to newest)
+        const ticketDoc =
+          (r.flight_ticket_document_id
+            ? docs?.find((d) => d.id === r.flight_ticket_document_id)
+            : undefined) ||
+          docs?.find(
+            (d) => d.group_request_id === r.id && d.document_type === "FlightTicket"
+          );
+
+        // Resolve exact host ID document (prioritize explicitly linked ID, fallback to newest)
+        const hostDoc =
+          (hostRow?.host_id_document_id
+            ? docs?.find((d) => d.id === hostRow.host_id_document_id)
+            : undefined) ||
+          docs?.find(
+            (d) => d.group_request_id === r.id && d.document_type === "HostId"
+          );
 
         let ticketUrl = ticketDoc?.storage_url;
         if (!ticketUrl && ticketDoc?.storage_path) {
@@ -558,9 +568,9 @@ export const supabaseService = {
           hostPhone: hostPhone,
           hostNationalId: hostNationalId,
           hostBirthDate: hostBirthDate,
-          hostIdDocumentId: hostRow?.host_id_document_id || hostDoc?.id,
+          hostIdDocumentId: hostDoc?.id || hostRow?.host_id_document_id || undefined,
           hostIdDocumentUrl: hostDocUrl || undefined,
-          flightTicketDocumentId: ticketDoc?.id || undefined,
+          flightTicketDocumentId: ticketDoc?.id || r.flight_ticket_document_id || undefined,
           flightTicketDocumentUrl: ticketUrl || undefined,
           returnFlightNumber: r.return_flight_number || (isSV314 ? "SV317" : undefined),
           arrivalAirport: r.arrival_airport || (isSV314 ? "مطار المدينة" : (r.destination?.includes("المدينة") && !r.destination?.includes("مكة") ? "مطار المدينة" : "مطار جدة")),
@@ -608,7 +618,7 @@ export const supabaseService = {
       ] = await Promise.all([
         client.from("hosting_infos").select("*").eq("group_request_id", id),
         client.from("travelers").select("*").eq("group_request_id", id).order("created_at", { ascending: true }),
-        client.from("documents").select("*").eq("group_request_id", id),
+        client.from("documents").select("*").eq("group_request_id", id).order("uploaded_at", { ascending: false }),
         client.from("correction_requests").select("*").eq("group_request_id", id).order("created_at", { ascending: false }),
         client.from("status_histories").select("*").eq("group_request_id", id).order("created_at", { ascending: false }),
       ]);
@@ -621,7 +631,7 @@ export const supabaseService = {
       let hostingInfo: HostingInfo | undefined = undefined;
       if (hostRow) {
         const hostDoc =
-          allDocs.find((d) => d.id === hostRow.host_id_document_id) ||
+          (hostRow.host_id_document_id ? allDocs.find((d) => d.id === hostRow.host_id_document_id) : undefined) ||
           allDocs.find((d) => d.documentType === "HostId");
 
         hostingInfo = {
@@ -633,13 +643,13 @@ export const supabaseService = {
           hostNationality: hostRow.host_nationality || undefined,
           hostNationalId: hostRow.host_national_id || undefined,
           hostAddress: hostRow.host_address || undefined,
-          hostIdDocumentId: hostRow.host_id_document_id || undefined,
+          hostIdDocumentId: hostDoc?.id || hostRow.host_id_document_id || undefined,
           hostIdDocument: hostDoc,
         };
       }
 
       const ticketDoc =
-        allDocs.find((d) => d.id === req.flight_ticket_document_id) ||
+        (req.flight_ticket_document_id ? allDocs.find((d) => d.id === req.flight_ticket_document_id) : undefined) ||
         allDocs.find((d) => d.documentType === "FlightTicket");
 
       const isSV314 = req.flight_number === "SV314" || ticketDoc?.originalFileName?.includes("74");
@@ -806,6 +816,7 @@ export const supabaseService = {
         if (data.hostNationality !== undefined) hostPayload.host_nationality = data.hostNationality;
         if (data.hostNationalId !== undefined) hostPayload.host_national_id = data.hostNationalId;
         if (data.hostAddress !== undefined) hostPayload.host_address = data.hostAddress;
+        if (data.hostIdDocumentId !== undefined) hostPayload.host_id_document_id = data.hostIdDocumentId;
 
         if (existingHost) {
           await client.from("hosting_infos").update(hostPayload).eq("id", existingHost.id);
@@ -1219,11 +1230,45 @@ export const supabaseService = {
           .from("group_requests")
           .update({ flight_ticket_document_id: docId })
           .eq("id", requestId);
-      } else if (documentType === "HostId") {
+
+        // Remove previous group FlightTicket documents to prevent conflicts
         await client
+          .from("documents")
+          .delete()
+          .eq("group_request_id", requestId)
+          .eq("document_type", "FlightTicket")
+          .neq("id", docId);
+      } else if (documentType === "HostId") {
+        const { data: hostRow } = await client
           .from("hosting_infos")
-          .update({ host_id_document_id: docId })
-          .eq("group_request_id", requestId);
+          .select("id")
+          .eq("group_request_id", requestId)
+          .maybeSingle();
+
+        if (hostRow) {
+          await client
+            .from("hosting_infos")
+            .update({ host_id_document_id: docId })
+            .eq("id", hostRow.id);
+        } else {
+          await client
+            .from("hosting_infos")
+            .insert({
+              id: `host-${Date.now()}`,
+              group_request_id: requestId,
+              host_name: "مستضيف داخل المملكة",
+              host_phone: "",
+              host_id_document_id: docId,
+            });
+        }
+
+        // Remove previous HostId documents to ensure singular, consistent active host identity
+        await client
+          .from("documents")
+          .delete()
+          .eq("group_request_id", requestId)
+          .eq("document_type", "HostId")
+          .neq("id", docId);
       }
 
       return mapDoc(inserted);

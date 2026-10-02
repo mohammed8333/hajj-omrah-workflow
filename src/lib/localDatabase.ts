@@ -566,14 +566,15 @@ class LocalDatabaseEngine {
                 hostAddress: "",
               };
             }
-            if (!req.hostingInfo.hostIdDocument) {
-              const hostDoc = req.groupDocuments?.find(
-                (d) => d.documentType === "HostId" || d.id === req.hostingInfo?.hostIdDocumentId
-              );
-              if (hostDoc) {
-                req.hostingInfo.hostIdDocument = hostDoc;
-                req.hostingInfo.hostIdDocumentId = hostDoc.id;
-              }
+            const hostDoc =
+              (req.hostingInfo.hostIdDocumentId
+                ? req.groupDocuments?.find((d) => d.id === req.hostingInfo.hostIdDocumentId)
+                : undefined) ||
+              req.hostingInfo.hostIdDocument ||
+              req.groupDocuments?.filter((d) => d.documentType === "HostId").slice(-1)[0];
+            if (hostDoc) {
+              req.hostingInfo.hostIdDocument = hostDoc;
+              req.hostingInfo.hostIdDocumentId = hostDoc.id;
             }
           }
         });
@@ -969,11 +970,18 @@ class LocalDatabaseEngine {
       });
 
       const flightTicketDoc =
+        (r.flightTicketDocumentId
+          ? r.groupDocuments?.find((d) => d.id === r.flightTicketDocumentId)
+          : undefined) ||
         r.flightTicketDocument ||
-        r.groupDocuments?.find((d) => d.documentType === "FlightTicket");
+        r.groupDocuments?.filter((d) => d.documentType === "FlightTicket").slice(-1)[0];
+
       const hostDoc =
+        (r.hostingInfo?.hostIdDocumentId
+          ? r.groupDocuments?.find((d) => d.id === r.hostingInfo.hostIdDocumentId)
+          : undefined) ||
         r.hostingInfo?.hostIdDocument ||
-        r.groupDocuments?.find((d) => d.documentType === "HostId");
+        r.groupDocuments?.filter((d) => d.documentType === "HostId").slice(-1)[0];
 
       const isSV314 =
         r.flightNumber === "SV314" ||
@@ -998,9 +1006,9 @@ class LocalDatabaseEngine {
         hostPhone: r.hostingInfo?.hostPhone || (r.hasHosting ? r.contactPhone : undefined),
         hostNationalId: r.hostingInfo?.hostNationalId,
         hostBirthDate: r.hostingInfo?.hostBirthDate,
-        hostIdDocumentId: r.hostingInfo?.hostIdDocumentId || hostDoc?.id,
+        hostIdDocumentId: hostDoc?.id || r.hostingInfo?.hostIdDocumentId,
         hostIdDocumentUrl: (hostDoc as any)?.storageUrl || (hostDoc as any)?.fileDataUrl,
-        flightTicketDocumentId: r.flightTicketDocumentId || flightTicketDoc?.id,
+        flightTicketDocumentId: flightTicketDoc?.id || r.flightTicketDocumentId,
         flightTicketDocumentUrl: (flightTicketDoc as any)?.storageUrl || (flightTicketDoc as any)?.fileDataUrl,
         contactPhone: r.contactPhone,
         travelDate: r.travelDate,
@@ -1066,25 +1074,27 @@ class LocalDatabaseEngine {
           hostAddress: "",
         };
       }
-      if (!req.hostingInfo.hostIdDocument) {
-        const hostDoc = req.groupDocuments?.find(
-          (d) => d.documentType === "HostId" || d.id === req.hostingInfo?.hostIdDocumentId
-        );
-        if (hostDoc) {
-          req.hostingInfo.hostIdDocument = hostDoc;
-          req.hostingInfo.hostIdDocumentId = hostDoc.id;
-        }
+      const hostDoc =
+        (req.hostingInfo.hostIdDocumentId
+          ? req.groupDocuments?.find((d) => d.id === req.hostingInfo.hostIdDocumentId)
+          : undefined) ||
+        req.hostingInfo.hostIdDocument ||
+        req.groupDocuments?.filter((d) => d.documentType === "HostId").slice(-1)[0];
+      if (hostDoc) {
+        req.hostingInfo.hostIdDocument = hostDoc;
+        req.hostingInfo.hostIdDocumentId = hostDoc.id;
       }
     }
 
-    if (!req.flightTicketDocument) {
-      const ticketDoc = req.groupDocuments?.find(
-        (d) => d.documentType === "FlightTicket" || d.id === req.flightTicketDocumentId
-      );
-      if (ticketDoc) {
-        req.flightTicketDocument = ticketDoc;
-        req.flightTicketDocumentId = ticketDoc.id;
-      }
+    const ticketDoc =
+      (req.flightTicketDocumentId
+        ? req.groupDocuments?.find((d) => d.id === req.flightTicketDocumentId)
+        : undefined) ||
+      req.flightTicketDocument ||
+      req.groupDocuments?.filter((d) => d.documentType === "FlightTicket").slice(-1)[0];
+    if (ticketDoc) {
+      req.flightTicketDocument = ticketDoc;
+      req.flightTicketDocumentId = ticketDoc.id;
     }
 
     const isSV314 =
@@ -1956,20 +1966,14 @@ class LocalDatabaseEngine {
         req.hostingInfo.hostIdDocumentId = docId;
         req.hostingInfo.hostIdDocument = docItem;
 
-        // Remove previous HostId document from groupDocuments if any
-        const prevIdx = req.groupDocuments.findIndex((d) => d.documentType === "HostId");
-        if (prevIdx !== -1) {
-          req.groupDocuments.splice(prevIdx, 1);
-        }
+        // Remove any previous HostId documents from groupDocuments to keep singular active host identity
+        req.groupDocuments = req.groupDocuments.filter((d) => d.documentType !== "HostId");
       } else if (documentType === "FlightTicket") {
         req.flightTicketDocumentId = docId;
         req.flightTicketDocument = docItem;
 
-        // Remove previous group FlightTicket document from groupDocuments if any
-        const prevIdx = req.groupDocuments.findIndex((d) => d.documentType === "FlightTicket");
-        if (prevIdx !== -1) {
-          req.groupDocuments.splice(prevIdx, 1);
-        }
+        // Remove any previous group FlightTicket documents from groupDocuments
+        req.groupDocuments = req.groupDocuments.filter((d) => d.documentType !== "FlightTicket");
       }
       req.groupDocuments.push(docItem);
     }
