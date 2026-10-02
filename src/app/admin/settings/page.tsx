@@ -35,6 +35,7 @@ import {
   CloudOff,
   UploadCloud,
   MessageCircle,
+  ShieldCheck,
 } from "lucide-react";
 import {
   getGeminiApiKey,
@@ -278,7 +279,7 @@ export default function AdminSettingsPage() {
       setSuccess(null);
       const res = await api.requests.runAutoMaintenance();
       setSuccess(
-        `تم تشغيل الصيانة التلقائية بنجاح: تم حذف (${res.deletedCount}) معاملة تجاوزت 30 يوماً، وأرشفة (${res.archivedCount}) معاملة انقضى موعد سفرها.`
+        `تم تشغيل الصيانة التلقائية بنجاح: تم أرشفة (${res.archivedCount}) معاملة انقضى موعد سفرها، مع الحفاظ على كافة المعاملات والوثائق بشكل دائم دون حذف.`
       );
       await loadStats();
     } catch (err: any) {
@@ -858,17 +859,17 @@ export default function AdminSettingsPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-          {/* Rule 1: 30-Day Deletion */}
-          <div className="bg-amber-50/60 border border-amber-200 rounded-xl p-4 space-y-2">
-            <div className="flex items-center gap-2 font-bold text-amber-900 text-sm">
-              <Hourglass className="w-4 h-4 text-amber-600" />
-              <span>قاعدة الحذف التلقائي (30 يوماً من الإنشاء)</span>
+          {/* Rule 1: Permanent Retention (Auto-Deletion Disabled) */}
+          <div className="bg-emerald-50/60 border border-emerald-200 rounded-xl p-4 space-y-2">
+            <div className="flex items-center gap-2 font-bold text-emerald-900 text-sm">
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              <span>قاعدة الحفظ الدائم (الحذف التلقائي معطّل)</span>
             </div>
-            <p className="text-amber-800 leading-relaxed text-[11px]">
-              يقوم النظام تلقائياً وبشكل دوري بفحص كافة المعاملات وحذف أي معاملة مر على تاريخ إنشائها 30 يوماً بشكل كامل مع مسح كافة مرفقاتها ووثائق المعتمرين التابعة لها من الذاكرة المحلية (IndexedDB).
+            <p className="text-emerald-800 leading-relaxed text-[11px]">
+              خاصية الحذف التلقائي معطلة بالكامل. يتم الاحتفاظ بكافة المعاملات ووثائق المعتمرين ومرفقاتها بشكل دائم في النظام للأبد دون أي حذف تلقائي، لضمان الرجوع إليها وسحب التقارير في أي وقت.
             </p>
-            <div className="text-[10px] text-amber-700 font-medium bg-amber-100/70 px-2.5 py-1 rounded-md inline-block">
-              ✓ تطبق تلقائياً عند فتح قائمة المعاملات أو تشغيل الصيانة
+            <div className="text-[10px] text-emerald-700 font-medium bg-emerald-100/70 px-2.5 py-1 rounded-md inline-block">
+              ✓ كافة المعاملات محفوظة بشكل دائم ولا تُحذف إلا يدوياً بواسطة مدير النظام
             </div>
           </div>
 

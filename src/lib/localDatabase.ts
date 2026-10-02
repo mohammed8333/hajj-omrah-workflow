@@ -768,30 +768,11 @@ class LocalDatabaseEngine {
     if (typeof window === "undefined") return { deletedCount: 0, archivedCount: 0 };
 
     const now = Date.now();
-    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
     let deletedCount = 0;
     let archivedCount = 0;
     let stateChanged = false;
 
-    // 1. Delete requests older than 30 days from creation
-    const toKeep: GroupRequestDetail[] = [];
-    for (const req of this.requests) {
-      const createdTime = new Date(req.createdAt).getTime();
-      if (!isNaN(createdTime) && now - createdTime >= thirtyDaysMs) {
-        this.deleteDocumentsForRequest(req.id);
-        this.logAction(
-          null,
-          `حذف تلقائي للمعاملة (${req.requestNumber} - ${req.groupName}) لمرور 30 يوماً على إنشائها`,
-          "GroupRequest",
-          req.id
-        );
-        deletedCount++;
-        stateChanged = true;
-      } else {
-        toKeep.push(req);
-      }
-    }
-    this.requests = toKeep;
+    // 1. Auto-deletion disabled: All requests are preserved permanently forever.
 
     // 2. Auto-archive requests whose travel date/time has passed
     for (const req of this.requests) {
