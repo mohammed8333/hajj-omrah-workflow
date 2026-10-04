@@ -477,6 +477,86 @@ ${travelersLines}
     }
   };
 
+  const handleLinkProgram = async (r: GroupRequestSummary, e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (role !== "SaudiAgent" && role !== "Admin") return;
+
+    const ok = await confirm({
+      title: "تأكيد ربط البرنامج",
+      message: r.hasHosting
+        ? `هل تؤكد ربط البرنامج للمعاملة (${r.requestNumber})؟ سيتم تحويل المعاملة للمُرسل لقبول الاستضافة.`
+        : `هل تؤكد ربط البرنامج للمعاملة (${r.requestNumber})؟ سيتم الانتقال لمرحلة دفع الفاتورة.`,
+      confirmText: "نعم، تم ربط البرنامج ✓",
+      cancelText: "إلغاء",
+      variant: "info",
+    });
+
+    if (!ok) return;
+
+    try {
+      if (r.hasHosting) {
+        await api.requests.requestHostingAcceptance(
+          r.id,
+          "تم ربط البرنامج وتحويل المعاملة للمرسل لقبول الاستضافة"
+        );
+      } else {
+        await api.requests.linkProgram(r.id, "تم ربط البرنامج بنجاح");
+      }
+
+      const reqsRes = await api.requests.getAll();
+      setRequests(reqsRes);
+
+      await alert({
+        title: "تم ربط البرنامج بنجاح",
+        message: r.hasHosting
+          ? `تم ربط البرنامج للمعاملة (${r.requestNumber}) بنجاح وإحالتها للمُرسل لقبول الاستضافة ✓`
+          : `تم ربط البرنامج للمعاملة (${r.requestNumber}) بنجاح، المعاملة جاهزة لدفع الفاتورة ✓`,
+        variant: "success",
+      });
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        await alert({ title: "خطأ", message: err.message, variant: "danger" });
+      }
+    }
+  };
+
+  const handlePayInvoice = async (r: GroupRequestSummary, e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (role !== "SaudiAgent" && role !== "Admin") return;
+
+    const ok = await confirm({
+      title: "تأكيد دفع الفاتورة واكتمال المعاملة",
+      message: `هل تؤكد سداد الفاتورة للمعاملة (${r.requestNumber}) وإتمام المعاملة نهائياً؟`,
+      confirmText: "نعم، تم دفع الفاتورة ✓",
+      cancelText: "إلغاء",
+      variant: "success",
+    });
+
+    if (!ok) return;
+
+    try {
+      await api.requests.agentComplete(
+        r.id,
+        "تم دفع الفاتورة وإصدار كافة التأشيرات والخدمات بنجاح"
+      );
+
+      const reqsRes = await api.requests.getAll();
+      setRequests(reqsRes);
+
+      await alert({
+        title: "اكتملت المعاملة بنجاح",
+        message: `تم سداد الفاتورة واعتماد معاملة (${r.requestNumber}) بنجاح كمعاملة مكتملة (تم) ✓`,
+        variant: "success",
+      });
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        await alert({ title: "خطأ", message: err.message, variant: "danger" });
+      }
+    }
+  };
+
   useEffect(() => {
     if (!authLoading && !user) {
       router.push("/login");
@@ -1770,51 +1850,117 @@ ${travelersLines}
                     <div className="flex items-center gap-1.5 flex-wrap">
                       {role === "SaudiAgent" && (
                         r.status === "Archived" ? (
-                          <span className="px-2.5 py-1 text-[11px] font-bold text-purple-700 bg-purple-50 border border-purple-200 rounded-xl flex items-center gap-1 shadow-2xs">
+                          <span className="px-2.5 py-1 text-[11px] font-bold text-purple-700 bg-purple-50 border border-purple-200 rounded-xl flex items-center gap-1 shadow-2xs whitespace-nowrap">
                             <Archive className="w-3 h-3 text-purple-600" />
                             <span>مؤرشفة</span>
                           </span>
+                        ) : r.status === "Completed" ? (
+                          <div className="flex items-center gap-1">
+                            <span className="px-2.5 py-1 text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-300 rounded-xl flex items-center gap-1 shadow-2xs whitespace-nowrap">
+                              <Check className="w-3 h-3 text-emerald-600 stroke-[3]" />
+                              <span>مكتملة (تم)</span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => handleAgentArchive(r.id, r.requestNumber, e)}
+                              className="px-2 py-1 text-[11px] font-bold text-stone-700 bg-stone-100 hover:bg-stone-200 border border-stone-300 rounded-xl cursor-pointer transition-colors flex items-center gap-1 shadow-2xs whitespace-nowrap"
+                              title="نقل المعاملة إلى الأرشيف"
+                            >
+                              <Archive className="w-3 h-3 text-stone-600" />
+                              <span>أرشفة</span>
+                            </button>
+                          </div>
+                        ) : r.status === "HostingAcceptanceRequested" ? (
+                          <span className="px-2.5 py-1 text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-300 rounded-xl flex items-center gap-1 shadow-2xs whitespace-nowrap">
+                            <Clock className="w-3 h-3 text-amber-600 animate-pulse" />
+                            <span>بانتظار قبول الاستضافة ⏳</span>
+                          </span>
+                        ) : r.status === "HostingAcceptedBySender" ||
+                          r.status === "HostingConfirmed" ||
+                          (!r.hasHosting && r.status === "ProgramLinked") ? (
+                          <button
+                            type="button"
+                            onClick={(e) => handlePayInvoice(r, e)}
+                            className="px-3.5 py-1.5 text-xs font-black text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 rounded-xl cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95 whitespace-nowrap"
+                            title="تأكيد دفع الفاتورة واكتمال المعاملة"
+                          >
+                            <Check className="w-3.5 h-3.5 stroke-[3]" />
+                            <span>تم دفع الفاتورة</span>
+                          </button>
                         ) : (
                           <button
                             type="button"
-                            onClick={(e) => handleAgentArchive(r.id, r.requestNumber, e)}
-                            className="px-3.5 py-1.5 text-xs font-black text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 rounded-xl cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95"
-                            title="إنجاز المعاملة ونقلها إلى الأرشيف (تم)"
+                            onClick={(e) => handleLinkProgram(r, e)}
+                            className="px-3.5 py-1.5 text-xs font-black text-white bg-purple-600 hover:bg-purple-700 active:bg-purple-800 rounded-xl cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95 whitespace-nowrap"
+                            title="تأكيد ربط البرنامج"
                           >
                             <Check className="w-3.5 h-3.5 stroke-[3]" />
-                            <span>تم</span>
+                            <span>تم ربط برنامج</span>
                           </button>
                         )
                       )}
 
                       {role === "Admin" && (
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1 flex-wrap">
                           {r.status === "Archived" ? (
                             <button
                               type="button"
                               onClick={(e) => handleAdminUnarchive(r.id, e)}
-                              className="px-2.5 py-1 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-xl cursor-pointer transition-colors flex items-center gap-1 shadow-2xs"
+                              className="px-2.5 py-1 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-xl cursor-pointer transition-colors flex items-center gap-1 shadow-2xs whitespace-nowrap"
                               title="إلغاء الأرشفة"
                             >
                               <Archive className="w-3.5 h-3.5 text-amber-600" />
                               <span>استعادة</span>
                             </button>
+                          ) : r.status === "Completed" ? (
+                            <div className="flex items-center gap-1">
+                              <span className="px-2 py-1 text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-300 rounded-xl flex items-center gap-1 shadow-2xs whitespace-nowrap">
+                                <Check className="w-3 h-3 text-emerald-600 stroke-[3]" />
+                                <span>مكتملة</span>
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => handleAgentArchive(r.id, r.requestNumber, e)}
+                                className="px-2 py-1 text-[11px] font-bold text-stone-700 bg-stone-100 hover:bg-stone-200 border border-stone-300 rounded-xl cursor-pointer transition-colors flex items-center gap-1 shadow-2xs whitespace-nowrap"
+                                title="نقل المعاملة إلى الأرشيف"
+                              >
+                                <Archive className="w-3 h-3 text-stone-600" />
+                                <span>أرشفة</span>
+                              </button>
+                            </div>
+                          ) : r.status === "HostingAcceptanceRequested" ? (
+                            <span className="px-2 py-1 text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-300 rounded-xl flex items-center gap-1 shadow-2xs whitespace-nowrap">
+                              <Clock className="w-3 h-3 text-amber-600 animate-pulse" />
+                              <span>بانتظار الاستضافة</span>
+                            </span>
+                          ) : r.status === "HostingAcceptedBySender" ||
+                            r.status === "HostingConfirmed" ||
+                            (!r.hasHosting && r.status === "ProgramLinked") ? (
+                            <button
+                              type="button"
+                              onClick={(e) => handlePayInvoice(r, e)}
+                              className="px-2.5 py-1 text-xs font-black text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 rounded-xl cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95 whitespace-nowrap"
+                              title="تأكيد دفع الفاتورة واكتمال المعاملة"
+                            >
+                              <Check className="w-3.5 h-3.5 stroke-[3]" />
+                              <span>دفع الفاتورة</span>
+                            </button>
                           ) : (
                             <button
                               type="button"
-                              onClick={(e) => handleAgentArchive(r.id, r.requestNumber, e)}
-                              className="px-3 py-1.5 text-xs font-black text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 rounded-xl cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95"
-                              title="إنجاز المعاملة ونقلها إلى الأرشيف (تم)"
+                              onClick={(e) => handleLinkProgram(r, e)}
+                              className="px-2.5 py-1 text-xs font-black text-white bg-purple-600 hover:bg-purple-700 active:bg-purple-800 rounded-xl cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95 whitespace-nowrap"
+                              title="تأكيد ربط البرنامج"
                             >
                               <Check className="w-3.5 h-3.5 stroke-[3]" />
-                              <span>تم</span>
+                              <span>تم ربط برنامج</span>
                             </button>
                           )}
 
                           <button
                             type="button"
                             onClick={(e) => handleAdminDelete(r.id, r.requestNumber, e)}
-                            className="p-1.5 text-red-600 hover:bg-red-50 border border-red-200 rounded-xl cursor-pointer transition-colors"
+                            className="p-1.5 text-red-600 hover:bg-red-50 border border-red-200 rounded-xl cursor-pointer transition-colors shrink-0"
                             title="مسح المعاملة نهائياً"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -2359,51 +2505,117 @@ ${travelersLines}
                             {/* أزرار الإجراء بحسب الدور */}
                             {role === "SaudiAgent" && (
                               r.status === "Archived" ? (
-                                <span className="px-2.5 py-1 text-xs font-bold text-purple-700 bg-purple-50 border border-purple-200 rounded-lg flex items-center gap-1 shadow-2xs">
+                                <span className="px-2.5 py-1 text-xs font-bold text-purple-700 bg-purple-50 border border-purple-200 rounded-lg flex items-center gap-1 shadow-2xs whitespace-nowrap">
                                   <Archive className="w-3.5 h-3.5 text-purple-600" />
                                   <span>مؤرشفة</span>
                                 </span>
+                              ) : r.status === "Completed" ? (
+                                <div className="flex items-center gap-1">
+                                  <span className="px-2.5 py-1 text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-300 rounded-lg flex items-center gap-1 shadow-2xs whitespace-nowrap">
+                                    <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[3]" />
+                                    <span>مكتملة (تم)</span>
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => handleAgentArchive(r.id, r.requestNumber, e)}
+                                    className="px-2 py-1 text-xs font-bold text-stone-700 bg-stone-100 hover:bg-stone-200 border border-stone-300 rounded-lg cursor-pointer transition-colors flex items-center gap-1 shadow-2xs whitespace-nowrap"
+                                    title="نقل المعاملة إلى الأرشيف"
+                                  >
+                                    <Archive className="w-3.5 h-3.5 text-stone-600" />
+                                    <span>أرشفة</span>
+                                  </button>
+                                </div>
+                              ) : r.status === "HostingAcceptanceRequested" ? (
+                                <span className="px-2.5 py-1 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-300 rounded-lg flex items-center gap-1 shadow-2xs whitespace-nowrap">
+                                  <Clock className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
+                                  <span>بانتظار قبول الاستضافة ⏳</span>
+                                </span>
+                              ) : r.status === "HostingAcceptedBySender" ||
+                                r.status === "HostingConfirmed" ||
+                                (!r.hasHosting && r.status === "ProgramLinked") ? (
+                                <button
+                                  type="button"
+                                  onClick={(e) => handlePayInvoice(r, e)}
+                                  className="px-3.5 py-1.5 text-xs font-black text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 border border-emerald-600 rounded-lg cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95 whitespace-nowrap"
+                                  title="تأكيد دفع الفاتورة واكتمال المعاملة"
+                                >
+                                  <Check className="w-3.5 h-3.5 stroke-[3]" />
+                                  <span>تم دفع الفاتورة</span>
+                                </button>
                               ) : (
                                 <button
                                   type="button"
-                                  onClick={(e) => handleAgentArchive(r.id, r.requestNumber, e)}
-                                  className="px-3.5 py-1.5 text-xs font-black text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 border border-emerald-600 rounded-lg cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95"
-                                  title="إنجاز المعاملة ونقلها إلى الأرشيف (تم)"
+                                  onClick={(e) => handleLinkProgram(r, e)}
+                                  className="px-3.5 py-1.5 text-xs font-black text-white bg-purple-600 hover:bg-purple-700 active:bg-purple-800 border border-purple-600 rounded-lg cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95 whitespace-nowrap"
+                                  title="تأكيد ربط البرنامج"
                                 >
                                   <Check className="w-3.5 h-3.5 stroke-[3]" />
-                                  <span>تم</span>
+                                  <span>تم ربط برنامج</span>
                                 </button>
                               )
                             )}
 
                             {role === "Admin" && (
-                              <div className="flex items-center gap-1">
+                              <div className="flex items-center gap-1 flex-wrap">
                                 {r.status === "Archived" ? (
                                   <button
                                     type="button"
                                     onClick={(e) => handleAdminUnarchive(r.id, e)}
-                                    className="px-2.5 py-1 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg cursor-pointer transition-colors flex items-center gap-1 shadow-2xs"
+                                    className="px-2.5 py-1 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg cursor-pointer transition-colors flex items-center gap-1 shadow-2xs whitespace-nowrap"
                                     title="إلغاء الأرشفة"
                                   >
                                     <Archive className="w-3.5 h-3.5 text-amber-600" />
                                     <span>استعادة</span>
                                   </button>
+                                ) : r.status === "Completed" ? (
+                                  <div className="flex items-center gap-1">
+                                    <span className="px-2 py-1 text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-300 rounded-lg flex items-center gap-1 shadow-2xs whitespace-nowrap">
+                                      <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[3]" />
+                                      <span>مكتملة</span>
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => handleAgentArchive(r.id, r.requestNumber, e)}
+                                      className="px-2 py-1 text-xs font-bold text-stone-700 bg-stone-100 hover:bg-stone-200 border border-stone-300 rounded-lg cursor-pointer transition-colors flex items-center gap-1 shadow-2xs whitespace-nowrap"
+                                      title="نقل المعاملة إلى الأرشيف"
+                                    >
+                                      <Archive className="w-3.5 h-3.5 text-stone-600" />
+                                      <span>أرشفة</span>
+                                    </button>
+                                  </div>
+                                ) : r.status === "HostingAcceptanceRequested" ? (
+                                  <span className="px-2 py-1 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-300 rounded-lg flex items-center gap-1 shadow-2xs whitespace-nowrap">
+                                    <Clock className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
+                                    <span>بانتظار الاستضافة</span>
+                                  </span>
+                                ) : r.status === "HostingAcceptedBySender" ||
+                                  r.status === "HostingConfirmed" ||
+                                  (!r.hasHosting && r.status === "ProgramLinked") ? (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => handlePayInvoice(r, e)}
+                                    className="px-2.5 py-1 text-xs font-black text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 border border-emerald-600 rounded-lg cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95 whitespace-nowrap"
+                                    title="تأكيد دفع الفاتورة واكتمال المعاملة"
+                                  >
+                                    <Check className="w-3.5 h-3.5 stroke-[3]" />
+                                    <span>دفع الفاتورة</span>
+                                  </button>
                                 ) : (
                                   <button
                                     type="button"
-                                    onClick={(e) => handleAgentArchive(r.id, r.requestNumber, e)}
-                                    className="px-3 py-1.5 text-xs font-black text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 border border-emerald-600 rounded-lg cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95"
-                                    title="إنجاز المعاملة ونقلها إلى الأرشيف (تم)"
+                                    onClick={(e) => handleLinkProgram(r, e)}
+                                    className="px-2.5 py-1 text-xs font-black text-white bg-purple-600 hover:bg-purple-700 active:bg-purple-800 border border-purple-600 rounded-lg cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95 whitespace-nowrap"
+                                    title="تأكيد ربط البرنامج"
                                   >
                                     <Check className="w-3.5 h-3.5 stroke-[3]" />
-                                    <span>تم</span>
+                                    <span>تم ربط برنامج</span>
                                   </button>
                                 )}
 
                                 <button
                                   type="button"
                                   onClick={(e) => handleAdminDelete(r.id, r.requestNumber, e)}
-                                  className="p-1.5 text-red-600 hover:bg-red-50 border border-red-200 rounded-lg cursor-pointer transition-colors"
+                                  className="p-1.5 text-red-600 hover:bg-red-50 border border-red-200 rounded-lg cursor-pointer transition-colors shrink-0"
                                   title="مسح المعاملة نهائياً"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
