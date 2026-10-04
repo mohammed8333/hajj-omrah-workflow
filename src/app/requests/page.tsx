@@ -556,7 +556,7 @@ ${travelersLines}
   const currentTabBaseRequests = React.useMemo(() => {
     if (activeTab === "ARCHIVED") return recentArchivedRequests;
     if (activeTab === "ARCHIVED_OLD") return oldArchivedRequests;
-    if (activeTab === "ALL") return activeRoleRequests;
+    if (activeTab === "ALL") return roleRequests;
     return activeRoleRequests.filter((r) => {
       if (activeTab === "NEW") return isRequestNew(r);
       if (
@@ -571,7 +571,7 @@ ${travelersLines}
         return isRequestInvoicePaid(r);
       return true;
     });
-  }, [activeTab, recentArchivedRequests, oldArchivedRequests, activeRoleRequests, role]);
+  }, [activeTab, recentArchivedRequests, oldArchivedRequests, roleRequests, activeRoleRequests]);
 
   const distinctStatusOptions = React.useMemo(() => {
     return getDistinctStatusOptions(currentTabBaseRequests, role, colFilters.status);
@@ -591,18 +591,21 @@ ${travelersLines}
   const countWithNusuk = activeRoleRequests.filter((r) => Boolean(r.nusukGroupNumber)).length;
   const countWithoutNusuk = activeRoleRequests.length - countWithNusuk;
 
-  // Precomputed tab counts for active tabs (excluding past/archived transactions):
+  // Precomputed tab counts:
+  const agentAllCount = roleRequests.length;
   const agentTransferredCount = activeRoleRequests.filter(isRequestTransferredToAgent).length;
   const agentProgramLinkedCount = activeRoleRequests.filter(isRequestProgramLinked).length;
   const agentHostingAcceptedCount = activeRoleRequests.filter(isRequestHostingAccepted).length;
   const agentInvoicePaidCount = activeRoleRequests.filter(isRequestInvoicePaid).length;
 
+  const senderAllCount = roleRequests.length;
   const senderNewCount = activeRoleRequests.filter(isRequestNew).length;
   const senderTransferredCount = activeRoleRequests.filter(isRequestTransferredToAgent).length;
   const senderProgramLinkedCount = activeRoleRequests.filter(isRequestProgramLinked).length;
   const senderHostingAcceptedCount = activeRoleRequests.filter(isRequestHostingAccepted).length;
   const senderInvoicePaidCount = activeRoleRequests.filter(isRequestInvoicePaid).length;
 
+  const adminAllCount = requests.length;
   const adminNewCount = activeAllRequests.filter(isRequestNew).length;
   const adminTransferredCount = activeAllRequests.filter(isRequestTransferredToAgent).length;
   const adminProgramLinkedCount = activeAllRequests.filter(isRequestProgramLinked).length;
@@ -631,6 +634,9 @@ ${travelersLines}
     // Optional granular status dropdown filter
     if (statusFilter && r.status !== statusFilter) return false;
 
+    // ALL tab includes all transactions (new, transferred, linked, accepted, completed, archived)
+    if (activeTab === "ALL") return true;
+
     const category = getTravelArchiveCategory(r);
 
     // Two-tier archive system
@@ -641,12 +647,11 @@ ${travelersLines}
       return category === "ARCHIVED_OLD";
     }
 
-    // All active tabs (including "ALL"): only ACTIVE transactions appear
+    // All active tabs: only ACTIVE transactions appear
     if (category !== "ACTIVE") {
       return false;
     }
 
-    if (activeTab === "ALL") return true;
     if (activeTab === "NEW") return isRequestNew(r);
     if (
       activeTab === "TRANSFERRED_TO_AGENT" ||
@@ -741,17 +746,6 @@ ${travelersLines}
             <>
               <button
                 type="button"
-                onClick={() => setActiveTab("ALL")}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
-                  activeTab === "ALL"
-                    ? "bg-sky-600 text-white shadow-xs"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                الكل ({activeRoleRequests.length})
-              </button>
-              <button
-                type="button"
                 onClick={() => setActiveTab("TRANSFERRED_TO_AGENT")}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
                   activeTab === "TRANSFERRED_TO_AGENT"
@@ -816,22 +810,22 @@ ${travelersLines}
               >
                 الأرشيف القديم ({oldArchivedRequests.length})
               </button>
-            </>
-          )}
-
-          {role === "Sender" && (
-            <>
               <button
                 type="button"
                 onClick={() => setActiveTab("ALL")}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors shrink-0 sm:ms-auto ${
                   activeTab === "ALL"
                     ? "bg-sky-600 text-white shadow-xs"
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
-                الكل ({activeRoleRequests.length})
+                الكل ({agentAllCount})
               </button>
+            </>
+          )}
+
+          {role === "Sender" && (
+            <>
               <button
                 type="button"
                 onClick={() => setActiveTab("NEW")}
@@ -909,22 +903,22 @@ ${travelersLines}
               >
                 الأرشيف القديم ({oldArchivedRequests.length})
               </button>
-            </>
-          )}
-
-          {(role === "SafaEmployee" || role === "Admin") && (
-            <>
               <button
                 type="button"
                 onClick={() => setActiveTab("ALL")}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors shrink-0 sm:ms-auto ${
                   activeTab === "ALL"
                     ? "bg-sky-600 text-white shadow-xs"
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
-                الكل ({activeAllRequests.length})
+                الكل ({senderAllCount})
               </button>
+            </>
+          )}
+
+          {(role === "SafaEmployee" || role === "Admin") && (
+            <>
               <button
                 type="button"
                 onClick={() => setActiveTab("NEW")}
@@ -1002,22 +996,22 @@ ${travelersLines}
               >
                 الأرشيف القديم ({oldArchivedRequests.length})
               </button>
-            </>
-          )}
-
-          {(!role || !["SaudiAgent", "SafaEmployee", "Sender", "Admin"].includes(role)) && (
-            <>
               <button
                 type="button"
                 onClick={() => setActiveTab("ALL")}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors shrink-0 sm:ms-auto ${
                   activeTab === "ALL"
                     ? "bg-sky-600 text-white shadow-xs"
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
-                الكل ({activeRoleRequests.length})
+                الكل ({adminAllCount})
               </button>
+            </>
+          )}
+
+          {(!role || !["SaudiAgent", "SafaEmployee", "Sender", "Admin"].includes(role)) && (
+            <>
               <button
                 type="button"
                 onClick={() => setActiveTab("ARCHIVED")}
@@ -1039,6 +1033,17 @@ ${travelersLines}
                 }`}
               >
                 الأرشيف القديم ({oldArchivedRequests.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("ALL")}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors shrink-0 sm:ms-auto ${
+                  activeTab === "ALL"
+                    ? "bg-sky-600 text-white shadow-xs"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                الكل ({roleRequests.length})
               </button>
             </>
           )}
