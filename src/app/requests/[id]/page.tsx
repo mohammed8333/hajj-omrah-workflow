@@ -1670,7 +1670,9 @@ export default function RequestDetailPage({
       setActionLoading(true);
       await api.requests.acceptHosting(
         requestId,
-        "تم قبول طلب الاستضافة من قِبل المُرسل"
+        isAdmin
+          ? "تم قبول وتمرير الاستضافة بواسطة إدارة النظام"
+          : "تم قبول طلب الاستضافة من قِبل المُرسل"
       );
       setSuccess("تم قبول الاستضافة بنجاح وإعادة المعاملة للوكيل السعودي لدفع الفاتورة ✓");
       await loadRequest();
