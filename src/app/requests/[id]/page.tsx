@@ -13,7 +13,7 @@ import {
   GroupRequestDetail,
   Traveler,
 } from "@/types";
-import { DocumentStatusBadge, RequestStatusBadge } from "@/components/ui/StatusBadge";
+import { RequestStatusBadge } from "@/components/ui/StatusBadge";
 import { DOCUMENT_TYPE_LABELS, REVIEW_STATUS_MAP } from "@/lib/constants";
 import { RequestLifecycleTimer } from "@/components/ui/RequestLifecycleTimer";
 import { SaudiAgentView } from "@/components/requests/SaudiAgentView";
@@ -1265,105 +1265,7 @@ export default function RequestDetailPage({
     }
   };
 
-  const checkAllDocumentsAccepted = (): { isAllAccepted: boolean; reason?: string } => {
-    if (!request) return { isAllAccepted: false, reason: "بيانات المعاملة غير متوفرة" };
-
-    // 1. Check hosting document if hasHosting is true
-    if (request.hasHosting) {
-      const hostDoc =
-        (request.hostingInfo?.hostIdDocumentId
-          ? request.groupDocuments?.find((d) => d.id === request.hostingInfo.hostIdDocumentId)
-          : undefined) ||
-        request.hostingInfo?.hostIdDocument ||
-        request.groupDocuments?.filter((d) => d.documentType === "HostId").slice(-1)[0];
-      if (!hostDoc) {
-        return { isAllAccepted: false, reason: "مستند هوية المستضيف غير مرفوع في المعاملة." };
-      }
-      if (hostDoc.reviewStatus !== "Accepted") {
-        const st = REVIEW_STATUS_MAP[hostDoc.reviewStatus]?.label || hostDoc.reviewStatus;
-        return {
-          isAllAccepted: false,
-          reason: `مستند هوية المستضيف (${st})، يجب مراجعته وقبوله أولاً.`,
-        };
-      }
-    }
-
-    // 2. Check travelers
-    if (!request.travelers || request.travelers.length === 0) {
-      return { isAllAccepted: false, reason: "لا يوجد مسافرين مسجلين في المعاملة." };
-    }
-
-    for (let i = 0; i < request.travelers.length; i++) {
-      const traveler = request.travelers[i];
-      const travelerLabel = traveler.fullName || `المسافر #${i + 1}`;
-      const docs = traveler.documents || [];
-
-      // Check passport
-      const passportDoc = docs.find((d) => d.documentType === "Passport");
-      if (!passportDoc) {
-        return { isAllAccepted: false, reason: `جواز السفر غير مرفوع للمسافر (${travelerLabel}).` };
-      }
-      if (passportDoc.reviewStatus !== "Accepted") {
-        const st = REVIEW_STATUS_MAP[passportDoc.reviewStatus]?.label || passportDoc.reviewStatus;
-        return {
-          isAllAccepted: false,
-          reason: `جواز السفر للمسافر (${travelerLabel}) (${st})، يجب قبوله أولاً.`,
-        };
-      }
-
-      // Check personal photo
-      const photoDoc = docs.find((d) => d.documentType === "PersonalPhoto");
-      if (!photoDoc) {
-        return { isAllAccepted: false, reason: `الصورة الشخصية غير مرفوعة للمسافر (${travelerLabel}).` };
-      }
-      if (photoDoc.reviewStatus !== "Accepted") {
-        const st = REVIEW_STATUS_MAP[photoDoc.reviewStatus]?.label || photoDoc.reviewStatus;
-        return {
-          isAllAccepted: false,
-          reason: `الصورة الشخصية للمسافر (${travelerLabel}) (${st})، يجب قبولها أولاً.`,
-        };
-      }
-
-      // Check all other uploaded documents for this traveler
-      for (const doc of docs) {
-        if (doc.reviewStatus !== "Accepted") {
-          const typeLabel = DOCUMENT_TYPE_LABELS[doc.documentType] || doc.documentType;
-          const st = REVIEW_STATUS_MAP[doc.reviewStatus]?.label || doc.reviewStatus;
-          return {
-            isAllAccepted: false,
-            reason: `المستند (${typeLabel}) للمسافر (${travelerLabel}) (${st})، يجب قبوله أولاً.`,
-          };
-        }
-      }
-    }
-
-    // 3. Check group documents
-    if (request.groupDocuments && request.groupDocuments.length > 0) {
-      for (const doc of request.groupDocuments) {
-        if (doc.reviewStatus !== "Accepted") {
-          const docName = doc.originalFileName || DOCUMENT_TYPE_LABELS[doc.documentType] || doc.documentType;
-          const st = REVIEW_STATUS_MAP[doc.reviewStatus]?.label || doc.reviewStatus;
-          return {
-            isAllAccepted: false,
-            reason: `المستند (${docName}) للمجموعة (${st})، لم يتم قبوله بعد.`,
-          };
-        }
-      }
-    }
-
-    return { isAllAccepted: true };
-  };
-
   const handleCompleteSafa = async () => {
-    const docCheckResult = checkAllDocumentsAccepted();
-    if (!docCheckResult.isAllAccepted) {
-      await alert({
-        title: "تنبيه تدقيق المستندات",
-        message: docCheckResult.reason || "لا يمكن إدخال رقم نسك إلا بعد قبول جميع المستندات.",
-        variant: "warning",
-      });
-      return;
-    }
     if (!nusukInput.trim()) {
       await alert({
         title: "تنبيه",
@@ -1393,8 +1295,9 @@ export default function RequestDetailPage({
       if (request) {
         request.groupName = nusukGroupName.trim();
         request.nusukGroupNumber = nusukInput.trim();
+        request.status = "ReadyForSaudiAgent";
       }
-      setSuccess("تم اكتمال تسجيل صفا وتوثيق رقم نسك وتحديث اسم المجموعة بنجاح.");
+      setSuccess("تم اعتماد رقم نسك وتحويل المعاملة للوكيل السعودي بنجاح 🕋");
       setShowNusukModal(false);
       await loadRequest();
     } catch (err: unknown) {
@@ -1677,9 +1580,6 @@ export default function RequestDetailPage({
     if (t.documents?.some((d) => d.documentType === "PersonalPhoto")) totalDocsCount++;
   });
 
-  const docCheck = checkAllDocumentsAccepted();
-  const canCompleteSafa = docCheck.isAllAccepted;
-
   const isAgentEligible = [
     "ReadyForSaudiAgent",
     "ReceivedBySaudiAgent",
@@ -1873,88 +1773,53 @@ export default function RequestDetailPage({
           )}
 
           {isSafaReviewer &&
-            (request.status === "UnderReview" ||
+            (request.status === "Submitted" ||
+              request.status === "UnderReview" ||
               request.status === "DocumentsCompleted" ||
               request.status === "SafaRegistrationCompleted") && (
-              <>
-                <button
-                  type="button"
-                  onClick={async (e) => {
-                    e.preventDefault();
-                    if (!canCompleteSafa) {
-                      await alert({
-                        title: "تنبيه تدقيق المستندات",
-                        message: docCheck.reason || "لا يمكن إدخال رقم نسك إلا بعد قبول جميع المستندات.",
-                        variant: "warning",
-                      });
-                      return;
-                    }
-                    const dep = request.departureDate || request.travelDate;
-                    const ret = request.returnDate;
-                    const senderCode = request.senderCode || resolveSenderCode(user);
-                    const suggested = formatOfficialGroupName(senderCode, dep, ret);
-                    const currentIsGeneric = !request.groupName || request.groupName.startsWith("مجموعة ") || request.groupName.startsWith("طلب جديد");
-                    setNusukGroupName(currentIsGeneric && suggested ? suggested : (request.groupName || suggested || ""));
-                    setShowNusukModal(true);
-                  }}
-                  disabled={actionLoading || !canCompleteSafa}
-                  title={
-                    !canCompleteSafa
-                      ? docCheck.reason || "يجب تدقيق وقبول جميع المستندات أولاً"
-                      : request.nusukGroupNumber
-                      ? "تعديل رقم نسك وإكمال صفا"
-                      : "إدخال رقم نسك وإكمال صفا"
-                  }
-                  className={
-                    !canCompleteSafa
-                      ? "bg-gray-200 text-gray-400 border border-gray-300 cursor-not-allowed text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5"
-                      : "bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
-                  }
-                >
-                  <Building className="w-3.5 h-3.5" />
-                  <span>
-                    {request.nusukGroupNumber
-                      ? "تعديل رقم نسك وإكمال صفا"
-                      : "إدخال رقم نسك وإكمال صفا"}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handleSendToSaudiAgent();
-                  }}
-                  disabled={actionLoading || !request.nusukGroupNumber || !canCompleteSafa}
-                  title={
-                    !canCompleteSafa
-                      ? docCheck.reason || "يجب تدقيق وقبول جميع المستندات أولاً"
-                      : !request.nusukGroupNumber
-                      ? "يجب إدخال رقم مجموعة نسك أولاً"
-                      : "إحالة إلى الوكيل السعودي"
-                  }
-                  className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>إحالة للوكيل السعودي</span>
-                </button>
-
-                {request.status === "SafaRegistrationCompleted" && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handleSafaStartReview();
-                    }}
-                    disabled={actionLoading}
-                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold px-3 py-2 rounded-xl flex items-center gap-1 cursor-pointer"
-                    title="إعادة المعاملة لحالة قيد المراجعة لتعديل المستندات أو التدقيق"
-                  >
-                    <span>إعادة للمراجعة</span>
-                  </button>
-                )}
-              </>
+              <button
+                type="button"
+                onClick={async (e) => {
+                  e.preventDefault();
+                  const dep = request.departureDate || request.travelDate;
+                  const ret = request.returnDate;
+                  const senderCode = request.senderCode || resolveSenderCode(user);
+                  const suggested = formatOfficialGroupName(senderCode, dep, ret);
+                  const currentIsGeneric = !request.groupName || request.groupName.startsWith("مجموعة ") || request.groupName.startsWith("طلب جديد");
+                  setNusukGroupName(currentIsGeneric && suggested ? suggested : (request.groupName || suggested || ""));
+                  setNusukInput(request.nusukGroupNumber || "");
+                  setShowNusukModal(true);
+                }}
+                disabled={actionLoading}
+                title="اعتماد رقم نسك وتحويل المعاملة فوراً للوكيل السعودي"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
+              >
+                <Building className="w-3.5 h-3.5" />
+                <span>
+                  {request.nusukGroupNumber
+                    ? "تعديل رقم نسك وتحويل للوكيل السعودي"
+                    : "اعتماد رقم نسك وتحويل للوكيل السعودي"}
+                </span>
+              </button>
             )}
+
+          {isSafaReviewer && request.status === "ReadyForSaudiAgent" && (
+            <button
+              type="button"
+              onClick={async (e) => {
+                e.preventDefault();
+                setNusukGroupName(request.groupName || "");
+                setNusukInput(request.nusukGroupNumber || "");
+                setShowNusukModal(true);
+              }}
+              disabled={actionLoading}
+              className="bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold px-3 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
+              title="تعديل رقم مجموعة نسك"
+            >
+              <Building className="w-3.5 h-3.5" />
+              <span>تعديل رقم نسك</span>
+            </button>
+          )}
 
           {/* زر إرسال حزمة المعاملة لمجموعة الواتساب (يتفعل تلقائياً بعد إحالة المعاملة للوكيل السعودي) */}
           {isSafaReviewer && request.status !== "Draft" && (
@@ -2078,39 +1943,7 @@ export default function RequestDetailPage({
         </div>
       )}
 
-      {/* Safa Employee Review Status Banner */}
-      {isSafaReviewer &&
-        (request.status === "UnderReview" || request.status === "Submitted") &&
-        !canCompleteSafa && (
-          <div className="p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs sm:text-sm flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 shrink-0 text-amber-600 mt-0.5" />
-            <div className="space-y-1">
-              <div className="font-bold text-amber-800">
-                زر إدخال رقم نسك معطل حتى تدقيق وقبول جميع المستندات
-              </div>
-              <div className="text-amber-700">
-                يلزم مراجعة وقبول كافة وثائق ومستندات المسافرين والمستضيف (مقبول ✓) لتتمكن من إدخال رقم نسك وإكمال صفا.
-              </div>
-              {docCheck.reason && (
-                <div className="text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-1.5 rounded-lg inline-block mt-1">
-                  المستند المطلوب مراجعته حالياً: {docCheck.reason}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
 
-      {isSafaReviewer &&
-        request.status === "UnderReview" &&
-        canCompleteSafa &&
-        !request.nusukGroupNumber && (
-          <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs sm:text-sm flex items-center gap-3">
-            <CheckCircle className="w-5 h-5 shrink-0 text-emerald-600" />
-            <div>
-              <strong>اكتمل تدقيق المستندات:</strong> تم قبول جميع وثائق المسافرين والمستضيف بنجاح ✓. يمكنك الآن الضغط على زر <strong>«إدخال رقم نسك وإكمال صفا»</strong> بالأعلى لتوثيق رقم نسك.
-            </div>
-          </div>
-        )}
       {/* Corrections Banner if any */}
       {request.correctionRequests.filter((c) => c.status === "Pending").length >
         0 && (
@@ -2470,90 +2303,20 @@ export default function RequestDetailPage({
                         </div>
 
                         <div className="shrink-0">
-                          <DocumentStatusBadge status={hostDoc.reviewStatus} />
+                          {hostDoc.reviewStatus === "NeedsCorrection" ? (
+                            <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-medium">
+                              مطلوب تعديل
+                            </span>
+                          ) : (
+                            <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded font-medium">
+                              تم الرفع ✓
+                            </span>
+                          )}
                         </div>
                       </div>
 
-                      {/* السطر الثاني: الخيارات والأزرار كاملة جنب بعض داخل الفريم بدون أي خروج أو قص */}
-                      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-gray-200/70">
-                        {/* خيارات التدقيق السريع لموظف صفا / الوكيل */}
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          {(isSafaReviewer || isAgent) && (
-                            <div className="flex flex-wrap items-center gap-1 bg-white p-1 rounded-lg border border-gray-200 shadow-2xs">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  handleQuickReview(hostDoc.id, "Accepted");
-                                }}
-                                disabled={actionLoading}
-                                className={`px-2 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer ${
-                                  hostDoc.reviewStatus === "Accepted"
-                                    ? "bg-emerald-600 text-white shadow-xs"
-                                    : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                                }`}
-                                title="قبول هوية المستضيف"
-                              >
-                                <Check className="w-3.5 h-3.5" />
-                                <span>مقبول</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  handleQuickReview(hostDoc.id, "NeedsCorrection");
-                                }}
-                                disabled={actionLoading}
-                                className={`px-2 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer ${
-                                  hostDoc.reviewStatus === "NeedsCorrection"
-                                    ? "bg-amber-600 text-white shadow-xs"
-                                    : "bg-amber-50 text-amber-700 hover:bg-amber-100"
-                                }`}
-                                title="طلب تعديل هوية المستضيف"
-                              >
-                                <AlertTriangle className="w-3.5 h-3.5" />
-                                <span>عايز تعديل</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  handleQuickReview(hostDoc.id, "Rejected");
-                                }}
-                                disabled={actionLoading}
-                                className={`px-2 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer ${
-                                  hostDoc.reviewStatus === "Rejected"
-                                    ? "bg-rose-600 text-white shadow-xs"
-                                    : "bg-rose-50 text-rose-700 hover:bg-rose-100"
-                                }`}
-                                title="رفض هوية المستضيف"
-                              >
-                                <X className="w-3.5 h-3.5" />
-                                <span>مرفوض</span>
-                              </button>
-                            </div>
-                          )}
-
-                          {isAgent && hostDoc.reviewStatus !== "Pending" && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                handleQuickReview(hostDoc.id, "Pending", "تمت إعادة المستند للمراجعة من قبل الوكيل");
-                              }}
-                              disabled={actionLoading}
-                              className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
-                              title="إعادة فتح تدقيق المستند"
-                            >
-                              <Undo2 className="w-3.5 h-3.5" />
-                              <span>إعادة تدقيق</span>
-                            </button>
-                          )}
-                        </div>
-
-                        {/* أزرار العمليات (معاينة، تنزيل، فحص ذكي، استبدال، حذف) */}
+                      {/* السطر الثاني: أزرار العمليات */}
+                      <div className="flex flex-wrap items-center justify-end gap-1.5 pt-2 border-t border-gray-200/70">
                         <div className="flex flex-wrap items-center gap-1.5">
                           <button
                             type="button"
@@ -2923,90 +2686,20 @@ export default function RequestDetailPage({
                       </div>
 
                       <div className="shrink-0">
-                        <DocumentStatusBadge status={ticketDoc.reviewStatus} />
+                        {ticketDoc.reviewStatus === "NeedsCorrection" ? (
+                          <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-medium">
+                            مطلوب تعديل
+                          </span>
+                        ) : (
+                          <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded font-medium">
+                            تم الرفع ✓
+                          </span>
+                        )}
                       </div>
                     </div>
 
-                    {/* السطر الثاني: الخيارات والأزرار كاملة جنب بعض داخل الفريم */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-gray-200/70">
-                      {/* خيارات التدقيق السريع */}
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        {(isSafaReviewer || isAgent) && (
-                          <div className="flex flex-wrap items-center gap-1 bg-white p-1 rounded-lg border border-gray-200 shadow-2xs">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                handleQuickReview(ticketDoc.id, "Accepted");
-                              }}
-                              disabled={actionLoading}
-                              className={`px-2 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer ${
-                                ticketDoc.reviewStatus === "Accepted"
-                                  ? "bg-emerald-600 text-white shadow-xs"
-                                  : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                              }`}
-                              title="قبول تذكرة الطيران"
-                            >
-                              <Check className="w-3.5 h-3.5" />
-                              <span>مقبول</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                handleQuickReview(ticketDoc.id, "NeedsCorrection");
-                              }}
-                              disabled={actionLoading}
-                              className={`px-2 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer ${
-                                ticketDoc.reviewStatus === "NeedsCorrection"
-                                  ? "bg-amber-600 text-white shadow-xs"
-                                  : "bg-amber-50 text-amber-700 hover:bg-amber-100"
-                              }`}
-                              title="طلب تعديل تذكرة الطيران"
-                            >
-                              <AlertTriangle className="w-3.5 h-3.5" />
-                              <span>عايز تعديل</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                handleQuickReview(ticketDoc.id, "Rejected");
-                              }}
-                              disabled={actionLoading}
-                              className={`px-2 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer ${
-                                ticketDoc.reviewStatus === "Rejected"
-                                  ? "bg-rose-600 text-white shadow-xs"
-                                  : "bg-rose-50 text-rose-700 hover:bg-rose-100"
-                              }`}
-                              title="رفض تذكرة الطيران"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                              <span>مرفوض</span>
-                            </button>
-                          </div>
-                        )}
-
-                        {isAgent && ticketDoc.reviewStatus !== "Pending" && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              handleQuickReview(ticketDoc.id, "Pending", "تمت إعادة المستند للمراجعة من قبل الوكيل");
-                            }}
-                            disabled={actionLoading}
-                            className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
-                            title="إعادة فتح تدقيق المستند"
-                          >
-                            <Undo2 className="w-3.5 h-3.5" />
-                            <span>إعادة تدقيق</span>
-                          </button>
-                        )}
-                      </div>
-
-                      {/* أزرار العمليات */}
+                    {/* السطر الثاني: أزرار العمليات */}
+                    <div className="flex flex-wrap items-center justify-end gap-1.5 pt-2 border-t border-gray-200/70">
                       <div className="flex flex-wrap items-center gap-1.5">
                         <button
                           type="button"
@@ -3500,7 +3193,15 @@ export default function RequestDetailPage({
                           </span>
 
                           {doc ? (
-                            <DocumentStatusBadge status={doc.reviewStatus} />
+                            doc.reviewStatus === "NeedsCorrection" ? (
+                              <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-medium">
+                                مطلوب تعديل
+                              </span>
+                            ) : (
+                              <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded font-medium">
+                                تم الرفع ✓
+                              </span>
+                            )
                           ) : (
                             <span className="text-[10px] bg-gray-200 text-gray-600 px-2 py-0.5 rounded font-medium">
                               غير مرفوع
@@ -3563,63 +3264,6 @@ export default function RequestDetailPage({
                                 </label>
                               )}
 
-                              {/* Quick Review Buttons when Pending */}
-                              {(isSafaReviewer || isAgent) && doc.reviewStatus === "Pending" && (
-                                <div className="flex items-center gap-1">
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      handleQuickReview(doc.id, "Accepted");
-                                    }}
-                                    disabled={actionLoading}
-                                    className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors cursor-pointer shadow-2xs"
-                                    title="قبول المستند (صح)"
-                                  >
-                                    <Check className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      handleQuickReview(doc.id, "NeedsCorrection");
-                                    }}
-                                    disabled={actionLoading}
-                                    className="p-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors cursor-pointer shadow-2xs"
-                                    title="طلب تصحيح للمستند (مثلث الخطر)"
-                                  >
-                                    <AlertTriangle className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      handleQuickReview(doc.id, "Rejected");
-                                    }}
-                                    disabled={actionLoading}
-                                    className="p-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition-colors cursor-pointer shadow-2xs"
-                                    title="رفض المستند (إكس)"
-                                  >
-                                    <X className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              )}
-
-                              {/* Agent Return/Reset Action: only Agent can return reviewed documents */}
-                              {isAgent && doc.reviewStatus !== "Pending" && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    handleQuickReview(doc.id, "Pending", "تمت إعادة المستند للمراجعة من قبل الوكيل");
-                                  }}
-                                  disabled={actionLoading}
-                                  className="p-1.5 bg-amber-50 hover:bg-amber-500 text-amber-800 hover:text-white border border-amber-300 rounded-lg transition-colors cursor-pointer shadow-2xs"
-                                  title="إعادة فتح تدقيق المستند لموظف الصفا (إعادة التدقيق)"
-                                >
-                                  <Undo2 className="w-4 h-4" />
-                                </button>
-                              )}
 
                               {canEditAnyData && (
                                 <button
@@ -3849,14 +3493,14 @@ export default function RequestDetailPage({
         </div>
       )}
 
-      {/* --- MODAL 3: Enter Nusuk Number & Complete Safa --- */}
+      {/* --- MODAL 3: Enter Nusuk Number & Transfer to Saudi Agent --- */}
       {showNusukModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
           <div className="bg-white w-full max-w-md rounded-2xl p-6 shadow-xl space-y-4">
             <div className="flex justify-between items-center border-b border-gray-100 pb-3">
               <h3 className="font-bold text-base text-gray-900 flex items-center gap-2">
-                <Building className="w-5 h-5 text-teal-600" />
-                <span>توثيق رقم مجموعة نسك وإكمال صفا</span>
+                <Building className="w-5 h-5 text-emerald-600" />
+                <span>اعتماد رقم نسك وتحويل للوكيل السعودي</span>
               </h3>
               <button
                 onClick={() => setShowNusukModal(false)}
@@ -3867,7 +3511,7 @@ export default function RequestDetailPage({
             </div>
 
             <p className="text-xs text-gray-500">
-              أدخل رقم المجموعة المعتمد من منصة نسك الرسمية بعد إنهاء تسجيل صفا. هذا الرقم إلزامي لإتاحة الإحالة للوكيل السعودي.
+              أدخل رقم مجموعة نسك المعتمد لتثبيته وتحويل المعاملة فوراً إلى الوكيل السعودي للمصادقة وإصدار التأشيرات.
             </p>
 
             <div>
@@ -3956,10 +3600,11 @@ export default function RequestDetailPage({
               <button
                 type="button"
                 onClick={handleCompleteSafa}
-                disabled={actionLoading || !nusukInput.trim() || !nusukGroupName.trim() || !canCompleteSafa}
-                className="px-4 py-2 text-xs font-bold bg-teal-600 hover:bg-teal-700 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed text-white rounded-xl shadow-xs cursor-pointer"
+                disabled={actionLoading || !nusukInput.trim() || !nusukGroupName.trim()}
+                className="px-4 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed text-white rounded-xl shadow-xs cursor-pointer flex items-center gap-1.5"
               >
-                اعتماد واكتمال صفا
+                <Send className="w-3.5 h-3.5" />
+                <span>اعتماد رقم نسك وتحويل للوكيل السعودي</span>
               </button>
             </div>
           </div>

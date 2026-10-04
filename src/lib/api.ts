@@ -234,7 +234,7 @@ export const api = {
       }
       await delay();
       localDB.safaComplete(id, nusukGroupNumber, note, current, groupName);
-      return { message: "تم توثيق رقم نسك وإكمال صفا بنجاح" };
+      return { message: "تم اعتماد رقم نسك وتحويل المعاملة للوكيل السعودي بنجاح" };
     },
 
     sendToAgent: async (

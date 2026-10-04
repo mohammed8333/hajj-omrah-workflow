@@ -887,7 +887,7 @@ export const supabaseService = {
       const now = new Date().toISOString();
       const updateData: Record<string, any> = {
         nusuk_group_number: nusukGroupNumber,
-        status: "SafaRegistrationCompleted",
+        status: "ReadyForSaudiAgent",
         assigned_safa_employee_id: currentUser?.id,
         assigned_safa_employee_name: currentUser?.fullName,
         updated_at: now,
@@ -904,14 +904,14 @@ export const supabaseService = {
         id: `sh-${Date.now()}`,
         group_request_id: id,
         from_status: "UnderReview",
-        to_status: "SafaRegistrationCompleted",
+        to_status: "ReadyForSaudiAgent",
         changed_by_id: currentUser?.id || "safa",
         changed_by_name: currentUser?.fullName || "موظف صفا",
-        note: note ? `تم إكمال صفا وتوثيق رقم نسك: ${nusukGroupNumber}. ملاحظات: ${note}` : `تم إكمال صفا وتوثيق رقم نسك: ${nusukGroupNumber}`,
+        note: note ? `تم اعتماد رقم نسك (${nusukGroupNumber}) وتحويل المعاملة للوكيل السعودي. ملاحظات: ${note}` : `تم اعتماد رقم نسك (${nusukGroupNumber}) وتحويل المعاملة للوكيل السعودي`,
         created_at: now,
       });
 
-      return { message: "تم اكتمال تسجيل صفا وتوثيق رقم نسك بنجاح" };
+      return { message: "تم اعتماد رقم نسك وتحويل المعاملة للوكيل السعودي بنجاح" };
     },
 
     sendToAgent: async (id: string, agentId?: string, note?: string, currentUser?: User) => {
