@@ -402,18 +402,6 @@ export default function RequestsListPage() {
     e.preventDefault();
     if (role !== "SaudiAgent" && role !== "Admin") return;
 
-    const ok = await confirm({
-      title: "تأكيد ربط البرنامج",
-      message: r.hasHosting
-        ? `هل تؤكد ربط البرنامج للمعاملة (${r.requestNumber})؟ سيتم تحويل المعاملة للمُرسل لقبول الاستضافة.`
-        : `هل تؤكد ربط البرنامج للمعاملة (${r.requestNumber})؟ سيتم الانتقال لمرحلة دفع الفاتورة.`,
-      confirmText: "نعم، تم ربط البرنامج ✓",
-      cancelText: "إلغاء",
-      variant: "info",
-    });
-
-    if (!ok) return;
-
     try {
       if (r.hasHosting) {
         await api.requests.requestHostingAcceptance(
@@ -425,14 +413,6 @@ export default function RequestsListPage() {
       }
 
       await loadRequests();
-
-      await alert({
-        title: "تم ربط البرنامج بنجاح",
-        message: r.hasHosting
-          ? `تم ربط البرنامج للمعاملة (${r.requestNumber}) بنجاح وإحالتها للمُرسل لقبول الاستضافة ✓`
-          : `تم ربط البرنامج للمعاملة (${r.requestNumber}) بنجاح، المعاملة جاهزة لدفع الفاتورة ✓`,
-        variant: "success",
-      });
     } catch (err: unknown) {
       if (err instanceof Error) {
         await alert({ title: "خطأ", message: err.message, variant: "danger" });
@@ -445,16 +425,6 @@ export default function RequestsListPage() {
     e.preventDefault();
     if (role !== "SaudiAgent" && role !== "Admin") return;
 
-    const ok = await confirm({
-      title: "تأكيد دفع الفاتورة واكتمال المعاملة",
-      message: `هل تؤكد سداد الفاتورة للمعاملة (${r.requestNumber}) وإتمام المعاملة نهائياً؟`,
-      confirmText: "نعم، تم دفع الفاتورة ✓",
-      cancelText: "إلغاء",
-      variant: "success",
-    });
-
-    if (!ok) return;
-
     try {
       await api.requests.agentComplete(
         r.id,
@@ -462,12 +432,6 @@ export default function RequestsListPage() {
       );
 
       await loadRequests();
-
-      await alert({
-        title: "اكتملت المعاملة بنجاح",
-        message: `تم سداد الفاتورة واعتماد معاملة (${r.requestNumber}) بنجاح كمعاملة مكتملة (تم) ✓`,
-        variant: "success",
-      });
     } catch (err: unknown) {
       if (err instanceof Error) {
         await alert({ title: "خطأ", message: err.message, variant: "danger" });

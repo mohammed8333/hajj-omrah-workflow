@@ -1643,16 +1643,6 @@ export default function RequestDetailPage({
 
   const handleLinkProgram = async () => {
     if (!isSaudiAgent && !isAdmin) return;
-    const ok = await confirm({
-      title: "تأكيد ربط البرنامج",
-      message: request.hasHosting
-        ? `هل تؤكد ربط البرنامج للمعاملة (${request.requestNumber})؟ سيتم تحويل المعاملة للمُرسل لقبول الاستضافة.`
-        : `هل تؤكد ربط البرنامج للمعاملة (${request.requestNumber})؟ سيتم الانتقال لمرحلة دفع الفاتورة.`,
-      confirmText: "نعم، تم ربط البرنامج ✓",
-      cancelText: "إلغاء",
-      variant: "info",
-    });
-    if (!ok) return;
     try {
       setActionLoading(true);
       if (request.hasHosting) {
@@ -1676,14 +1666,6 @@ export default function RequestDetailPage({
 
   const handleAcceptHosting = async () => {
     if (!isAdmin && (!isSender || !isOwnerSender)) return;
-    const ok = await confirm({
-      title: "تأكيد قبول الاستضافة",
-      message: `هل تؤكد قبول الاستضافة للمعاملة (${request.requestNumber})؟ ستتم إحالة المعاملة للوكيل السعودي لدفع الفاتورة.`,
-      confirmText: "نعم، قبول الاستضافة ✓",
-      cancelText: "إلغاء",
-      variant: "info",
-    });
-    if (!ok) return;
     try {
       setActionLoading(true);
       await api.requests.acceptHosting(
@@ -1702,14 +1684,6 @@ export default function RequestDetailPage({
 
   const handlePayInvoice = async () => {
     if (!isSaudiAgent && !isAdmin) return;
-    const ok = await confirm({
-      title: "تأكيد دفع الفاتورة واكتمال المعاملة",
-      message: `هل تؤكد سداد الفاتورة للمعاملة (${request.requestNumber}) وإتمام المعاملة نهائياً؟`,
-      confirmText: "نعم، تم دفع الفاتورة ✓",
-      cancelText: "إلغاء",
-      variant: "success",
-    });
-    if (!ok) return;
     try {
       setActionLoading(true);
       await api.requests.agentComplete(
