@@ -1756,21 +1756,7 @@ export default function RequestDetailPage({
             </button>
           )}
 
-          {/* Safa Employee & Admin Actions: بدء التدقيق والمراجعة */}
-          {isSafaReviewer && request.status === "Submitted" && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                handleSafaStartReview();
-              }}
-              disabled={actionLoading}
-              className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
-            >
-              <Check className="w-3.5 h-3.5" />
-              <span>بدء التدقيق والمراجعة</span>
-            </button>
-          )}
+
 
           {isSafaReviewer &&
             (request.status === "Submitted" ||
