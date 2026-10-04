@@ -514,6 +514,13 @@ ${travelersLines}
   // Saudi Agent isolation: strictly only transactions referred to the agent or beyond
   const agentEligibleStatuses = [
     "ReadyForSaudiAgent",
+    "ReceivedBySaudiAgent",
+    "SaudiAgentProcessing",
+    "SaudiAgentCorrectionRequired",
+    "ProgramLinked",
+    "HostingAcceptanceRequested",
+    "HostingAcceptedBySender",
+    "HostingConfirmed",
     "Completed",
     "Archived",
   ];
@@ -536,6 +543,35 @@ ${travelersLines}
       ? requests.filter(isRequestOwnedBySender)
       : requests;
 
+  // Predicate helpers for clean, role-tailored workflow filter tabs
+  const isRequestNew = (r: GroupRequestSummary) =>
+    !r.nusukGroupNumber &&
+    (r.status === "Draft" ||
+      r.status === "Submitted" ||
+      r.status === "UnderReview" ||
+      r.status === "DocumentsCompleted" ||
+      r.status === "CorrectionRequired" ||
+      r.status === "MissingDocuments");
+
+  const isRequestTransferredToAgent = (r: GroupRequestSummary) =>
+    r.status === "ReadyForSaudiAgent" ||
+    r.status === "ReceivedBySaudiAgent" ||
+    r.status === "SaudiAgentProcessing" ||
+    r.status === "SaudiAgentCorrectionRequired";
+
+  const isRequestProgramLinked = (r: GroupRequestSummary) =>
+    r.status === "ProgramLinked" ||
+    r.status === "HostingAcceptanceRequested";
+
+  const isRequestHostingAccepted = (r: GroupRequestSummary) =>
+    r.status === "HostingAcceptedBySender" ||
+    r.status === "HostingConfirmed";
+
+  const isRequestInvoicePaid = (r: GroupRequestSummary) =>
+    r.status === "Completed" ||
+    ((role === "SafaEmployee" || role === "Admin") &&
+      r.status === "SafaRegistrationCompleted");
+
   // Categorize role requests into Active, Recent Archive (<=30 days past), and Old Archive (>30 days past)
   const activeRoleRequests = roleRequests.filter((r) => getTravelArchiveCategory(r) === "ACTIVE");
   const recentArchivedRequests = roleRequests.filter((r) => getTravelArchiveCategory(r) === "ARCHIVED_RECENT");
@@ -547,28 +583,17 @@ ${travelersLines}
     if (activeTab === "ARCHIVED_OLD") return oldArchivedRequests;
     if (activeTab === "ALL") return activeRoleRequests;
     return activeRoleRequests.filter((r) => {
-      if (activeTab === "NEW") return r.status === "Submitted" || r.status === "Draft";
-      if (activeTab === "REVIEW") return r.status === "UnderReview";
-      if (activeTab === "ISSUES")
-        return (
-          r.status === "CorrectionRequired" ||
-          r.status === "MissingDocuments"
-        );
-      if (activeTab === "READY_AGENT") return r.status === "ReadyForSaudiAgent";
-      if (activeTab === "AGENT_INBOX")
-        return r.status === "ReadyForSaudiAgent";
-      if (activeTab === "PROCESSING")
-        return (
-          r.status === "UnderReview" ||
-          r.status === "ReadyForSaudiAgent"
-        );
-      if (activeTab === "COMPLETED")
-        return (
-          r.status === "Completed" ||
-          ((role === "SafaEmployee" || role === "Admin") &&
-            (r.status === "SafaRegistrationCompleted" ||
-              r.status === "DocumentsCompleted"))
-        );
+      if (activeTab === "NEW") return isRequestNew(r);
+      if (
+        activeTab === "TRANSFERRED_TO_AGENT" ||
+        activeTab === "READY_AGENT" ||
+        activeTab === "AGENT_INBOX"
+      )
+        return isRequestTransferredToAgent(r);
+      if (activeTab === "PROGRAM_LINKED") return isRequestProgramLinked(r);
+      if (activeTab === "HOSTING_ACCEPTED") return isRequestHostingAccepted(r);
+      if (activeTab === "INVOICE_PAID" || activeTab === "COMPLETED")
+        return isRequestInvoicePaid(r);
       return true;
     });
   }, [activeTab, recentArchivedRequests, oldArchivedRequests, activeRoleRequests, role]);
@@ -592,47 +617,22 @@ ${travelersLines}
   const countWithoutNusuk = activeRoleRequests.length - countWithNusuk;
 
   // Precomputed tab counts for active tabs (excluding past/archived transactions):
-  const agentInboxCount = activeRoleRequests.filter(
-    (r) => r.status === "ReadyForSaudiAgent"
-  ).length;
-  const agentCompletedCount = activeRoleRequests.filter((r) => r.status === "Completed").length;
+  const agentTransferredCount = activeRoleRequests.filter(isRequestTransferredToAgent).length;
+  const agentProgramLinkedCount = activeRoleRequests.filter(isRequestProgramLinked).length;
+  const agentHostingAcceptedCount = activeRoleRequests.filter(isRequestHostingAccepted).length;
+  const agentInvoicePaidCount = activeRoleRequests.filter(isRequestInvoicePaid).length;
 
-  const safaNewCount = activeAllRequests.filter((r) => r.status === "Submitted" || r.status === "Draft").length;
-  const safaReviewCount = activeAllRequests.filter((r) => r.status === "UnderReview").length;
-  const safaIssuesCount = activeAllRequests.filter(
-    (r) =>
-      r.status === "CorrectionRequired" ||
-      r.status === "MissingDocuments"
-  ).length;
-  const safaReadyAgentCount = activeAllRequests.filter((r) => r.status === "ReadyForSaudiAgent").length;
-  const safaCompletedCount = activeAllRequests.filter(
-    (r) =>
-      r.status === "Completed" ||
-      r.status === "SafaRegistrationCompleted" ||
-      r.status === "DocumentsCompleted"
-  ).length;
+  const senderNewCount = activeRoleRequests.filter(isRequestNew).length;
+  const senderTransferredCount = activeRoleRequests.filter(isRequestTransferredToAgent).length;
+  const senderProgramLinkedCount = activeRoleRequests.filter(isRequestProgramLinked).length;
+  const senderHostingAcceptedCount = activeRoleRequests.filter(isRequestHostingAccepted).length;
+  const senderInvoicePaidCount = activeRoleRequests.filter(isRequestInvoicePaid).length;
 
-  const senderNewCount = activeRoleRequests.filter((r) => r.status === "Submitted" || r.status === "Draft").length;
-  const senderIssuesCount = activeRoleRequests.filter(
-    (r) =>
-      r.status === "CorrectionRequired" ||
-      r.status === "MissingDocuments"
-  ).length;
-  const senderCompletedCount = activeRoleRequests.filter((r) => r.status === "Completed").length;
-
-  const adminNewCount = activeAllRequests.filter((r) => r.status === "Submitted" || r.status === "Draft").length;
-  const adminProcessingCount = activeAllRequests.filter((r) =>
-    [
-      "UnderReview",
-      "ReadyForSaudiAgent",
-    ].includes(r.status)
-  ).length;
-  const adminIssuesCount = activeAllRequests.filter(
-    (r) =>
-      r.status === "CorrectionRequired" ||
-      r.status === "MissingDocuments"
-  ).length;
-  const adminCompletedCount = activeAllRequests.filter((r) => r.status === "Completed").length;
+  const adminNewCount = activeAllRequests.filter(isRequestNew).length;
+  const adminTransferredCount = activeAllRequests.filter(isRequestTransferredToAgent).length;
+  const adminProgramLinkedCount = activeAllRequests.filter(isRequestProgramLinked).length;
+  const adminHostingAcceptedCount = activeAllRequests.filter(isRequestHostingAccepted).length;
+  const adminInvoicePaidCount = activeAllRequests.filter(isRequestInvoicePaid).length;
 
   const urgentUpcomingRequests = activeRoleRequests.filter((r) => {
     if (r.status === "Completed" || r.status === "Archived" || r.status === "Cancelled") return false;
@@ -672,28 +672,17 @@ ${travelersLines}
     }
 
     if (activeTab === "ALL") return true;
-    if (activeTab === "NEW") return r.status === "Submitted" || r.status === "Draft";
-    if (activeTab === "REVIEW") return r.status === "UnderReview";
-    if (activeTab === "ISSUES")
-      return (
-        r.status === "CorrectionRequired" ||
-        r.status === "MissingDocuments"
-      );
-    if (activeTab === "READY_AGENT") return r.status === "ReadyForSaudiAgent";
-    if (activeTab === "AGENT_INBOX")
-      return r.status === "ReadyForSaudiAgent";
-    if (activeTab === "PROCESSING")
-      return (
-        r.status === "UnderReview" ||
-        r.status === "ReadyForSaudiAgent"
-      );
-    if (activeTab === "COMPLETED")
-      return (
-        r.status === "Completed" ||
-        ((role === "SafaEmployee" || role === "Admin") &&
-          (r.status === "SafaRegistrationCompleted" ||
-            r.status === "DocumentsCompleted"))
-      );
+    if (activeTab === "NEW") return isRequestNew(r);
+    if (
+      activeTab === "TRANSFERRED_TO_AGENT" ||
+      activeTab === "READY_AGENT" ||
+      activeTab === "AGENT_INBOX"
+    )
+      return isRequestTransferredToAgent(r);
+    if (activeTab === "PROGRAM_LINKED") return isRequestProgramLinked(r);
+    if (activeTab === "HOSTING_ACCEPTED") return isRequestHostingAccepted(r);
+    if (activeTab === "INVOICE_PAID" || activeTab === "COMPLETED")
+      return isRequestInvoicePaid(r);
 
     return true;
   });
@@ -845,125 +834,54 @@ ${travelersLines}
               </button>
               <button
                 type="button"
-                onClick={() => setActiveTab("AGENT_INBOX")}
+                onClick={() => setActiveTab("TRANSFERRED_TO_AGENT")}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
-                  activeTab === "AGENT_INBOX"
-                    ? "bg-sky-600 text-white shadow-xs"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                الوارد والجديد للمعالجة ({agentInboxCount})
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("COMPLETED")}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
-                  activeTab === "COMPLETED"
-                    ? "bg-green-600 text-white shadow-xs"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                مكتملة ({agentCompletedCount})
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("ARCHIVED")}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
-                  activeTab === "ARCHIVED"
-                    ? "bg-purple-600 text-white shadow-xs"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                الأرشيف ({recentArchivedRequests.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("ARCHIVED_OLD")}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
-                  activeTab === "ARCHIVED_OLD"
-                    ? "bg-stone-600 text-white shadow-xs"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                الأرشيف القديم ({oldArchivedRequests.length})
-              </button>
-            </>
-          )}
-
-          {role === "SafaEmployee" && (
-            <>
-              <button
-                type="button"
-                onClick={() => setActiveTab("ALL")}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
-                  activeTab === "ALL"
-                    ? "bg-sky-600 text-white shadow-xs"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                الكل ({activeAllRequests.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("NEW")}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
-                  activeTab === "NEW"
-                    ? "bg-sky-600 text-white shadow-xs"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                جديد للمراجعة ({safaNewCount})
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("REVIEW")}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
-                  activeTab === "REVIEW"
-                    ? "bg-amber-600 text-white shadow-xs"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                قيد الفحص ({safaReviewCount})
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("ISSUES")}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
-                  activeTab === "ISSUES"
-                    ? "bg-rose-600 text-white shadow-xs"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                طلبات تصحيح ونواقص ({safaIssuesCount})
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("READY_AGENT")}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
-                  activeTab === "READY_AGENT"
+                  activeTab === "TRANSFERRED_TO_AGENT"
                     ? "bg-indigo-600 text-white shadow-xs"
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
-                جاهزة للوكيل ({safaReadyAgentCount})
+                تم التحويل للوكيل ({agentTransferredCount})
               </button>
               <button
                 type="button"
-                onClick={() => setActiveTab("COMPLETED")}
+                onClick={() => setActiveTab("PROGRAM_LINKED")}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
-                  activeTab === "COMPLETED"
-                    ? "bg-green-600 text-white shadow-xs"
+                  activeTab === "PROGRAM_LINKED"
+                    ? "bg-purple-600 text-white shadow-xs"
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
-                مكتملة ({safaCompletedCount})
+                تم ربط برنامج ({agentProgramLinkedCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("HOSTING_ACCEPTED")}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                  activeTab === "HOSTING_ACCEPTED"
+                    ? "bg-amber-600 text-white shadow-xs"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                تم قبول الاستضافة ({agentHostingAcceptedCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("INVOICE_PAID")}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                  activeTab === "INVOICE_PAID"
+                    ? "bg-emerald-600 text-white shadow-xs"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                تم دفع الفاتورة ({agentInvoicePaidCount})
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab("ARCHIVED")}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
                   activeTab === "ARCHIVED"
-                    ? "bg-purple-600 text-white shadow-xs"
+                    ? "bg-stone-700 text-white shadow-xs"
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
@@ -1001,40 +919,62 @@ ${travelersLines}
                 onClick={() => setActiveTab("NEW")}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
                   activeTab === "NEW"
-                    ? "bg-sky-600 text-white shadow-xs"
+                    ? "bg-blue-600 text-white shadow-xs"
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
-                المسودات والمقدمة ({senderNewCount})
+                جديد ({senderNewCount})
               </button>
               <button
                 type="button"
-                onClick={() => setActiveTab("ISSUES")}
+                onClick={() => setActiveTab("TRANSFERRED_TO_AGENT")}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
-                  activeTab === "ISSUES"
-                    ? "bg-rose-600 text-white shadow-xs"
+                  activeTab === "TRANSFERRED_TO_AGENT"
+                    ? "bg-indigo-600 text-white shadow-xs"
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
-                تحتاج تعديل ({senderIssuesCount})
+                تم التحويل للوكيل ({senderTransferredCount})
               </button>
               <button
                 type="button"
-                onClick={() => setActiveTab("COMPLETED")}
+                onClick={() => setActiveTab("PROGRAM_LINKED")}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
-                  activeTab === "COMPLETED"
-                    ? "bg-green-600 text-white shadow-xs"
+                  activeTab === "PROGRAM_LINKED"
+                    ? "bg-purple-600 text-white shadow-xs"
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
-                المكتملة ({senderCompletedCount})
+                تم ربط برنامج ({senderProgramLinkedCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("HOSTING_ACCEPTED")}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                  activeTab === "HOSTING_ACCEPTED"
+                    ? "bg-amber-600 text-white shadow-xs"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                تم قبول الاستضافة ({senderHostingAcceptedCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("INVOICE_PAID")}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                  activeTab === "INVOICE_PAID"
+                    ? "bg-emerald-600 text-white shadow-xs"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                تم دفع الفاتورة ({senderInvoicePaidCount})
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab("ARCHIVED")}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
                   activeTab === "ARCHIVED"
-                    ? "bg-purple-600 text-white shadow-xs"
+                    ? "bg-stone-700 text-white shadow-xs"
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
@@ -1054,7 +994,7 @@ ${travelersLines}
             </>
           )}
 
-          {role === "Admin" && (
+          {(role === "SafaEmployee" || role === "Admin") && (
             <>
               <button
                 type="button"
@@ -1072,62 +1012,62 @@ ${travelersLines}
                 onClick={() => setActiveTab("NEW")}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
                   activeTab === "NEW"
-                    ? "bg-sky-600 text-white shadow-xs"
+                    ? "bg-blue-600 text-white shadow-xs"
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
-                جديد ومقدم ({adminNewCount})
+                جديد ({adminNewCount})
               </button>
               <button
                 type="button"
-                onClick={() => setActiveTab("PROCESSING")}
+                onClick={() => setActiveTab("TRANSFERRED_TO_AGENT")}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
-                  activeTab === "PROCESSING"
-                    ? "bg-amber-600 text-white shadow-xs"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                قيد المعالجة والمراجعة ({adminProcessingCount})
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("READY_AGENT")}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
-                  activeTab === "READY_AGENT"
+                  activeTab === "TRANSFERRED_TO_AGENT"
                     ? "bg-indigo-600 text-white shadow-xs"
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
-                جاهزة للوكيل ({safaReadyAgentCount})
+                تم التحويل للوكيل ({adminTransferredCount})
               </button>
               <button
                 type="button"
-                onClick={() => setActiveTab("ISSUES")}
+                onClick={() => setActiveTab("PROGRAM_LINKED")}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
-                  activeTab === "ISSUES"
-                    ? "bg-rose-600 text-white shadow-xs"
+                  activeTab === "PROGRAM_LINKED"
+                    ? "bg-purple-600 text-white shadow-xs"
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
-                تحتاج تصحيح ({adminIssuesCount})
+                تم ربط برنامج ({adminProgramLinkedCount})
               </button>
               <button
                 type="button"
-                onClick={() => setActiveTab("COMPLETED")}
+                onClick={() => setActiveTab("HOSTING_ACCEPTED")}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
-                  activeTab === "COMPLETED"
-                    ? "bg-green-600 text-white shadow-xs"
+                  activeTab === "HOSTING_ACCEPTED"
+                    ? "bg-amber-600 text-white shadow-xs"
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
-                المكتملة ({adminCompletedCount})
+                تم قبول الاستضافة ({adminHostingAcceptedCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("INVOICE_PAID")}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                  activeTab === "INVOICE_PAID"
+                    ? "bg-emerald-600 text-white shadow-xs"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                تم دفع الفاتورة ({adminInvoicePaidCount})
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab("ARCHIVED")}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
                   activeTab === "ARCHIVED"
-                    ? "bg-purple-600 text-white shadow-xs"
+                    ? "bg-stone-700 text-white shadow-xs"
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >

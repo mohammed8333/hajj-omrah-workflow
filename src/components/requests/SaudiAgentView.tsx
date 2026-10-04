@@ -37,6 +37,8 @@ interface SaudiAgentViewProps {
   onSaveNusukNumber: (num: string) => Promise<void>;
   onArchiveRequest?: () => Promise<void>;
   onDoneRequest?: () => Promise<void>;
+  onLinkProgram?: () => Promise<void>;
+  onPayInvoice?: () => Promise<void>;
   actionLoading: boolean;
 }
 
@@ -50,6 +52,8 @@ export const SaudiAgentView: React.FC<SaudiAgentViewProps> = ({
   onSaveNusukNumber,
   onArchiveRequest,
   onDoneRequest,
+  onLinkProgram,
+  onPayInvoice,
   actionLoading,
 }) => {
   const [editingNusuk, setEditingNusuk] = useState(false);
@@ -89,37 +93,112 @@ export const SaudiAgentView: React.FC<SaudiAgentViewProps> = ({
     setEditingNusuk(false);
   };
 
-  const handleDoneClick = onDoneRequest || onArchiveRequest;
-
   return (
     <div className="space-y-6">
-      {/* زر "تم" للوكيل السعودي */}
-      {request.status !== "Archived" && handleDoneClick && (
+      {/* 1. مرحلة ربط البرنامج: عندما تكون المعاملة محالة للوكيل */}
+      {(request.status === "ReadyForSaudiAgent" || request.status === "ReceivedBySaudiAgent") && onLinkProgram && (
+        <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+              <Check className="w-5 h-5 stroke-[3]" />
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-purple-950">ربط البرنامج في مسار</h3>
+              <p className="text-xs text-purple-800 mt-0.5">
+                {request.hasHosting
+                  ? "بعد ربط البرنامج، اضغط على الزر لتحويل المعاملة إلى المُرسل لقبول الاستضافة."
+                  : "بعد ربط البرنامج، اضغط على الزر للانتقال إلى مرحلة دفع الفاتورة."}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onLinkProgram}
+            disabled={actionLoading}
+            className="w-full sm:w-auto px-8 py-3 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white rounded-xl text-sm font-black shadow-md hover:shadow-lg flex items-center justify-center gap-2 shrink-0 transition-all cursor-pointer active:scale-95"
+            title="تأكيد ربط البرنامج"
+          >
+            <Check className="w-4 h-4 stroke-[3]" />
+            <span>تم ربط البرنامج</span>
+          </button>
+        </div>
+      )}
+
+      {/* 2. مرحلة انتظار قبول الاستضافة من قِبل المُرسل */}
+      {request.status === "HostingAcceptanceRequested" && (
+        <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 sm:p-5 flex items-center gap-3 shadow-xs">
+          <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-2xs">
+            <Clock className="w-5 h-5 animate-pulse" />
+          </div>
+          <div>
+            <h3 className="text-sm font-black text-amber-950">بانتظار قبول الاستضافة من قِبل المُرسل ⏳</h3>
+            <p className="text-xs text-amber-800 mt-0.5">
+              تم إرسال طلب قبول الاستضافة للمُرسل، وبانتظار موافقته واعتماده لتتمكن من دفع الفاتورة.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* 3. مرحلة سداد الفاتورة وإنجاز المعاملة: بعد قبول الاستضافة أو بعد ربط البرنامج */}
+      {(request.status === "HostingAcceptedBySender" ||
+        request.status === "HostingConfirmed" ||
+        (!request.hasHosting && request.status === "ProgramLinked")) &&
+        onPayInvoice && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                <Check className="w-5 h-5 stroke-[3]" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-emerald-950">سداد الفاتورة واكتمال المعاملة</h3>
+                <p className="text-xs text-emerald-800 mt-0.5">
+                  تم قبول الاستضافة وجاهزية التأشيرات. اضغط على الزر لتأكيد دفع الفاتورة واكتمال المعاملة نهائياً.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onPayInvoice}
+              disabled={actionLoading}
+              className="w-full sm:w-auto px-8 py-3 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-sm font-black shadow-md hover:shadow-lg flex items-center justify-center gap-2 shrink-0 transition-all cursor-pointer active:scale-95"
+              title="تأكيد دفع الفاتورة"
+            >
+              <Check className="w-4 h-4 stroke-[3]" />
+              <span>تم دفع الفاتورة</span>
+            </button>
+          </div>
+        )}
+
+      {/* 4. المعاملة مكتملة (تم) */}
+      {request.status === "Completed" && (
         <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
               <Check className="w-5 h-5 stroke-[3]" />
             </div>
             <div>
-              <h3 className="text-sm font-black text-emerald-950">إنجاز المعاملة</h3>
+              <h3 className="text-sm font-black text-emerald-950">المعاملة مكتملة بنجاح (تم) ✓</h3>
               <p className="text-xs text-emerald-800 mt-0.5">
-                اضغط على زر &quot;تم&quot; لاعتماد المعاملة ونقلها إلى سجل المعاملات المؤرشفة.
+                تم دفع الفاتورة وإنجاز كافة متطلبات المعاملة بنجاح.
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={handleDoneClick}
-            disabled={actionLoading}
-            className="w-full sm:w-auto px-8 py-3 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-sm font-black shadow-md hover:shadow-lg flex items-center justify-center gap-2 shrink-0 transition-all cursor-pointer active:scale-95"
-            title="اعتماد المعاملة ونقلها إلى الأرشيف (تم)"
-          >
-            <Check className="w-4 h-4 stroke-[3]" />
-            <span>تم</span>
-          </button>
+          {onArchiveRequest && (
+            <button
+              type="button"
+              onClick={onArchiveRequest}
+              disabled={actionLoading}
+              className="w-full sm:w-auto px-5 py-2.5 bg-stone-600 hover:bg-stone-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center justify-center gap-2 shrink-0 transition-all cursor-pointer"
+              title="نقل المعاملة إلى الأرشيف"
+            >
+              <Archive className="w-4 h-4" />
+              <span>نقل للأرشيف</span>
+            </button>
+          )}
         </div>
       )}
 
+      {/* 5. المعاملة في الأرشيف */}
       {request.status === "Archived" && (
         <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4 flex items-center gap-3 shadow-xs">
           <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-2xs">

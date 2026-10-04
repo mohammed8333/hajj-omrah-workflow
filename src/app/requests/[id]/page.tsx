@@ -1641,6 +1641,91 @@ export default function RequestDetailPage({
     );
   }
 
+  const handleLinkProgram = async () => {
+    if (!isSaudiAgent && !isAdmin) return;
+    const ok = await confirm({
+      title: "تأكيد ربط البرنامج",
+      message: request.hasHosting
+        ? `هل تؤكد ربط البرنامج للمعاملة (${request.requestNumber})؟ سيتم تحويل المعاملة للمُرسل لقبول الاستضافة.`
+        : `هل تؤكد ربط البرنامج للمعاملة (${request.requestNumber})؟ سيتم الانتقال لمرحلة دفع الفاتورة.`,
+      confirmText: "نعم، تم ربط البرنامج ✓",
+      cancelText: "إلغاء",
+      variant: "info",
+    });
+    if (!ok) return;
+    try {
+      setActionLoading(true);
+      if (request.hasHosting) {
+        await api.requests.requestHostingAcceptance(
+          requestId,
+          "تم ربط البرنامج وتحويل المعاملة للمرسل لقبول الاستضافة"
+        );
+        setSuccess("تم ربط البرنامج بنجاح وإحالة المعاملة للمُرسل لقبول الاستضافة ✓");
+      } else {
+        await api.requests.linkProgram(requestId, "تم ربط البرنامج بنجاح");
+        setSuccess("تم ربط البرنامج بنجاح، المعاملة جاهزة لدفع الفاتورة ✓");
+      }
+      await loadRequest();
+    } catch (err: unknown) {
+      if (err instanceof Error) setError(err.message);
+      else setError("حدث خطأ أثناء ربط البرنامج.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleAcceptHosting = async () => {
+    if (!isAdmin && (!isSender || !isOwnerSender)) return;
+    const ok = await confirm({
+      title: "تأكيد قبول الاستضافة",
+      message: `هل تؤكد قبول الاستضافة للمعاملة (${request.requestNumber})؟ ستتم إحالة المعاملة للوكيل السعودي لدفع الفاتورة.`,
+      confirmText: "نعم، قبول الاستضافة ✓",
+      cancelText: "إلغاء",
+      variant: "info",
+    });
+    if (!ok) return;
+    try {
+      setActionLoading(true);
+      await api.requests.acceptHosting(
+        requestId,
+        "تم قبول طلب الاستضافة من قِبل المُرسل"
+      );
+      setSuccess("تم قبول الاستضافة بنجاح وإعادة المعاملة للوكيل السعودي لدفع الفاتورة ✓");
+      await loadRequest();
+    } catch (err: unknown) {
+      if (err instanceof Error) setError(err.message);
+      else setError("حدث خطأ أثناء قبول الاستضافة.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handlePayInvoice = async () => {
+    if (!isSaudiAgent && !isAdmin) return;
+    const ok = await confirm({
+      title: "تأكيد دفع الفاتورة واكتمال المعاملة",
+      message: `هل تؤكد سداد الفاتورة للمعاملة (${request.requestNumber}) وإتمام المعاملة نهائياً؟`,
+      confirmText: "نعم، تم دفع الفاتورة ✓",
+      cancelText: "إلغاء",
+      variant: "success",
+    });
+    if (!ok) return;
+    try {
+      setActionLoading(true);
+      await api.requests.agentComplete(
+        requestId,
+        "تم دفع الفاتورة وإنجاز كافة متطلبات المعاملة بنجاح"
+      );
+      setSuccess("تم تأكيد دفع الفاتورة واكتمال المعاملة بنجاح (تم) ✓");
+      await loadRequest();
+    } catch (err: unknown) {
+      if (err instanceof Error) setError(err.message);
+      else setError("حدث خطأ أثناء تأكيد دفع الفاتورة.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6 w-full max-w-full overflow-x-hidden">
       {/* Top Breadcrumb & Status Header */}
@@ -1829,28 +1914,114 @@ export default function RequestDetailPage({
             />
           )}
 
-          {/* Saudi Agent & Admin Direct Action: زر "تم" للوكيل السعودي وللأدمن */}
-          {(isSaudiAgent || isAdmin) && (
-            request.status === "Archived" ? (
-              <div className="flex items-center gap-1.5 bg-purple-50 text-purple-700 border border-purple-200 px-4 py-2 rounded-xl text-xs font-black shadow-xs">
-                <Archive className="w-4 h-4 text-purple-600" />
-                <span>المعاملة في الأرشيف (تم) ✓</span>
-              </div>
-            ) : (
+          {/* Workflow Action 1: تم ربط البرنامج (الوكيل السعودي أو الآدمن فقط) */}
+          {(isSaudiAgent || isAdmin) &&
+            (request.status === "ReadyForSaudiAgent" || request.status === "ReceivedBySaudiAgent") && (
               <button
                 type="button"
                 onClick={(e) => {
                   e.preventDefault();
-                  handleAgentArchive();
+                  handleLinkProgram();
                 }}
                 disabled={actionLoading}
-                className="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs sm:text-sm font-black px-6 py-2 rounded-xl shadow-md hover:shadow-lg flex items-center gap-2 cursor-pointer transition-all active:scale-95"
-                title="اعتماد المعاملة ونقلها إلى الأرشيف (تم)"
+                className="bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white text-xs sm:text-sm font-black px-5 py-2 rounded-xl shadow-md hover:shadow-lg flex items-center gap-2 cursor-pointer transition-all active:scale-95"
+                title="تأكيد ربط البرنامج"
               >
                 <Check className="w-4 h-4 stroke-[3]" />
-                <span>تم</span>
+                <span>تم ربط البرنامج</span>
               </button>
-            )
+            )}
+
+          {/* Workflow Action 2: تم قبول الاستضافة (المرسل صاحب الطلب أو الآدمن فقط) */}
+          {((isSender && isOwnerSender) || isAdmin) &&
+            request.status === "HostingAcceptanceRequested" && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleAcceptHosting();
+                }}
+                disabled={actionLoading}
+                className="bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white text-xs sm:text-sm font-black px-5 py-2 rounded-xl shadow-md hover:shadow-lg flex items-center gap-2 cursor-pointer transition-all active:scale-95 animate-pulse"
+                title="تأكيد قبول الاستضافة"
+              >
+                <Check className="w-4 h-4 stroke-[3]" />
+                <span>تم قبول الاستضافة</span>
+              </button>
+            )}
+
+          {/* Workflow Action 3: تم دفع الفاتورة (الوكيل السعودي أو الآدمن فقط) */}
+          {(isSaudiAgent || isAdmin) &&
+            (request.status === "HostingAcceptedBySender" ||
+              request.status === "HostingConfirmed" ||
+              (!request.hasHosting && request.status === "ProgramLinked")) && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handlePayInvoice();
+                }}
+                disabled={actionLoading}
+                className="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs sm:text-sm font-black px-5 py-2 rounded-xl shadow-md hover:shadow-lg flex items-center gap-2 cursor-pointer transition-all active:scale-95"
+                title="تأكيد دفع الفاتورة واكتمال المعاملة"
+              >
+                <Check className="w-4 h-4 stroke-[3]" />
+                <span>تم دفع الفاتورة</span>
+              </button>
+            )}
+
+          {/* شارات الانتظار للطرف المقابل: */}
+          {/* للمرسل أثناء تواجد المعاملة لدى الوكيل السعودي */}
+          {isSender &&
+            (request.status === "ReadyForSaudiAgent" ||
+              request.status === "ReceivedBySaudiAgent" ||
+              request.status === "ProgramLinked" ||
+              request.status === "HostingAcceptedBySender") && (
+              <div className="flex items-center gap-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-xs">
+                <Clock className="w-3.5 h-3.5 text-indigo-600 animate-pulse" />
+                <span>قيد المعالجة لدى الوكيل السعودي ⏳</span>
+              </div>
+            )}
+
+          {/* للوكيل أثناء انتظار قبول الاستضافة من المرسل */}
+          {isSaudiAgent && request.status === "HostingAcceptanceRequested" && (
+            <div className="flex items-center gap-1.5 bg-amber-50 text-amber-800 border border-amber-300 px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-xs">
+              <Clock className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
+              <span>بانتظار قبول الاستضافة من قِبل المُرسل ⏳</span>
+            </div>
+          )}
+
+          {/* اكتمال المعاملة */}
+          {request.status === "Completed" && (
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-800 border border-emerald-300 px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-xs">
+                <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[3]" />
+                <span>تم دفع الفاتورة واكتمال المعاملة (تم) ✓</span>
+              </div>
+              {(isSaudiAgent || isAdmin) && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleAgentArchive();
+                  }}
+                  disabled={actionLoading}
+                  className="bg-stone-600 hover:bg-stone-700 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-xs flex items-center gap-1 cursor-pointer transition-colors"
+                  title="نقل المعاملة إلى الأرشيف"
+                >
+                  <Archive className="w-3.5 h-3.5" />
+                  <span>أرشفة</span>
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* أرشفة المعاملة */}
+          {request.status === "Archived" && (
+            <div className="flex items-center gap-1.5 bg-purple-50 text-purple-700 border border-purple-200 px-4 py-2 rounded-xl text-xs font-black shadow-xs">
+              <Archive className="w-4 h-4 text-purple-600" />
+              <span>المعاملة في الأرشيف (تم) ✓</span>
+            </div>
           )}
 
           {/* Admin Management Actions: Archive & Delete */}
@@ -1999,6 +2170,8 @@ export default function RequestDetailPage({
           onSaveNusukNumber={handleSaveNusukNumber}
           onArchiveRequest={handleAgentArchive}
           onDoneRequest={handleAgentArchive}
+          onLinkProgram={handleLinkProgram}
+          onPayInvoice={handlePayInvoice}
           actionLoading={actionLoading}
         />
       ) : !isAdmin && isSafaEmployee ? (
@@ -2044,6 +2217,20 @@ export default function RequestDetailPage({
 
             {/* الأزرار والشارات تحت العنوان مباشرة دون أي تداخل أو خروج عن الإطار */}
             <div className="flex flex-wrap items-center gap-2 pt-1">
+              {/* زر قبول الاستضافة للمرسل والآدمن داخل كارت الاستضافة مباشرة */}
+              {((isSender && isOwnerSender) || isAdmin) && request.status === "HostingAcceptanceRequested" && (
+                <button
+                  type="button"
+                  onClick={handleAcceptHosting}
+                  disabled={actionLoading}
+                  className="text-xs bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95 animate-pulse"
+                  title="تأكيد قبول الاستضافة"
+                >
+                  <Check className="w-3.5 h-3.5 stroke-[3]" />
+                  <span>تم قبول الاستضافة</span>
+                </button>
+              )}
+
               <span className="text-xs bg-amber-50 text-amber-800 font-semibold px-2.5 py-1.5 rounded-lg border border-amber-200 flex items-center gap-1.5 shadow-2xs">
                 <Users className="w-3.5 h-3.5 text-amber-600" />
                 <span>مشتركة لجميع المسافرين</span>
