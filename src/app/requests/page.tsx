@@ -413,7 +413,7 @@ export default function RequestsListPage() {
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-300 shadow-2xs">
           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-          <span>(تم)</span>
+          <span>مكتملة</span>
         </span>
       );
     }
@@ -433,27 +433,19 @@ export default function RequestsListPage() {
         </span>
       );
     }
-    if (r.status === "HostingAcceptedBySender" || r.status === "HostingConfirmed") {
+    if (isReadyForPayment(r)) {
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-50 text-blue-800 border border-blue-200 shadow-2xs">
-          <Check className="w-3.5 h-3.5 text-blue-600" />
-          <span>تم قبول الاستضافة</span>
-        </span>
-      );
-    }
-    if (r.status === "ProgramLinked") {
-      return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200 shadow-2xs">
-          <Check className="w-3.5 h-3.5 text-purple-600" />
-          <span>تم ربط البرنامج</span>
+          <Clock className="w-3.5 h-3.5 text-blue-600" />
+          <span>بانتظار دفع الفاتورة</span>
         </span>
       );
     }
     if (role === "SaudiAgent") {
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-sky-50 text-sky-700 border border-sky-300 shadow-2xs">
-          <Check className="w-3.5 h-3.5 text-sky-600" />
-          <span>تم التحويل للوكيل</span>
+          <Clock className="w-3.5 h-3.5 text-sky-600" />
+          <span>بانتظار ربط البرنامج</span>
         </span>
       );
     }
@@ -879,7 +871,7 @@ ${travelersLines}
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
-                تم التحويل للوكيل ({agentTransferredCount})
+                بانتظار ربط البرنامج ({agentTransferredCount})
               </button>
               <button
                 type="button"
@@ -890,7 +882,7 @@ ${travelersLines}
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
-                تم ربط برنامج ({agentProgramLinkedCount})
+                بانتظار قبول الاستضافة ({agentProgramLinkedCount})
               </button>
               <button
                 type="button"
@@ -901,7 +893,7 @@ ${travelersLines}
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
-                تم قبول الاستضافة ({agentHostingAcceptedCount})
+                بانتظار دفع الفاتورة ({agentHostingAcceptedCount})
               </button>
               <button
                 type="button"
@@ -912,7 +904,7 @@ ${travelersLines}
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
-                تم دفع الفاتورة ({agentInvoicePaidCount})
+                مكتملة ({agentInvoicePaidCount})
               </button>
               <button
                 type="button"
@@ -972,7 +964,7 @@ ${travelersLines}
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
-                تم التحويل للوكيل ({senderTransferredCount})
+                بانتظار ربط البرنامج ({senderTransferredCount})
               </button>
               <button
                 type="button"
@@ -983,7 +975,7 @@ ${travelersLines}
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
-                تم ربط برنامج ({senderProgramLinkedCount})
+                بانتظار قبول الاستضافة ({senderProgramLinkedCount})
               </button>
               <button
                 type="button"
@@ -994,7 +986,7 @@ ${travelersLines}
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
-                تم قبول الاستضافة ({senderHostingAcceptedCount})
+                بانتظار دفع الفاتورة ({senderHostingAcceptedCount})
               </button>
               <button
                 type="button"
@@ -1005,7 +997,7 @@ ${travelersLines}
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
-                تم دفع الفاتورة ({senderInvoicePaidCount})
+                مكتملة ({senderInvoicePaidCount})
               </button>
               <button
                 type="button"
@@ -1065,7 +1057,7 @@ ${travelersLines}
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
-                تم التحويل للوكيل ({adminTransferredCount})
+                بانتظار ربط البرنامج ({adminTransferredCount})
               </button>
               <button
                 type="button"
@@ -1076,7 +1068,7 @@ ${travelersLines}
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
-                تم ربط برنامج ({adminProgramLinkedCount})
+                بانتظار قبول الاستضافة ({adminProgramLinkedCount})
               </button>
               <button
                 type="button"
@@ -1087,7 +1079,7 @@ ${travelersLines}
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
-                تم قبول الاستضافة ({adminHostingAcceptedCount})
+                بانتظار دفع الفاتورة ({adminHostingAcceptedCount})
               </button>
               <button
                 type="button"
@@ -1098,7 +1090,7 @@ ${travelersLines}
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
-                تم دفع الفاتورة ({adminInvoicePaidCount})
+                مكتملة ({adminInvoicePaidCount})
               </button>
               <button
                 type="button"
