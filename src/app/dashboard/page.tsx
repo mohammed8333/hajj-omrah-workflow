@@ -685,12 +685,10 @@ ${travelersLines}
     r.status === "SaudiAgentCorrectionRequired";
 
   const isRequestProgramLinked = (r: GroupRequestSummary) =>
-    r.status === "ProgramLinked" ||
-    r.status === "HostingAcceptanceRequested";
+    isWaitingHosting(r);
 
   const isRequestHostingAccepted = (r: GroupRequestSummary) =>
-    r.status === "HostingAcceptedBySender" ||
-    r.status === "HostingConfirmed";
+    isReadyForPayment(r);
 
   const isRequestInvoicePaid = (r: GroupRequestSummary) =>
     r.status === "Completed" ||
