@@ -684,11 +684,9 @@ ${travelersLines}
     r.status === "SaudiAgentProcessing" ||
     r.status === "SaudiAgentCorrectionRequired";
 
-  const isRequestProgramLinked = (r: GroupRequestSummary) =>
-    isWaitingHosting(r);
+  const isRequestProgramLinked = (r: GroupRequestSummary) => isWaitingHosting(r);
 
-  const isRequestHostingAccepted = (r: GroupRequestSummary) =>
-    isReadyForPayment(r);
+  const isRequestHostingAccepted = (r: GroupRequestSummary) => isReadyForPayment(r);
 
   const isRequestInvoicePaid = (r: GroupRequestSummary) =>
     r.status === "Completed" ||

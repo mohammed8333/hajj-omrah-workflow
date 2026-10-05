@@ -55,15 +55,21 @@ export const STATUS_DISPLAY_NAMES: Record<string, string> = {
   CorrectionRequired: "مطلوب تصحيح",
   DocumentsCompleted: "المستندات مكتملة",
   SafaRegistrationCompleted: "اكتمل تسجيل صفا",
-  ReadyForSaudiAgent: "جاهز للوكيل السعودي",
-  Completed: "(تم) - مكتمل",
+  ReadyForSaudiAgent: "بانتظار ربط البرنامج",
+  ReceivedBySaudiAgent: "بانتظار ربط البرنامج",
+  SaudiAgentProcessing: "بانتظار ربط البرنامج",
+  ProgramLinked: "بانتظار دفع الفاتورة",
+  HostingAcceptanceRequested: "بانتظار قبول الاستضافة",
+  HostingAcceptedBySender: "بانتظار دفع الفاتورة",
+  HostingConfirmed: "بانتظار دفع الفاتورة",
+  Completed: "مكتملة",
   Cancelled: "ملغي",
   Archived: "معاملات مؤرشفة",
 };
 
 export const SAUDI_AGENT_STATUS_DISPLAY_NAMES: Record<string, string> = {
   ...STATUS_DISPLAY_NAMES,
-  ReadyForSaudiAgent: "جديد محال من صفا",
+  ReadyForSaudiAgent: "بانتظار ربط البرنامج",
 };
 
 export const STATUS_WORKFLOW_ORDER: string[] = [
@@ -75,6 +81,12 @@ export const STATUS_WORKFLOW_ORDER: string[] = [
   "DocumentsCompleted",
   "SafaRegistrationCompleted",
   "ReadyForSaudiAgent",
+  "ReceivedBySaudiAgent",
+  "SaudiAgentProcessing",
+  "ProgramLinked",
+  "HostingAcceptanceRequested",
+  "HostingAcceptedBySender",
+  "HostingConfirmed",
   "Completed",
   "Cancelled",
   "Archived",
