@@ -1001,7 +1001,7 @@ class LocalDatabaseEngine {
         assignedSaudiAgentName: r.assignedSaudiAgentName,
         status: r.status,
         nusukGroupNumber: r.nusukGroupNumber,
-        hasHosting: r.hasHosting,
+        hasHosting: Boolean(r.hasHosting || r.hostingInfo?.hostName || r.hostingInfo?.hostPhone || hostDoc),
         hostName: r.hostingInfo?.hostName,
         hostPhone: r.hostingInfo?.hostPhone || (r.hasHosting ? r.contactPhone : undefined),
         hostNationalId: r.hostingInfo?.hostNationalId,

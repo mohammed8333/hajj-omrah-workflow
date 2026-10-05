@@ -397,13 +397,76 @@ export default function RequestsListPage() {
     }
   };
 
+  const hasHostingReq = (r: GroupRequestSummary) =>
+    Boolean(r.hasHosting || r.hostName || r.hostNationalId || r.hostIdDocumentId || r.hostIdDocumentUrl);
+
+  const isWaitingHosting = (r: GroupRequestSummary) =>
+    r.status === "HostingAcceptanceRequested" || (hasHostingReq(r) && r.status === "ProgramLinked");
+
+  const isReadyForPayment = (r: GroupRequestSummary) =>
+    r.status === "HostingAcceptedBySender" ||
+    r.status === "HostingConfirmed" ||
+    (!hasHostingReq(r) && r.status === "ProgramLinked");
+
+  const renderWorkflowStatusBadge = (r: GroupRequestSummary) => {
+    if (r.status === "Completed") {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-300 shadow-2xs">
+          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+          <span>(تم)</span>
+        </span>
+      );
+    }
+    if (r.status === "Archived") {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 border border-slate-300 shadow-2xs">
+          <Archive className="w-3.5 h-3.5 text-slate-600" />
+          <span>مؤرشف</span>
+        </span>
+      );
+    }
+    if (isWaitingHosting(r)) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs">
+          <Clock className="w-3.5 h-3.5 text-amber-600" />
+          <span>بانتظار قبول الاستضافة</span>
+        </span>
+      );
+    }
+    if (r.status === "HostingAcceptedBySender" || r.status === "HostingConfirmed") {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-50 text-blue-800 border border-blue-200 shadow-2xs">
+          <Check className="w-3.5 h-3.5 text-blue-600" />
+          <span>تم قبول الاستضافة</span>
+        </span>
+      );
+    }
+    if (r.status === "ProgramLinked") {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200 shadow-2xs">
+          <Check className="w-3.5 h-3.5 text-purple-600" />
+          <span>تم ربط البرنامج</span>
+        </span>
+      );
+    }
+    if (role === "SaudiAgent") {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-sky-50 text-sky-700 border border-sky-300 shadow-2xs">
+          <Check className="w-3.5 h-3.5 text-sky-600" />
+          <span>تم التحويل للوكيل</span>
+        </span>
+      );
+    }
+    return <RequestStatusBadge status={r.status} />;
+  };
+
   const handleLinkProgram = async (r: GroupRequestSummary, e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
     if (role !== "SaudiAgent" && role !== "Admin") return;
 
     try {
-      if (r.hasHosting) {
+      if (hasHostingReq(r)) {
         await api.requests.requestHostingAcceptance(
           r.id,
           "تم ربط البرنامج وتحويل المعاملة للمرسل لقبول الاستضافة"
@@ -1153,47 +1216,13 @@ ${travelersLines}
           </div>
         )}
 
-        {/* Nusuk Quick Filter Pills */}
-        <div className="flex items-center gap-2 pt-1 border-t border-gray-100 overflow-x-auto text-xs">
-          <span className="text-gray-400 text-[11px] shrink-0 font-medium">تصفية نسك:</span>
-          <button
-            onClick={() => setNusukFilter("ALL")}
-            className={`px-3 py-1 rounded-lg font-medium transition-colors cursor-pointer ${
-              nusukFilter === "ALL"
-                ? "bg-gray-800 text-white"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }`}
-          >
-            الكل ({roleRequests.length})
-          </button>
-          <button
-            onClick={() => setNusukFilter("WITH_NUSUK")}
-            className={`inline-flex items-center gap-1 px-3 py-1 rounded-lg font-medium transition-colors cursor-pointer ${
-              nusukFilter === "WITH_NUSUK"
-                ? "bg-emerald-600 text-white"
-                : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-            }`}
-          >
-            <Hash className="w-3 h-3" />
-            <span>مسجلة بنسك ({countWithNusuk})</span>
-          </button>
-          <button
-            onClick={() => setNusukFilter("WITHOUT_NUSUK")}
-            className={`px-3 py-1 rounded-lg font-medium transition-colors cursor-pointer ${
-              nusukFilter === "WITHOUT_NUSUK"
-                ? "bg-amber-600 text-white"
-                : "bg-amber-50 text-amber-700 hover:bg-amber-100"
-            }`}
-          >
-            بدون رقم نسك ({countWithoutNusuk})
-          </button>
-
-          {search && (
-            <span className="mr-auto text-[11px] text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md font-medium">
+        {search && (
+          <div className="pt-1 text-xs">
+            <span className="text-[11px] text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md font-medium">
               نتائج البحث عن: &quot;{search}&quot; ({filtered.length})
             </span>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Requests Content */}
@@ -1273,19 +1302,7 @@ ${travelersLines}
                     </div>
 
                     <div className="flex items-center gap-1.5">
-                      {isCompleted ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-300 shadow-2xs">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>(تم)</span>
-                        </span>
-                      ) : role === "SaudiAgent" ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-sky-50 text-sky-700 border border-sky-300 shadow-2xs">
-                          <Check className="w-3.5 h-3.5 text-sky-600" />
-                          <span>تم الاستلام</span>
-                        </span>
-                      ) : (
-                        <RequestStatusBadge status={r.status} />
-                      )}
+                      {renderWorkflowStatusBadge(r)}
                     </div>
                   </div>
 
@@ -1755,7 +1772,7 @@ ${travelersLines}
 
                     {/* أزرار الإجراءات */}
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      {role === "Sender" && r.status === "HostingAcceptanceRequested" && (
+                      {role === "Sender" && isWaitingHosting(r) && (
                         <button
                           type="button"
                           onClick={(e) => handleAcceptHosting(r, e)}
@@ -1789,14 +1806,12 @@ ${travelersLines}
                               <span>أرشفة</span>
                             </button>
                           </div>
-                        ) : r.status === "HostingAcceptanceRequested" ? (
+                        ) : isWaitingHosting(r) ? (
                           <span className="px-2.5 py-1 text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-300 rounded-xl flex items-center gap-1 shadow-2xs whitespace-nowrap">
                             <Clock className="w-3 h-3 text-amber-600 animate-pulse" />
                             <span>بانتظار قبول الاستضافة ⏳</span>
                           </span>
-                        ) : r.status === "HostingAcceptedBySender" ||
-                          r.status === "HostingConfirmed" ||
-                          (!r.hasHosting && r.status === "ProgramLinked") ? (
+                        ) : isReadyForPayment(r) ? (
                           <button
                             type="button"
                             onClick={(e) => handlePayInvoice(r, e)}
@@ -1847,7 +1862,7 @@ ${travelersLines}
                                 <span>أرشفة</span>
                               </button>
                             </div>
-                          ) : r.status === "HostingAcceptanceRequested" ? (
+                          ) : isWaitingHosting(r) ? (
                             <button
                               type="button"
                               onClick={(e) => handleAcceptHosting(r, e)}
@@ -1857,9 +1872,7 @@ ${travelersLines}
                               <Check className="w-3.5 h-3.5 stroke-[3]" />
                               <span>تم قبول الاستضافة</span>
                             </button>
-                          ) : r.status === "HostingAcceptedBySender" ||
-                            r.status === "HostingConfirmed" ||
-                            (!r.hasHosting && r.status === "ProgramLinked") ? (
+                          ) : isReadyForPayment(r) ? (
                             <button
                               type="button"
                               onClick={(e) => handlePayInvoice(r, e)}
@@ -2139,19 +2152,7 @@ ${travelersLines}
 
                         {/* 2. الحالة: تم الاستلام أو (تم) أو شارة الحالة */}
                         <td className="py-2.5 px-2 align-middle text-center border-l border-gray-100">
-                          {isCompleted ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-300 shadow-2xs">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                              <span>(تم)</span>
-                            </span>
-                          ) : role === "SaudiAgent" ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-sky-50 text-sky-700 border border-sky-300 shadow-2xs">
-                              <Check className="w-3.5 h-3.5 text-sky-600" />
-                              <span>تم الاستلام</span>
-                            </span>
-                          ) : (
-                            <RequestStatusBadge status={r.status} />
-                          )}
+                          {renderWorkflowStatusBadge(r)}
                         </td>
 
                         {/* 2.5 المرسل (لموظف صفا والأدمن فقط) */}
@@ -2427,7 +2428,7 @@ ${travelersLines}
                             </div>
 
                             {/* أزرار الإجراء بحسب الدور */}
-                            {role === "Sender" && r.status === "HostingAcceptanceRequested" && (
+                            {role === "Sender" && isWaitingHosting(r) && (
                               <button
                                 type="button"
                                 onClick={(e) => handleAcceptHosting(r, e)}
@@ -2461,14 +2462,12 @@ ${travelersLines}
                                     <span>أرشفة</span>
                                   </button>
                                 </div>
-                              ) : r.status === "HostingAcceptanceRequested" ? (
+                              ) : isWaitingHosting(r) ? (
                                 <span className="px-2.5 py-1 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-300 rounded-lg flex items-center gap-1 shadow-2xs whitespace-nowrap">
                                   <Clock className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
                                   <span>بانتظار قبول الاستضافة ⏳</span>
                                 </span>
-                              ) : r.status === "HostingAcceptedBySender" ||
-                                r.status === "HostingConfirmed" ||
-                                (!r.hasHosting && r.status === "ProgramLinked") ? (
+                              ) : isReadyForPayment(r) ? (
                                 <button
                                   type="button"
                                   onClick={(e) => handlePayInvoice(r, e)}
@@ -2519,7 +2518,7 @@ ${travelersLines}
                                       <span>أرشفة</span>
                                     </button>
                                   </div>
-                                ) : r.status === "HostingAcceptanceRequested" ? (
+                                ) : isWaitingHosting(r) ? (
                                   <button
                                     type="button"
                                     onClick={(e) => handleAcceptHosting(r, e)}
@@ -2529,9 +2528,7 @@ ${travelersLines}
                                     <Check className="w-3.5 h-3.5 stroke-[3]" />
                                     <span>تم قبول الاستضافة</span>
                                   </button>
-                                ) : r.status === "HostingAcceptedBySender" ||
-                                  r.status === "HostingConfirmed" ||
-                                  (!r.hasHosting && r.status === "ProgramLinked") ? (
+                                ) : isReadyForPayment(r) ? (
                                   <button
                                     type="button"
                                     onClick={(e) => handlePayInvoice(r, e)}

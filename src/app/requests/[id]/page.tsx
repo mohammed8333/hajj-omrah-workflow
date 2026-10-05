@@ -1641,11 +1641,21 @@ export default function RequestDetailPage({
     );
   }
 
+  const hasHostingReq = Boolean(
+    request?.hasHosting ||
+    request?.hostingInfo?.hostName ||
+    request?.hostingInfo?.hostPhone ||
+    request?.hostName ||
+    request?.hostNationalId ||
+    request?.hostIdDocumentId ||
+    request?.hostIdDocumentUrl
+  );
+
   const handleLinkProgram = async () => {
     if (!isSaudiAgent && !isAdmin) return;
     try {
       setActionLoading(true);
-      if (request.hasHosting) {
+      if (hasHostingReq) {
         await api.requests.requestHostingAcceptance(
           requestId,
           "تم ربط البرنامج وتحويل المعاملة للمرسل لقبول الاستضافة"
@@ -1910,7 +1920,8 @@ export default function RequestDetailPage({
 
           {/* Workflow Action 2: تم قبول الاستضافة (المرسل صاحب الطلب أو الآدمن فقط) */}
           {((isSender && isOwnerSender) || isAdmin) &&
-            request.status === "HostingAcceptanceRequested" && (
+            (request.status === "HostingAcceptanceRequested" ||
+              (hasHostingReq && request.status === "ProgramLinked")) && (
               <button
                 type="button"
                 onClick={(e) => {
@@ -1930,7 +1941,7 @@ export default function RequestDetailPage({
           {(isSaudiAgent || isAdmin) &&
             (request.status === "HostingAcceptedBySender" ||
               request.status === "HostingConfirmed" ||
-              (!request.hasHosting && request.status === "ProgramLinked")) && (
+              (!hasHostingReq && request.status === "ProgramLinked")) && (
               <button
                 type="button"
                 onClick={(e) => {
@@ -1951,7 +1962,7 @@ export default function RequestDetailPage({
           {isSender &&
             (request.status === "ReadyForSaudiAgent" ||
               request.status === "ReceivedBySaudiAgent" ||
-              request.status === "ProgramLinked" ||
+              (!hasHostingReq && request.status === "ProgramLinked") ||
               request.status === "HostingAcceptedBySender") && (
               <div className="flex items-center gap-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-xs">
                 <Clock className="w-3.5 h-3.5 text-indigo-600 animate-pulse" />
@@ -1960,7 +1971,9 @@ export default function RequestDetailPage({
             )}
 
           {/* للوكيل أثناء انتظار قبول الاستضافة من المرسل */}
-          {isSaudiAgent && request.status === "HostingAcceptanceRequested" && (
+          {isSaudiAgent &&
+            (request.status === "HostingAcceptanceRequested" ||
+              (hasHostingReq && request.status === "ProgramLinked")) && (
             <div className="flex items-center gap-1.5 bg-amber-50 text-amber-800 border border-amber-300 px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-xs">
               <Clock className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
               <span>بانتظار قبول الاستضافة من قِبل المُرسل ⏳</span>
