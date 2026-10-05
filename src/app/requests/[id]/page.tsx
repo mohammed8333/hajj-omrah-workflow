@@ -1712,6 +1712,64 @@ export default function RequestDetailPage({
     }
   };
 
+  const handleRevertInvoicePayment = async () => {
+    if (!isAdmin || !request) return;
+    try {
+      setActionLoading(true);
+      const targetStatus = hasHostingReq ? "HostingAcceptedBySender" : "ProgramLinked";
+      await api.requests.transition(
+        requestId,
+        targetStatus,
+        "تم التراجع عن دفع الفاتورة بواسطة إدارة النظام وإعادتها لمرحلة الدفع"
+      );
+      setSuccess("تم التراجع عن دفع الفاتورة وإعادة المعاملة لانتظار الدفع ✓");
+      await loadRequest();
+    } catch (err: unknown) {
+      if (err instanceof Error) setError(err.message);
+      else setError("حدث خطأ أثناء التراجع عن دفع الفاتورة.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRevertHostingAcceptance = async () => {
+    if (!isAdmin || !request) return;
+    try {
+      setActionLoading(true);
+      await api.requests.transition(
+        requestId,
+        "HostingAcceptanceRequested",
+        "تم التراجع عن قبول الاستضافة بواسطة إدارة النظام وإعادتها لانتظار قبول الاستضافة"
+      );
+      setSuccess("تم التراجع عن قبول الاستضافة وإعادة المعاملة لانتظار قبول الاستضافة ✓");
+      await loadRequest();
+    } catch (err: unknown) {
+      if (err instanceof Error) setError(err.message);
+      else setError("حدث خطأ أثناء التراجع عن قبول الاستضافة.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRevertProgramLink = async () => {
+    if (!isAdmin || !request) return;
+    try {
+      setActionLoading(true);
+      await api.requests.transition(
+        requestId,
+        "ReadyForSaudiAgent",
+        "تم التراجع عن ربط البرنامج بواسطة إدارة النظام وإعادتها لانتظار ربط البرنامج"
+      );
+      setSuccess("تم التراجع عن ربط البرنامج وإعادة المعاملة لانتظار ربط البرنامج للوكيل السعودي ✓");
+      await loadRequest();
+    } catch (err: unknown) {
+      if (err instanceof Error) setError(err.message);
+      else setError("حدث خطأ أثناء التراجع عن ربط البرنامج.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6 w-full max-w-full overflow-x-hidden">
       {/* Top Breadcrumb & Status Header */}
@@ -1922,19 +1980,36 @@ export default function RequestDetailPage({
           {((isSender && isOwnerSender) || isAdmin) &&
             (request.status === "HostingAcceptanceRequested" ||
               (hasHostingReq && request.status === "ProgramLinked")) && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleAcceptHosting();
-                }}
-                disabled={actionLoading}
-                className="bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white text-xs sm:text-sm font-black px-5 py-2 rounded-xl shadow-md hover:shadow-lg flex items-center gap-2 cursor-pointer transition-all active:scale-95 animate-pulse"
-                title="تأكيد قبول الاستضافة"
-              >
-                <Check className="w-4 h-4 stroke-[3]" />
-                <span>تم قبول الاستضافة</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleAcceptHosting();
+                  }}
+                  disabled={actionLoading}
+                  className="bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white text-xs sm:text-sm font-black px-5 py-2 rounded-xl shadow-md hover:shadow-lg flex items-center gap-2 cursor-pointer transition-all active:scale-95 animate-pulse"
+                  title="تأكيد قبول الاستضافة"
+                >
+                  <Check className="w-4 h-4 stroke-[3]" />
+                  <span>تم قبول الاستضافة</span>
+                </button>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleRevertProgramLink();
+                    }}
+                    disabled={actionLoading}
+                    className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs sm:text-sm font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors active:scale-95"
+                    title="تراجع عن ربط البرنامج وإعادة المعاملة لانتظار الربط"
+                  >
+                    <RotateCcw className="w-4 h-4 text-rose-600" />
+                    <span>تراجع عن الربط</span>
+                  </button>
+                )}
+              </div>
             )}
 
           {/* Workflow Action 3: تم دفع الفاتورة (الوكيل السعودي أو الآدمن فقط) */}
@@ -1942,19 +2017,52 @@ export default function RequestDetailPage({
             (request.status === "HostingAcceptedBySender" ||
               request.status === "HostingConfirmed" ||
               (!hasHostingReq && request.status === "ProgramLinked")) && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  handlePayInvoice();
-                }}
-                disabled={actionLoading}
-                className="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs sm:text-sm font-black px-5 py-2 rounded-xl shadow-md hover:shadow-lg flex items-center gap-2 cursor-pointer transition-all active:scale-95"
-                title="تأكيد دفع الفاتورة واكتمال المعاملة"
-              >
-                <Check className="w-4 h-4 stroke-[3]" />
-                <span>تم دفع الفاتورة</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handlePayInvoice();
+                  }}
+                  disabled={actionLoading}
+                  className="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs sm:text-sm font-black px-5 py-2 rounded-xl shadow-md hover:shadow-lg flex items-center gap-2 cursor-pointer transition-all active:scale-95"
+                  title="تأكيد دفع الفاتورة واكتمال المعاملة"
+                >
+                  <Check className="w-4 h-4 stroke-[3]" />
+                  <span>تم دفع الفاتورة</span>
+                </button>
+                {isAdmin && (
+                  hasHostingReq ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleRevertHostingAcceptance();
+                      }}
+                      disabled={actionLoading}
+                      className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs sm:text-sm font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors active:scale-95"
+                      title="تراجع عن قبول الاستضافة وإعادة المعاملة لانتظار قبول الاستضافة"
+                    >
+                      <RotateCcw className="w-4 h-4 text-rose-600" />
+                      <span>تراجع عن الاستضافة</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleRevertProgramLink();
+                      }}
+                      disabled={actionLoading}
+                      className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs sm:text-sm font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors active:scale-95"
+                      title="تراجع عن ربط البرنامج وإعادة المعاملة لانتظار الربط"
+                    >
+                      <RotateCcw className="w-4 h-4 text-rose-600" />
+                      <span>تراجع عن الربط</span>
+                    </button>
+                  )
+                )}
+              </div>
             )}
 
           {/* شارات الانتظار للطرف المقابل: */}
@@ -1982,11 +2090,26 @@ export default function RequestDetailPage({
 
           {/* اكتمال المعاملة */}
           {request.status === "Completed" && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-800 border border-emerald-300 px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-xs">
                 <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[3]" />
                 <span>تم دفع الفاتورة واكتمال المعاملة (تم) ✓</span>
               </div>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleRevertInvoicePayment();
+                  }}
+                  disabled={actionLoading}
+                  className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold px-3 py-1.5 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors active:scale-95"
+                  title="تراجع عن دفع الفاتورة وإعادة المعاملة لانتظار الدفع"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
+                  <span>تراجع عن الدفع</span>
+                </button>
+              )}
               {(isSaudiAgent || isAdmin) && (
                 <button
                   type="button"
@@ -2217,6 +2340,20 @@ export default function RequestDetailPage({
                 >
                   <Check className="w-3.5 h-3.5 stroke-[3]" />
                   <span>تم قبول الاستضافة</span>
+                </button>
+              )}
+
+              {/* زر التراجع عن قبول الاستضافة للآدمن داخل كارت الاستضافة */}
+              {isAdmin && (request.status === "HostingAcceptedBySender" || request.status === "HostingConfirmed") && (
+                <button
+                  type="button"
+                  onClick={handleRevertHostingAcceptance}
+                  disabled={actionLoading}
+                  className="text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer active:scale-95"
+                  title="تراجع عن قبول الاستضافة وإعادة المعاملة لانتظار قبول الاستضافة"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
+                  <span>تراجع عن قبول الاستضافة</span>
                 </button>
               )}
 
