@@ -2002,11 +2002,11 @@ export default function RequestDetailPage({
                       handleRevertProgramLink();
                     }}
                     disabled={actionLoading}
-                    className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs sm:text-sm font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors active:scale-95"
-                    title="تراجع عن ربط البرنامج وإعادة المعاملة لانتظار الربط"
+                    className="bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-xs sm:text-sm font-black px-4 py-2 rounded-xl shadow-md hover:shadow-lg flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
+                    title="تراجع عن ربط البرنامج وإعادة المعاملة لانتظار ربط البرنامج"
                   >
-                    <RotateCcw className="w-4 h-4 text-rose-600" />
-                    <span>تراجع عن الربط</span>
+                    <RotateCcw className="w-4 h-4 stroke-[2.5]" />
+                    <span>تراجع عن ربط البرنامج</span>
                   </button>
                 )}
               </div>
@@ -2040,11 +2040,11 @@ export default function RequestDetailPage({
                         handleRevertHostingAcceptance();
                       }}
                       disabled={actionLoading}
-                      className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs sm:text-sm font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors active:scale-95"
+                      className="bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-xs sm:text-sm font-black px-4 py-2 rounded-xl shadow-md hover:shadow-lg flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
                       title="تراجع عن قبول الاستضافة وإعادة المعاملة لانتظار قبول الاستضافة"
                     >
-                      <RotateCcw className="w-4 h-4 text-rose-600" />
-                      <span>تراجع عن الاستضافة</span>
+                      <RotateCcw className="w-4 h-4 stroke-[2.5]" />
+                      <span>تراجع عن قبول الاستضافة</span>
                     </button>
                   ) : (
                     <button
@@ -2054,11 +2054,11 @@ export default function RequestDetailPage({
                         handleRevertProgramLink();
                       }}
                       disabled={actionLoading}
-                      className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs sm:text-sm font-bold px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors active:scale-95"
-                      title="تراجع عن ربط البرنامج وإعادة المعاملة لانتظار الربط"
+                      className="bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-xs sm:text-sm font-black px-4 py-2 rounded-xl shadow-md hover:shadow-lg flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
+                      title="تراجع عن ربط البرنامج وإعادة المعاملة لانتظار ربط البرنامج"
                     >
-                      <RotateCcw className="w-4 h-4 text-rose-600" />
-                      <span>تراجع عن الربط</span>
+                      <RotateCcw className="w-4 h-4 stroke-[2.5]" />
+                      <span>تراجع عن ربط البرنامج</span>
                     </button>
                   )
                 )}
@@ -2103,11 +2103,11 @@ export default function RequestDetailPage({
                     handleRevertInvoicePayment();
                   }}
                   disabled={actionLoading}
-                  className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold px-3 py-1.5 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors active:scale-95"
+                  className="bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-xs sm:text-sm font-black px-4 py-2 rounded-xl shadow-md hover:shadow-lg flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
                   title="تراجع عن دفع الفاتورة وإعادة المعاملة لانتظار الدفع"
                 >
-                  <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
-                  <span>تراجع عن الدفع</span>
+                  <RotateCcw className="w-4 h-4 stroke-[2.5]" />
+                  <span>تراجع عن دفع الفاتورة</span>
                 </button>
               )}
               {(isSaudiAgent || isAdmin) && (
@@ -2343,16 +2343,36 @@ export default function RequestDetailPage({
                 </button>
               )}
 
+              {/* زر التراجع عن ربط البرنامج للآدمن داخل كارت الاستضافة */}
+              {isAdmin && request.status === "HostingAcceptanceRequested" && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleRevertProgramLink();
+                  }}
+                  disabled={actionLoading}
+                  className="text-xs bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95"
+                  title="تراجع عن ربط البرنامج وإعادة المعاملة لانتظار ربط البرنامج"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>تراجع عن ربط البرنامج</span>
+                </button>
+              )}
+
               {/* زر التراجع عن قبول الاستضافة للآدمن داخل كارت الاستضافة */}
               {isAdmin && (request.status === "HostingAcceptedBySender" || request.status === "HostingConfirmed") && (
                 <button
                   type="button"
-                  onClick={handleRevertHostingAcceptance}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleRevertHostingAcceptance();
+                  }}
                   disabled={actionLoading}
-                  className="text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer active:scale-95"
+                  className="text-xs bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95"
                   title="تراجع عن قبول الاستضافة وإعادة المعاملة لانتظار قبول الاستضافة"
                 >
-                  <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
+                  <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
                   <span>تراجع عن قبول الاستضافة</span>
                 </button>
               )}

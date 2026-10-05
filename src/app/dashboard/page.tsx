@@ -2000,10 +2000,10 @@ ${travelersLines}
                               <button
                                 type="button"
                                 onClick={(e) => handleRevertInvoicePayment(r, e)}
-                                className="px-2 py-1 text-[11px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl cursor-pointer transition-colors flex items-center gap-1 shadow-2xs whitespace-nowrap"
+                                className="px-2 py-1 text-[11px] font-bold text-white bg-rose-600 hover:bg-rose-700 active:bg-rose-800 rounded-xl cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95 whitespace-nowrap"
                                 title="تراجع عن دفع الفاتورة وإعادة المعاملة لانتظار الدفع"
                               >
-                                <RotateCcw className="w-3 h-3 text-rose-600" />
+                                <RotateCcw className="w-3 h-3 stroke-[2.5]" />
                                 <span>تراجع عن الدفع</span>
                               </button>
                               <button
@@ -2030,10 +2030,10 @@ ${travelersLines}
                               <button
                                 type="button"
                                 onClick={(e) => handleRevertProgramLink(r, e)}
-                                className="px-2 py-1 text-[11px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl cursor-pointer transition-colors flex items-center gap-1 shadow-2xs whitespace-nowrap"
+                                className="px-2 py-1 text-[11px] font-bold text-white bg-rose-600 hover:bg-rose-700 active:bg-rose-800 rounded-xl cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95 whitespace-nowrap"
                                 title="تراجع عن ربط البرنامج وإعادة المعاملة لانتظار الربط"
                               >
-                                <RotateCcw className="w-3 h-3 text-rose-600" />
+                                <RotateCcw className="w-3 h-3 stroke-[2.5]" />
                                 <span>تراجع عن الربط</span>
                               </button>
                             </div>
@@ -2052,20 +2052,20 @@ ${travelersLines}
                                 <button
                                   type="button"
                                   onClick={(e) => handleRevertHostingAcceptance(r, e)}
-                                  className="px-2 py-1 text-[11px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl cursor-pointer transition-colors flex items-center gap-1 shadow-2xs whitespace-nowrap"
+                                  className="px-2 py-1 text-[11px] font-bold text-white bg-rose-600 hover:bg-rose-700 active:bg-rose-800 rounded-xl cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95 whitespace-nowrap"
                                   title="تراجع عن قبول الاستضافة وإعادة المعاملة لانتظار قبول الاستضافة"
                                 >
-                                  <RotateCcw className="w-3 h-3 text-rose-600" />
+                                  <RotateCcw className="w-3 h-3 stroke-[2.5]" />
                                   <span>تراجع عن الاستضافة</span>
                                 </button>
                               ) : (
                                 <button
                                   type="button"
                                   onClick={(e) => handleRevertProgramLink(r, e)}
-                                  className="px-2 py-1 text-[11px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl cursor-pointer transition-colors flex items-center gap-1 shadow-2xs whitespace-nowrap"
+                                  className="px-2 py-1 text-[11px] font-bold text-white bg-rose-600 hover:bg-rose-700 active:bg-rose-800 rounded-xl cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95 whitespace-nowrap"
                                   title="تراجع عن ربط البرنامج وإعادة المعاملة لانتظار الربط"
                                 >
-                                  <RotateCcw className="w-3 h-3 text-rose-600" />
+                                  <RotateCcw className="w-3 h-3 stroke-[2.5]" />
                                   <span>تراجع عن الربط</span>
                                 </button>
                               )}
@@ -2699,10 +2699,10 @@ ${travelersLines}
                                     <button
                                       type="button"
                                       onClick={(e) => handleRevertInvoicePayment(r, e)}
-                                      className="px-2 py-1 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg cursor-pointer transition-colors flex items-center gap-1 shadow-2xs whitespace-nowrap"
+                                      className="px-2 py-1 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 active:bg-rose-800 rounded-lg cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95 whitespace-nowrap"
                                       title="تراجع عن دفع الفاتورة وإعادة المعاملة لانتظار الدفع"
                                     >
-                                      <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
+                                      <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
                                       <span>تراجع عن الدفع</span>
                                     </button>
                                     <button
@@ -2729,10 +2729,10 @@ ${travelersLines}
                                     <button
                                       type="button"
                                       onClick={(e) => handleRevertProgramLink(r, e)}
-                                      className="px-2 py-1 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg cursor-pointer transition-colors flex items-center gap-1 shadow-2xs whitespace-nowrap"
+                                      className="px-2 py-1 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 active:bg-rose-800 rounded-lg cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95 whitespace-nowrap"
                                       title="تراجع عن ربط البرنامج وإعادة المعاملة لانتظار الربط"
                                     >
-                                      <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
+                                      <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
                                       <span>تراجع عن الربط</span>
                                     </button>
                                   </div>
@@ -2751,20 +2751,20 @@ ${travelersLines}
                                       <button
                                         type="button"
                                         onClick={(e) => handleRevertHostingAcceptance(r, e)}
-                                        className="px-2 py-1 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg cursor-pointer transition-colors flex items-center gap-1 shadow-2xs whitespace-nowrap"
+                                        className="px-2 py-1 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 active:bg-rose-800 rounded-lg cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95 whitespace-nowrap"
                                         title="تراجع عن قبول الاستضافة وإعادة المعاملة لانتظار قبول الاستضافة"
                                       >
-                                        <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
+                                        <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
                                         <span>تراجع عن الاستضافة</span>
                                       </button>
                                     ) : (
                                       <button
                                         type="button"
                                         onClick={(e) => handleRevertProgramLink(r, e)}
-                                        className="px-2 py-1 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg cursor-pointer transition-colors flex items-center gap-1 shadow-2xs whitespace-nowrap"
+                                        className="px-2 py-1 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 active:bg-rose-800 rounded-lg cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95 whitespace-nowrap"
                                         title="تراجع عن ربط البرنامج وإعادة المعاملة لانتظار الربط"
                                       >
-                                        <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
+                                        <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
                                         <span>تراجع عن الربط</span>
                                       </button>
                                     )}
