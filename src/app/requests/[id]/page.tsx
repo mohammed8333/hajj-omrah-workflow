@@ -60,6 +60,8 @@ import {
   Plus,
   UserPlus,
   UserMinus,
+  IdCard,
+  User,
 } from "lucide-react";
 import { scanPassportMRZ, translateEnglishNameToArabic } from "@/lib/mrzScanner";
 import { scanHostId } from "@/lib/hostIdScanner";
@@ -72,7 +74,7 @@ import { WhatsAppModal } from "@/components/ui/WhatsAppModal";
 import { formatOfficialGroupName, resolveSenderCode } from "@/lib/groupNaming";
 import { downloadFile } from "@/lib/fileDownload";
 import { sendWhatsAppGroupPackage } from "@/lib/whatsappGroupSend";
-import { checkPassportValidity } from "@/lib/passportValidation";
+import { checkPassportValidity, findDuplicatePassportOrId } from "@/lib/passportValidation";
 
 export default function RequestDetailPage({
   requestId: propRequestId,
@@ -202,6 +204,15 @@ export default function RequestDetailPage({
   const [newTravelerAffiliation, setNewTravelerAffiliation] = useState("");
   const [newTravelerNotes, setNewTravelerNotes] = useState("");
   const [isTranslatingNewName, setIsTranslatingNewName] = useState(false);
+  const [newTravelerPassportFile, setNewTravelerPassportFile] = useState<File | null>(null);
+  const [newTravelerPassportPreview, setNewTravelerPassportPreview] = useState<string | null>(null);
+  const [isScanningNewTravelerPassport, setIsScanningNewTravelerPassport] = useState(false);
+  const [newTravelerScanSuccess, setNewTravelerScanSuccess] = useState(false);
+  const [newTravelerScanMessage, setNewTravelerScanMessage] = useState<string | null>(null);
+  const [newTravelerExpiryWarning, setNewTravelerExpiryWarning] = useState<string | null>(null);
+  const [newTravelerDuplicateWarning, setNewTravelerDuplicateWarning] = useState<string | null>(null);
+  const [newTravelerPhotoFile, setNewTravelerPhotoFile] = useState<File | null>(null);
+  const [newTravelerPhotoPreview, setNewTravelerPhotoPreview] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -641,6 +652,133 @@ export default function RequestDetailPage({
     }
   };
 
+  const resetAddTravelerForm = () => {
+    setNewTravelerName("");
+    setNewTravelerPassport("");
+    setNewTravelerPhone("");
+    setNewTravelerNationality("");
+    setNewTravelerBirthDate("");
+    setNewTravelerExpiryDate("");
+    setNewTravelerAffiliation("");
+    setNewTravelerNotes("");
+    setNewTravelerPassportFile(null);
+    setNewTravelerPassportPreview(null);
+    setIsScanningNewTravelerPassport(false);
+    setNewTravelerScanSuccess(false);
+    setNewTravelerScanMessage(null);
+    setNewTravelerExpiryWarning(null);
+    setNewTravelerDuplicateWarning(null);
+    setNewTravelerPhotoFile(null);
+    setNewTravelerPhotoPreview(null);
+  };
+
+  const handleNewTravelerPassportChange = async (file: File | null) => {
+    if (!file) {
+      setNewTravelerPassportFile(null);
+      setNewTravelerPassportPreview(null);
+      setIsScanningNewTravelerPassport(false);
+      setNewTravelerScanSuccess(false);
+      setNewTravelerScanMessage(null);
+      setNewTravelerExpiryWarning(null);
+      setNewTravelerDuplicateWarning(null);
+      return;
+    }
+
+    setNewTravelerPassportFile(file);
+    if (file.type.startsWith("image/")) {
+      const url = URL.createObjectURL(file);
+      setNewTravelerPassportPreview(url);
+    } else {
+      setNewTravelerPassportPreview(null);
+    }
+
+    setIsScanningNewTravelerPassport(true);
+    setNewTravelerScanSuccess(false);
+    setNewTravelerScanMessage("جاري فحص وقراءة بيانات الجواز (بالذكاء الاصطناعي)...");
+    setNewTravelerExpiryWarning(null);
+    setNewTravelerDuplicateWarning(null);
+
+    try {
+      const result = await scanPassportMRZ(file, (msg) => {
+        setNewTravelerScanMessage(msg);
+      });
+
+      if (result && (result.fullNameArabic || result.fullNameEnglish || result.passportNumber)) {
+        if (result.fullNameArabic) {
+          setNewTravelerName(result.fullNameArabic);
+        } else if (result.fullNameEnglish) {
+          try {
+            const tr = await translateEnglishNameToArabic(result.fullNameEnglish);
+            setNewTravelerName(tr || result.fullNameEnglish);
+          } catch {
+            setNewTravelerName(result.fullNameEnglish);
+          }
+        }
+
+        if (result.passportNumber) {
+          const cleanP = result.passportNumber.trim().toUpperCase();
+          setNewTravelerPassport(cleanP);
+
+          const dupInCurrent = (request?.travelers || []).some(
+            (t) => t.passportNumber && t.passportNumber.trim().toUpperCase() === cleanP
+          );
+          if (dupInCurrent) {
+            setNewTravelerDuplicateWarning("⚠️ رقم الجواز مكرر مع مسافر آخر في نفس المعاملة!");
+          } else {
+            const found = await findDuplicatePassportOrId(cleanP, "passport", requestId);
+            if (found && found.isDuplicate) {
+              setNewTravelerDuplicateWarning(
+                `⚠️ تنبيه: رقم الجواز مسجل مسبقاً في المعاملة (${found.requestNumber} - ${found.matchedName})`
+              );
+            }
+          }
+        }
+
+        if (result.nationality) {
+          setNewTravelerNationality(result.nationality);
+        }
+        if (result.dateOfBirth) {
+          setNewTravelerBirthDate(result.dateOfBirth);
+        }
+        if (result.expiryDate) {
+          setNewTravelerExpiryDate(result.expiryDate);
+          const depDate = request?.departureDate || request?.travelDate;
+          const validity = checkPassportValidity(result.expiryDate, depDate);
+          if (validity.isExpiringSoon || validity.isExpired) {
+            setNewTravelerExpiryWarning(validity.message);
+          }
+        }
+
+        setNewTravelerScanSuccess(true);
+        setNewTravelerScanMessage(
+          `تم التعرف بنجاح على: ${result.fullNameArabic || result.fullNameEnglish || result.passportNumber}`
+        );
+      } else {
+        setNewTravelerScanSuccess(false);
+        setNewTravelerScanMessage("لم يتم التقاط بيانات الجواز بدقة، يمكنك كتابة البيانات يدوياً.");
+      }
+    } catch (err: any) {
+      setNewTravelerScanSuccess(false);
+      setNewTravelerScanMessage(err?.message || "تعذر فحص الجواز، يرجى كتابة البيانات يدوياً.");
+    } finally {
+      setIsScanningNewTravelerPassport(false);
+    }
+  };
+
+  const handleNewTravelerPhotoChange = (file: File | null) => {
+    if (!file) {
+      setNewTravelerPhotoFile(null);
+      setNewTravelerPhotoPreview(null);
+      return;
+    }
+    setNewTravelerPhotoFile(file);
+    if (file.type.startsWith("image/")) {
+      setNewTravelerPhotoPreview(URL.createObjectURL(file));
+    } else {
+      setNewTravelerPhotoPreview(null);
+    }
+  };
+
   const handleTranslateNewName = async () => {
     if (!newTravelerName.trim()) return;
     try {
@@ -684,7 +822,7 @@ export default function RequestDetailPage({
     try {
       setActionLoading(true);
       setError(null);
-      await api.travelers.add(requestId, {
+      const newTraveler = await api.travelers.add(requestId, {
         fullName: newTravelerName.trim(),
         passportNumber: newTravelerPassport.trim() || undefined,
         phoneNumber: formattedPhone,
@@ -694,16 +832,38 @@ export default function RequestDetailPage({
         affiliation: newTravelerAffiliation.trim() || undefined,
         notes: newTravelerNotes.trim() || undefined,
       });
-      setSuccess("تمت إضافة المسافر بنجاح إلى المعاملة.");
+
+      // Upload passport document if attached
+      if (newTravelerPassportFile && newTraveler?.id) {
+        try {
+          await api.documents.upload(
+            requestId,
+            newTravelerPassportFile,
+            "Passport",
+            newTraveler.id
+          );
+        } catch (uploadErr) {
+          console.error("Failed to upload passport document:", uploadErr);
+        }
+      }
+
+      // Upload photo document if attached
+      if (newTravelerPhotoFile && newTraveler?.id) {
+        try {
+          await api.documents.upload(
+            requestId,
+            newTravelerPhotoFile,
+            "PersonalPhoto",
+            newTraveler.id
+          );
+        } catch (uploadErr) {
+          console.error("Failed to upload photo document:", uploadErr);
+        }
+      }
+
+      setSuccess("تمت إضافة المسافر ومستنداته بنجاح إلى المعاملة.");
       setShowAddTravelerModal(false);
-      setNewTravelerName("");
-      setNewTravelerPassport("");
-      setNewTravelerPhone("");
-      setNewTravelerNationality("");
-      setNewTravelerBirthDate("");
-      setNewTravelerExpiryDate("");
-      setNewTravelerAffiliation("");
-      setNewTravelerNotes("");
+      resetAddTravelerForm();
       await loadRequest(false);
     } catch (err: unknown) {
       if (err instanceof Error) setError(err.message);
@@ -3243,7 +3403,10 @@ export default function RequestDetailPage({
             {canEditAnyData && (
               <button
                 type="button"
-                onClick={() => setShowAddTravelerModal(true)}
+                onClick={() => {
+                  resetAddTravelerForm();
+                  setShowAddTravelerModal(true);
+                }}
                 className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-all"
               >
                 <Plus className="w-3.5 h-3.5" />
@@ -4490,8 +4653,8 @@ export default function RequestDetailPage({
 
       {/* --- MODAL 8: Add New Traveler to Group --- */}
       {showAddTravelerModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
-          <div className="bg-white w-full max-w-lg rounded-2xl p-6 shadow-xl space-y-4">
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-white w-full max-w-lg rounded-2xl p-5 sm:p-6 shadow-xl space-y-4 my-auto max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b border-gray-100 pb-3">
               <h3 className="font-bold text-base text-gray-900 flex items-center gap-2">
                 <Users className="w-5 h-5 text-emerald-600" />
@@ -4499,7 +4662,10 @@ export default function RequestDetailPage({
               </h3>
               <button
                 type="button"
-                onClick={() => setShowAddTravelerModal(false)}
+                onClick={() => {
+                  setShowAddTravelerModal(false);
+                  resetAddTravelerForm();
+                }}
                 className="p-1 text-gray-400 hover:bg-gray-100 rounded-lg cursor-pointer"
               >
                 <X className="w-5 h-5" />
@@ -4507,6 +4673,166 @@ export default function RequestDetailPage({
             </div>
 
             <form onSubmit={handleAddTraveler} className="space-y-4 text-xs">
+              {/* قسم رفع جواز السفر والصورة الشخصية */}
+              <div className="grid grid-cols-2 gap-3 sm:gap-3.5 items-stretch">
+                {/* 1. جواز السفر (مع فحص الذكاء الاصطناعي MRZ) */}
+                <FileDropArea
+                  onFileDrop={(file) => handleNewTravelerPassportChange(file)}
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  maxSizeMb={10}
+                  activeBorderColor="blue"
+                  overlayText="أفلت جواز السفر هنا"
+                  onError={(msg) => alert({ title: "تنبيه", message: msg, variant: "warning" })}
+                  className="rounded-2xl h-full"
+                >
+                  {newTravelerPassportFile ? (
+                    <div className="relative h-28 sm:h-32 p-3 bg-blue-50/70 border-2 border-blue-400 rounded-2xl flex flex-col items-center justify-center text-center">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleNewTravelerPassportChange(null);
+                        }}
+                        className="absolute top-1.5 left-1.5 p-1 bg-red-100 hover:bg-red-200 text-red-600 rounded-full cursor-pointer transition-colors shadow-2xs"
+                        title="إزالة واستبدال الجواز"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center mb-1 overflow-hidden">
+                        {isScanningNewTravelerPassport ? (
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : newTravelerPassportPreview ? (
+                          <img src={newTravelerPassportPreview} alt="جواز السفر" className="w-full h-full object-cover" />
+                        ) : (
+                          <IdCard className="w-5 h-5 sm:w-6 sm:h-6" />
+                        )}
+                      </div>
+                      <span className="text-xs font-bold text-gray-900 truncate max-w-[90%]" title={newTravelerPassportFile.name}>
+                        {newTravelerPassportFile.name}
+                      </span>
+                      <span className="text-[11px] text-emerald-700 font-bold mt-0.5">
+                        {isScanningNewTravelerPassport ? "جاري الفحص..." : "تم الرفع ✓"}
+                      </span>
+                    </div>
+                  ) : (
+                    <label
+                      htmlFor="modal-new-traveler-passport"
+                      className="h-28 sm:h-32 flex flex-col items-center justify-center border-2 border-dashed border-blue-300 hover:border-blue-500 bg-blue-50/40 hover:bg-blue-50/70 rounded-2xl cursor-pointer transition-all p-2 text-center group"
+                    >
+                      <input
+                        type="file"
+                        id="modal-new-traveler-passport"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(e) => handleNewTravelerPassportChange(e.target.files?.[0] || null)}
+                        className="hidden"
+                      />
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center group-hover:scale-105 transition-transform mb-1 shadow-2xs">
+                        <IdCard className="w-5 h-5 sm:w-6 sm:h-6" />
+                      </div>
+                      <span className="text-xs sm:text-sm font-bold text-blue-950">جواز السفر</span>
+                      <span className="text-[10px] text-blue-600 font-medium">قراءة آلية بالذكاء الاصطناعي</span>
+                    </label>
+                  )}
+                </FileDropArea>
+
+                {/* 2. الصورة الشخصية (اختياري) */}
+                <FileDropArea
+                  onFileDrop={(file) => handleNewTravelerPhotoChange(file)}
+                  accept=".jpg,.jpeg,.png"
+                  maxSizeMb={10}
+                  activeBorderColor="purple"
+                  overlayText="أفلت الصورة هنا"
+                  onError={(msg) => alert({ title: "تنبيه", message: msg, variant: "warning" })}
+                  className="rounded-2xl h-full"
+                >
+                  {newTravelerPhotoFile ? (
+                    <div className="relative h-28 sm:h-32 p-3 bg-purple-50/70 border-2 border-purple-400 rounded-2xl flex flex-col items-center justify-center text-center">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleNewTravelerPhotoChange(null);
+                        }}
+                        className="absolute top-1.5 left-1.5 p-1 bg-red-100 hover:bg-red-200 text-red-600 rounded-full cursor-pointer transition-colors shadow-2xs"
+                        title="إزالة واستبدال الصورة"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center mb-1 overflow-hidden border border-purple-300">
+                        {newTravelerPhotoPreview ? (
+                          <img src={newTravelerPhotoPreview} alt="الصورة الشخصية" className="w-full h-full object-cover" />
+                        ) : (
+                          <User className="w-5 h-5 sm:w-6 sm:h-6" />
+                        )}
+                      </div>
+                      <span className="text-xs font-bold text-gray-900 truncate max-w-[90%]" title={newTravelerPhotoFile.name}>
+                        {newTravelerPhotoFile.name}
+                      </span>
+                      <span className="text-[11px] text-emerald-700 font-bold mt-0.5">
+                        تم الرفع ✓
+                      </span>
+                    </div>
+                  ) : (
+                    <label
+                      htmlFor="modal-new-traveler-photo"
+                      className="h-28 sm:h-32 flex flex-col items-center justify-center border-2 border-dashed border-purple-300 hover:border-purple-500 bg-purple-50/40 hover:bg-purple-50/70 rounded-2xl cursor-pointer transition-all p-2 text-center group"
+                    >
+                      <input
+                        type="file"
+                        id="modal-new-traveler-photo"
+                        accept=".jpg,.jpeg,.png"
+                        onChange={(e) => handleNewTravelerPhotoChange(e.target.files?.[0] || null)}
+                        className="hidden"
+                      />
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center group-hover:scale-105 transition-transform mb-1 shadow-2xs">
+                        <User className="w-5 h-5 sm:w-6 sm:h-6" />
+                      </div>
+                      <span className="text-xs sm:text-sm font-bold text-purple-950">الصورة الشخصية</span>
+                      <span className="text-[10px] text-purple-600 font-medium">اختياري</span>
+                    </label>
+                  )}
+                </FileDropArea>
+              </div>
+
+              {/* شريط حالة فحص الجواز */}
+              {newTravelerScanMessage && (
+                <div
+                  className={`p-2.5 rounded-xl text-xs flex items-center gap-2 animate-in fade-in ${
+                    isScanningNewTravelerPassport
+                      ? "bg-blue-50 text-blue-800 border border-blue-200"
+                      : newTravelerScanSuccess
+                      ? "bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold"
+                      : "bg-gray-50 text-gray-700 border border-gray-200"
+                  }`}
+                >
+                  {isScanningNewTravelerPassport ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-blue-600 shrink-0" />
+                  ) : newTravelerScanSuccess ? (
+                    <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                  )}
+                  <span className="leading-relaxed">{newTravelerScanMessage}</span>
+                </div>
+              )}
+
+              {/* تنبيه صلاحية الجواز أقل من 6 أشهر */}
+              {newTravelerExpiryWarning && (
+                <div className="bg-amber-50 border border-amber-300 text-amber-900 rounded-xl p-2.5 text-xs flex items-center gap-2 animate-in fade-in">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span className="font-bold leading-relaxed">{newTravelerExpiryWarning}</span>
+                </div>
+              )}
+
+              {/* تنبيه تكرار رقم الجواز */}
+              {newTravelerDuplicateWarning && (
+                <div className="bg-rose-50 border border-rose-300 text-rose-900 rounded-xl p-2.5 text-xs flex items-center gap-2 animate-in fade-in">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span className="font-bold leading-relaxed">{newTravelerDuplicateWarning}</span>
+                </div>
+              )}
+
+              {/* حقول البيانات */}
               <div className="space-y-3">
                 <div>
                   <div className="flex items-center justify-between mb-1 gap-2">
@@ -4542,7 +4868,30 @@ export default function RequestDetailPage({
                     <input
                       type="text"
                       value={newTravelerPassport}
-                      onChange={(e) => setNewTravelerPassport(e.target.value.toUpperCase())}
+                      onChange={async (e) => {
+                        const val = e.target.value.toUpperCase();
+                        setNewTravelerPassport(val);
+                        const cleanP = val.trim().toUpperCase();
+                        if (cleanP) {
+                          const dupInCurrent = (request?.travelers || []).some(
+                            (t) => t.passportNumber && t.passportNumber.trim().toUpperCase() === cleanP
+                          );
+                          if (dupInCurrent) {
+                            setNewTravelerDuplicateWarning("⚠️ رقم الجواز مكرر مع مسافر آخر في نفس المعاملة!");
+                          } else {
+                            const found = await findDuplicatePassportOrId(cleanP, "passport", requestId);
+                            if (found && found.isDuplicate) {
+                              setNewTravelerDuplicateWarning(
+                                `⚠️ تنبيه: رقم الجواز مسجل مسبقاً في المعاملة (${found.requestNumber} - ${found.matchedName})`
+                              );
+                            } else {
+                              setNewTravelerDuplicateWarning(null);
+                            }
+                          }
+                        } else {
+                          setNewTravelerDuplicateWarning(null);
+                        }
+                      }}
                       placeholder="A12345678"
                       className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 text-gray-800 font-mono font-bold uppercase"
                     />
@@ -4594,7 +4943,21 @@ export default function RequestDetailPage({
                     <input
                       type="date"
                       value={newTravelerExpiryDate}
-                      onChange={(e) => setNewTravelerExpiryDate(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setNewTravelerExpiryDate(val);
+                        if (val) {
+                          const depDate = request?.departureDate || request?.travelDate;
+                          const validity = checkPassportValidity(val, depDate);
+                          if (validity.isExpiringSoon || validity.isExpired) {
+                            setNewTravelerExpiryWarning(validity.message);
+                          } else {
+                            setNewTravelerExpiryWarning(null);
+                          }
+                        } else {
+                          setNewTravelerExpiryWarning(null);
+                        }
+                      }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 text-gray-800 font-mono"
                     />
                   </div>
@@ -4630,18 +4993,30 @@ export default function RequestDetailPage({
               <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
                 <button
                   type="button"
-                  onClick={() => setShowAddTravelerModal(false)}
+                  onClick={() => {
+                    setShowAddTravelerModal(false);
+                    resetAddTravelerForm();
+                  }}
                   className="px-4 py-2 font-semibold text-gray-600 hover:bg-gray-100 rounded-xl cursor-pointer"
                 >
                   إلغاء
                 </button>
                 <button
                   type="submit"
-                  disabled={actionLoading || !newTravelerName.trim()}
-                  className="px-5 py-2 font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs cursor-pointer flex items-center gap-1.5"
+                  disabled={actionLoading || isScanningNewTravelerPassport || !newTravelerName.trim()}
+                  className="px-5 py-2 font-bold bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl shadow-xs cursor-pointer flex items-center gap-1.5"
                 >
-                  <Plus className="w-4 h-4" />
-                  <span>إضافة المسافر الآن</span>
+                  {actionLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>جاري الإضافة ورفع المستندات...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4" />
+                      <span>إضافة المسافر الآن</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>
