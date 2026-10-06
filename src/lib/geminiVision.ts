@@ -7,19 +7,17 @@ import { api } from "./api";
 
 const GEMINI_API_KEY_STORAGE_KEY = "gemini_ai_api_key";
 const GEMINI_SELECTED_MODEL_KEY = "gemini_selected_model";
-const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
+const DEFAULT_GEMINI_MODEL = "gemini-3.8-flash";
 
 export const CANDIDATE_GEMINI_MODELS: string[] = [
-  "gemini-2.5-flash",
-  "gemini-2.0-flash",
-  "gemini-1.5-flash",
-  "gemini-2.0-flash-lite",
-  "gemini-1.5-pro",
   "gemini-3.8-flash",
   "gemini-3.5-flash",
   "gemini-3.5-flash-lite",
   "gemini-3.7-flash",
   "gemini-3.6-flash",
+  "gemini-2.5-flash",
+  "gemini-2.0-flash",
+  "gemini-1.5-flash",
 ];
 
 export interface GeminiPassportResult {
@@ -146,9 +144,9 @@ async function pingGeminiModel(
     const errMsg = formatGeminiErrorMessage(rawErrMsg);
 
     // Extract any model suggestion from Google's response
-    // e.g. "Please update your code to use models/gemini-3.6-flash"
-    const suggestedMatch = rawErrMsg.match(/models\/([a-zA-Z0-9\.\-_]+)/);
-    const suggestedModel = suggestedMatch ? suggestedMatch[1] : undefined;
+    // e.g. "This model models/gemini-2.5-flash is no longer available... Please update your code to use models/gemini-3.8-flash"
+    const allMatches = Array.from(rawErrMsg.matchAll(/models\/([a-zA-Z0-9\.\-_]+)/g));
+    const suggestedModel = allMatches.map((m) => m[1]).find((m) => m !== modelName);
 
     return { ok: false, suggestedModel, error: errMsg };
   } catch (err: unknown) {
