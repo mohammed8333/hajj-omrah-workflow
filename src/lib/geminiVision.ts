@@ -167,6 +167,9 @@ export function formatGeminiErrorMessage(rawMsg: string): string {
   if (lower.includes("quota") || lower.includes("429") || lower.includes("resource_exhausted")) {
     return "تم تجاوز حد الطلبات المسموح به لمفتاح Gemini مؤقتاً (429 Rate Limit). يرجى الانتظار دقيقة والمحاولة مجدداً.";
   }
+  if (lower.includes("blocked") || lower.includes("service_blocked")) {
+    return "المفتاح محظور من استخدام خدمة الذكاء الاصطناعي (Generative Language API blocked). إذا أنشأت المفتاح من Google Cloud، تأكد من إزالة قيود المفتاح (API restrictions) وتفعيل خدمة Generative Language API. أو الأفضل والأسهل: استخرج مفتاحاً جديداً ومجانياً مباشرة من Google AI Studio (aistudio.google.com/app/apikey).";
+  }
   if (lower.includes("high demand") || lower.includes("503") || lower.includes("unavailable")) {
     return "تشهد خوادم Google Gemini ضغطاً مؤقتاً في الوقت الحالي (503 High Demand). يرجى إعادة المحاولة بعد قليل.";
   }
