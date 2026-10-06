@@ -257,10 +257,12 @@ export function matchesColumnFilters(
   r: GroupRequestSummary,
   filters: TableColumnFiltersState
 ): boolean {
-  // 1. Nusuk Number Filter
+  // 1. Nusuk Number & Group Name Filter
   if (filters.nusuk.trim()) {
     const term = filters.nusuk.trim().toLowerCase();
-    if (!r.nusukGroupNumber || !r.nusukGroupNumber.toLowerCase().includes(term)) {
+    const matchNusuk = Boolean(r.nusukGroupNumber && r.nusukGroupNumber.toLowerCase().includes(term));
+    const matchGroup = Boolean(r.groupName && r.groupName.toLowerCase().includes(term));
+    if (!matchNusuk && !matchGroup) {
       return false;
     }
   }

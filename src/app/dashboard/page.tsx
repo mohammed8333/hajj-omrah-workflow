@@ -1475,31 +1475,41 @@ ${travelersLines}
                 >
                   {/* الشريط العلوي: يمين = رقم مجموعة نسك مع النسخ، شمال = حالة المعاملة */}
                   <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 px-2.5 py-1 rounded-xl">
-                      <span className="text-[11px] text-gray-500 font-bold">نسك:</span>
-                      {r.nusukGroupNumber ? (
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-mono font-bold text-emerald-800 text-xs">
-                            {r.nusukGroupNumber}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              copyToClipboard(r.nusukGroupNumber!, e);
-                            }}
-                            className="text-gray-400 hover:text-emerald-700 p-0.5 cursor-pointer"
-                            title="نسخ رقم نسك"
-                          >
-                            {copiedNusuk === r.nusukGroupNumber ? (
-                              <Check className="w-3.5 h-3.5 text-emerald-600" />
-                            ) : (
-                              <Copy className="w-3.5 h-3.5" />
-                            )}
-                          </button>
+                    <div className="flex flex-col gap-0.5 bg-gray-50 border border-gray-200 px-2.5 py-1 rounded-xl">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] text-gray-500 font-bold">نسك:</span>
+                        {r.nusukGroupNumber ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono font-bold text-emerald-800 text-xs">
+                              {r.nusukGroupNumber}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                copyToClipboard(r.nusukGroupNumber!, e);
+                              }}
+                              className="text-gray-400 hover:text-emerald-700 p-0.5 cursor-pointer"
+                              title="نسخ رقم نسك"
+                            >
+                              {copiedNusuk === r.nusukGroupNumber ? (
+                                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                              ) : (
+                                <Copy className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 text-xs italic">قيد التسجيل</span>
+                        )}
+                      </div>
+                      {r.groupName && (
+                        <div
+                          className="text-[10px] font-bold text-gray-700 truncate max-w-[150px]"
+                          title={`اسم المجموعة: ${r.groupName}`}
+                        >
+                          {r.groupName}
                         </div>
-                      ) : (
-                        <span className="text-gray-400 text-xs italic">قيد التسجيل</span>
                       )}
                     </div>
 
@@ -2371,10 +2381,10 @@ ${travelersLines}
                           rIdx % 2 === 0 ? "bg-white" : "bg-slate-50/40"
                         } hover:bg-sky-50/30`}
                       >
-                        {/* 1. رقم مجموعة نسك */}
-                        <td className="py-2.5 px-3 align-middle border-l border-gray-100 font-mono">
+                        {/* 1. رقم مجموعة نسك واسم المجموعة */}
+                        <td className="py-2.5 px-3 align-middle border-l border-gray-100">
                           {r.nusukGroupNumber ? (
-                            <div className="inline-flex items-center gap-1.5">
+                            <div className="inline-flex items-center gap-1.5 font-mono">
                               <span
                                 className={`px-2.5 py-1 rounded-md text-xs font-bold font-mono transition-all ${
                                   isNusukMatch
@@ -2398,7 +2408,17 @@ ${travelersLines}
                               </button>
                             </div>
                           ) : (
-                            <span className="text-gray-400 text-xs italic">قيد التسجيل</span>
+                            <span className="text-gray-400 text-xs italic font-mono">قيد التسجيل</span>
+                          )}
+
+                          {/* اسم المجموعة تحت رقم نسك */}
+                          {r.groupName && (
+                            <div
+                              className="text-[11px] font-bold text-gray-800 truncate max-w-[170px] mt-1 select-all"
+                              title={`اسم المجموعة: ${r.groupName}`}
+                            >
+                              {r.groupName}
+                            </div>
                           )}
                           {isTravelerMatched && (
                             <div
