@@ -197,6 +197,7 @@ export interface GroupRequestSummary {
   saudiArrivalTime?: string;
   returnDepartureAirport?: string;
   returnFlightDepartureTime?: string;
+  notes?: string;
   travelersCount: number;
   travelersList?: TravelerSummaryItem[];
   documentsCount: number;
@@ -219,6 +220,12 @@ export interface GroupRequestDetail {
   status: RequestStatus;
   nusukGroupNumber?: string;
   hasHosting: boolean;
+  hostName?: string;
+  hostPhone?: string;
+  hostNationalId?: string;
+  hostBirthDate?: string;
+  hostIdDocumentId?: string;
+  hostIdDocumentUrl?: string;
   contactPhone: string;
   travelDate?: string;
   departureDate?: string;

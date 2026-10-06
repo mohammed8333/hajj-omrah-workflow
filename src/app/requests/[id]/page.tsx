@@ -71,6 +71,7 @@ import { WhatsAppModal } from "@/components/ui/WhatsAppModal";
 import { formatOfficialGroupName, resolveSenderCode } from "@/lib/groupNaming";
 import { downloadFile } from "@/lib/fileDownload";
 import { sendWhatsAppGroupPackage } from "@/lib/whatsappGroupSend";
+import { checkPassportValidity } from "@/lib/passportValidation";
 
 export default function RequestDetailPage({
   requestId: propRequestId,

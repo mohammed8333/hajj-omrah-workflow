@@ -39,6 +39,8 @@ import { useDialog } from "@/lib/dialog-context";
 import { getWhatsAppUrl } from "@/lib/phoneUtils";
 import { WhatsAppModal } from "@/components/ui/WhatsAppModal";
 import { NusukApprovalModal } from "@/components/requests/NusukApprovalModal";
+import { notificationsService } from "@/lib/notificationsService";
+import { downloadFile } from "@/lib/fileDownload";
 import { matchesRequestSearch, getMatchingTravelers, isTravelerMatch } from "@/lib/searchUtils";
 import {
   HeaderColumnFilter,
@@ -2834,8 +2836,12 @@ ${travelersLines}
         onClose={() => setNusukModalRequest(null)}
         request={nusukModalRequest}
         currentUser={user}
-        onSuccess={(msg) => {
-          setSuccess(msg || "تم اعتماد رقم نسك بنجاح");
+        onSuccess={async (msg) => {
+          await alert({
+            title: "نجاح",
+            message: msg || "تم اعتماد رقم نسك بنجاح",
+            variant: "success",
+          });
           loadRequests();
         }}
       />

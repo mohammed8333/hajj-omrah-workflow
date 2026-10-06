@@ -2930,9 +2930,22 @@ ${travelersLines}
         onClose={() => setNusukModalRequest(null)}
         request={nusukModalRequest}
         currentUser={user}
-        onSuccess={(msg) => {
-          setSuccess(msg || "تم اعتماد رقم نسك بنجاح");
-          loadRequests();
+        onSuccess={async (msg) => {
+          await alert({
+            title: "نجاح",
+            message: msg || "تم اعتماد رقم نسك بنجاح",
+            variant: "success",
+          });
+          try {
+            const reqsRes = await api.requests.getAll();
+            setRequests(reqsRes);
+            if (role === "Admin") {
+              const statsRes = await api.admin.getStats();
+              setAdminStats(statsRes);
+            }
+          } catch (err) {
+            console.error(err);
+          }
         }}
       />
     </div>

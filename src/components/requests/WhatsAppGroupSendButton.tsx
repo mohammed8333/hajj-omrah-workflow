@@ -66,7 +66,10 @@ export const WhatsAppGroupSendButton: React.FC<WhatsAppGroupSendButtonProps> = (
   const isReferredToSaudiAgent =
     POST_REFERRAL_STATUSES.includes(request.status) ||
     Boolean(request.assignedSaudiAgentId) ||
-    Boolean(request.statusHistory?.some((h) => POST_REFERRAL_STATUSES.includes(h.status)));
+    Boolean(
+      (request as any).statusHistory?.some((h: any) => POST_REFERRAL_STATUSES.includes(h.status || h.toStatus)) ||
+      request.statusHistories?.some((h) => POST_REFERRAL_STATUSES.includes(h.toStatus))
+    );
 
   const isButtonEnabled = isReferredToSaudiAgent && !disabled;
   const [bridgeStatus, setBridgeStatus] = useState<{

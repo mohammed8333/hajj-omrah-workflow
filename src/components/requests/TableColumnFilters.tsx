@@ -333,7 +333,7 @@ export interface HeaderColumnFilterProps {
   value: string;
   onChange: (value: string) => void;
   onClear: () => void;
-  options?: Array<{ value: string; label: string }>;
+  options?: Array<{ value: string; label: string; count?: number }>;
   placeholder?: string;
   align?: "right" | "left" | "center";
 }
