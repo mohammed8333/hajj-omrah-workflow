@@ -30,7 +30,7 @@ import {
   TravelReportExportRow,
 } from "@/lib/excelExport";
 import { normalizeArabicText } from "@/lib/searchUtils";
-import { extractEgyptianPhoneNumber, getWhatsAppUrl } from "@/lib/phoneUtils";
+import { extractEgyptianPhoneNumber, getWhatsAppUrl, normalizePhone } from "@/lib/phoneUtils";
 import { getTravelArchiveCategory } from "@/lib/travelArchiveUtils";
 
 export interface TravelPilgrimItem {
@@ -150,10 +150,14 @@ export default function TravelReportPage() {
     loadData();
   }, []);
 
-  // Helper to extract Egyptian phone only (rejects Saudi)
+  // Helper to extract traveler phone (prioritizes clean Egyptian, accepts direct traveler phone, rejects Saudi host fallback)
   const resolveTravelerEgyptianPhone = (phoneNumber?: string, travelerNotes?: string, parentReq?: GroupRequestSummary): string => {
     const eg1 = extractEgyptianPhoneNumber(phoneNumber);
     if (eg1) return eg1;
+    if (phoneNumber && phoneNumber.trim() && phoneNumber.trim() !== "-") {
+      const norm = normalizePhone(phoneNumber);
+      return norm.displayFormatted || phoneNumber.trim();
+    }
     const eg2 = extractEgyptianPhoneNumber(travelerNotes);
     if (eg2) return eg2;
     const eg3 = extractEgyptianPhoneNumber(parentReq?.contactPhone);

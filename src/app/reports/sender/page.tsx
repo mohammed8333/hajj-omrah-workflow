@@ -353,11 +353,17 @@ export default function SenderReportPage() {
     exportSenderTravelersReportToExcel(exportRows, filterName);
   };
 
-  // Helper to extract Egyptian phone only (rejects Saudi)
+  // Helper to extract traveler phone (prioritizes clean Egyptian, accepts direct traveler phone, rejects Saudi host fallback)
   const resolveTravelerEgyptianPhone = (p: PilgrimReportItem, parentReq?: GroupRequestSummary): string => {
     // 1. Traveler's phone
     const eg1 = extractEgyptianPhoneNumber(p.phoneNumber);
     if (eg1) return eg1;
+
+    // Direct traveler phone fallback (if user explicitly entered a phone for this traveler)
+    if (p.phoneNumber && p.phoneNumber.trim() && p.phoneNumber.trim() !== "-") {
+      const norm = normalizePhone(p.phoneNumber);
+      return norm.displayFormatted || p.phoneNumber.trim();
+    }
 
     // 2. Traveler's notes
     const eg2 = extractEgyptianPhoneNumber(p.notes);

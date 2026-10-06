@@ -416,7 +416,7 @@ export const supabaseService = {
           const { data: matchedTravelers } = await client
             .from("travelers")
             .select("group_request_id")
-            .or(`full_name.ilike.%${cleanSearch}%,passport_number.ilike.%${cleanSearch}%`)
+            .or(`full_name.ilike.%${cleanSearch}%,passport_number.ilike.%${cleanSearch}%,phone_number.ilike.%${cleanSearch}%`)
             .limit(100);
           matchedGroupIds = (matchedTravelers || [])
             .map((t) => t.group_request_id)
@@ -445,17 +445,26 @@ export const supabaseService = {
       let travelers: any[] | null = null;
       const { data: trvWithAff, error: trvAffErr } = await client
         .from("travelers")
-        .select("id, group_request_id, full_name, passport_number, affiliation, notes, created_at")
+        .select("id, group_request_id, full_name, passport_number, phone_number, affiliation, notes, created_at")
         .in("group_request_id", requestIds)
         .order("created_at", { ascending: true });
 
       if (trvAffErr) {
-        const { data: trvFallback } = await client
+        const { data: trvFallback, error: trvFallbackErr } = await client
           .from("travelers")
-          .select("id, group_request_id, full_name, passport_number, notes, created_at")
+          .select("id, group_request_id, full_name, passport_number, phone_number, notes, created_at")
           .in("group_request_id", requestIds)
           .order("created_at", { ascending: true });
-        travelers = trvFallback || [];
+        if (trvFallbackErr) {
+          const { data: trvBare } = await client
+            .from("travelers")
+            .select("id, group_request_id, full_name, passport_number, notes, created_at")
+            .in("group_request_id", requestIds)
+            .order("created_at", { ascending: true });
+          travelers = trvBare || [];
+        } else {
+          travelers = trvFallback || [];
+        }
       } else {
         travelers = trvWithAff || [];
       }
