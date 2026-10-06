@@ -7,9 +7,14 @@ import { api } from "./api";
 
 const GEMINI_API_KEY_STORAGE_KEY = "gemini_ai_api_key";
 const GEMINI_SELECTED_MODEL_KEY = "gemini_selected_model";
-const DEFAULT_GEMINI_MODEL = "gemini-3.8-flash";
+const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
 
 export const CANDIDATE_GEMINI_MODELS: string[] = [
+  "gemini-2.5-flash",
+  "gemini-2.0-flash",
+  "gemini-1.5-flash",
+  "gemini-2.0-flash-lite",
+  "gemini-1.5-pro",
   "gemini-3.8-flash",
   "gemini-3.5-flash",
   "gemini-3.5-flash-lite",
@@ -187,20 +192,8 @@ export async function resolveAvailableGeminiModel(
   // 1. Check cached model if not force refreshing
   if (!forceRefresh && typeof window !== "undefined") {
     const cached = localStorage.getItem(GEMINI_SELECTED_MODEL_KEY);
-    // Strictly accept verified active 3.x flash models from cache
-    if (
-      cached &&
-      (cached === "gemini-3.8-flash" ||
-        cached === "gemini-3.5-flash" ||
-        cached === "gemini-3.5-flash-lite" ||
-        cached === "gemini-3.7-flash" ||
-        cached === "gemini-3.6-flash")
-    ) {
+    if (cached && CANDIDATE_GEMINI_MODELS.includes(cached)) {
       return cached;
-    }
-    // Evict any deprecated model (gemini-2.5-flash, gemini-2.0-flash, gemini-1.5-*, etc.)
-    if (cached) {
-      localStorage.removeItem(GEMINI_SELECTED_MODEL_KEY);
     }
   }
 
