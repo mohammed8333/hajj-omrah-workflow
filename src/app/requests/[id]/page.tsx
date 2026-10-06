@@ -627,7 +627,7 @@ export default function RequestDetailPage({
         contactPhone: editContactPhone.trim() || request.contactPhone,
         destination: editDestination.trim() || undefined,
         notes: editNotes.trim() || undefined,
-        nusukGroupNumber: editNusukGroupNumber.trim() || undefined,
+        nusukGroupNumber: isSender ? request.nusukGroupNumber : (editNusukGroupNumber.trim() || undefined),
         senderCode: editSenderCode.trim().toUpperCase() || undefined,
       });
       setSuccess("تم تحديث بيانات المعاملة بنجاح.");
@@ -1614,6 +1614,23 @@ export default function RequestDetailPage({
     );
   }
 
+  const cleanNusuk = request.nusukGroupNumber?.trim();
+  const hasNusukGroupNumber = Boolean(
+    cleanNusuk &&
+    cleanNusuk !== "" &&
+    cleanNusuk !== "-" &&
+    cleanNusuk !== "لم يُسجل بعد" &&
+    cleanNusuk !== "لم يسجل بعد" &&
+    cleanNusuk.toLowerCase() !== "null" &&
+    cleanNusuk.toLowerCase() !== "undefined"
+  );
+
+  const canSenderEditWithoutNusuk =
+    role === "Sender" &&
+    !hasNusukGroupNumber &&
+    request.status !== "Cancelled" &&
+    request.status !== "Archived";
+
   const hasItemsNeedingCorrection =
     request.status === "CorrectionRequired" ||
     request.travelers.some(
@@ -1626,6 +1643,7 @@ export default function RequestDetailPage({
 
   const canEditDocs =
     role === "Admin" ||
+    canSenderEditWithoutNusuk ||
     (role === "Sender" &&
       (request.status === "Draft" ||
         request.status === "CorrectionRequired" ||
@@ -1634,6 +1652,7 @@ export default function RequestDetailPage({
 
   const canEditAnyData =
     role === "Admin" ||
+    canSenderEditWithoutNusuk ||
     canEditDocs ||
     hasItemsNeedingCorrection;
 
@@ -1646,10 +1665,10 @@ export default function RequestDetailPage({
   const isAgent = role === "SaudiAgent" || role === "Admin";
   const canEditTraveler =
     role === "Admin" ||
-    role === "Sender" ||
+    canSenderEditWithoutNusuk ||
+    canEditAnyData ||
     role === "SafaEmployee" ||
-    role === "SaudiAgent" ||
-    canEditAnyData;
+    role === "SaudiAgent";
 
   const hostDoc =
     (request.hostingInfo?.hostIdDocumentId
@@ -4408,19 +4427,21 @@ export default function RequestDetailPage({
                   />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-gray-100">
-                  <div>
-                    <label className="block font-bold text-teal-800 mb-1 flex items-center gap-1">
-                      <Building className="w-3.5 h-3.5 text-teal-600" />
-                      <span>رقم مجموعة نسك</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={editNusukGroupNumber}
-                      onChange={(e) => setEditNusukGroupNumber(e.target.value)}
-                      placeholder="مثال: NUSUK-109283"
-                      className="w-full px-3 py-2 border border-teal-300 rounded-xl focus:ring-2 focus:ring-teal-500 text-teal-900 font-mono font-bold"
-                    />
-                  </div>
+                  {!isSender && (
+                    <div>
+                      <label className="block font-bold text-teal-800 mb-1 flex items-center gap-1">
+                        <Building className="w-3.5 h-3.5 text-teal-600" />
+                        <span>رقم مجموعة نسك</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={editNusukGroupNumber}
+                        onChange={(e) => setEditNusukGroupNumber(e.target.value)}
+                        placeholder="مثال: NUSUK-109283"
+                        className="w-full px-3 py-2 border border-teal-300 rounded-xl focus:ring-2 focus:ring-teal-500 text-teal-900 font-mono font-bold"
+                      />
+                    </div>
+                  )}
 
                   <div>
                     <label className="block font-bold text-gray-700 mb-1">
