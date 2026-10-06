@@ -1409,12 +1409,31 @@ ${travelersLines}
                           <span className="text-gray-400 text-xs italic">قيد التسجيل</span>
                         )}
                       </div>
+                      {/* اسم المجموعة في مستطيل مستقل زيه زي رقم نسك مع زر نسخ */}
                       {r.groupName && (
-                        <div
-                          className="text-[10px] font-bold text-gray-700 truncate max-w-[150px]"
-                          title={`اسم المجموعة: ${r.groupName}`}
-                        >
-                          {r.groupName}
+                        <div className="flex items-center gap-1.5 font-mono pt-1 border-t border-gray-200/60">
+                          <span className="text-[10px] text-gray-500 font-bold">المجموعة:</span>
+                          <span
+                            className="px-2 py-0.5 rounded-md text-[11px] font-bold font-mono bg-indigo-50 text-indigo-900 border border-indigo-300 truncate max-w-[140px]"
+                            title={`اسم المجموعة: ${r.groupName}`}
+                          >
+                            {r.groupName}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              copyText(r.groupName!, `m-groupName-${r.id}`, e);
+                            }}
+                            className="text-gray-400 hover:text-indigo-700 p-0.5 cursor-pointer"
+                            title="نسخ اسم المجموعة"
+                          >
+                            {copiedKey === `m-groupName-${r.id}` ? (
+                              <Check className="w-3.5 h-3.5 text-indigo-600" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5" />
+                            )}
+                          </button>
                         </div>
                       )}
                     </div>
@@ -2273,6 +2292,10 @@ ${travelersLines}
                       Boolean(search.trim()) &&
                       Boolean(r.nusukGroupNumber) &&
                       r.nusukGroupNumber!.toLowerCase().includes(search.trim().toLowerCase());
+                    const isGroupNameMatch =
+                      Boolean(search.trim()) &&
+                      Boolean(r.groupName) &&
+                      r.groupName.toLowerCase().includes(search.trim().toLowerCase());
                     const matchingTravelers = getMatchingTravelers(r, search);
                     const isTravelerMatched = Boolean(search.trim()) && matchingTravelers.length > 0;
                     const reqTravelers =
@@ -2289,43 +2312,65 @@ ${travelersLines}
                       >
                         {/* 1. رقم مجموعة نسك واسم المجموعة */}
                         <td className="py-2.5 px-3 align-middle border-l border-gray-100">
-                          {r.nusukGroupNumber ? (
-                            <div className="inline-flex items-center gap-1.5 font-mono">
-                              <span
-                                className={`px-2.5 py-1 rounded-md text-xs font-bold font-mono transition-all ${
-                                  isNusukMatch
-                                    ? "bg-emerald-600 text-white ring-2 ring-emerald-300"
-                                    : "bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-2xs"
-                                }`}
-                              >
-                                {r.nusukGroupNumber}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={(e) => copyToClipboard(r.nusukGroupNumber!, e)}
-                                className="text-gray-400 hover:text-emerald-700 p-1 cursor-pointer transition-colors"
-                                title="نسخ رقم نسك"
-                              >
-                                {copiedNusuk === r.nusukGroupNumber ? (
-                                  <Check className="w-3.5 h-3.5 text-emerald-600" />
-                                ) : (
-                                  <Copy className="w-3.5 h-3.5" />
-                                )}
-                              </button>
-                            </div>
-                          ) : (
-                            <span className="text-gray-400 text-xs italic font-mono">قيد التسجيل</span>
-                          )}
+                          <div className="flex flex-col gap-1.5 items-start">
+                            {/* رقم مجموعة نسك */}
+                            {r.nusukGroupNumber ? (
+                              <div className="inline-flex items-center gap-1.5 font-mono">
+                                <span
+                                  className={`px-2.5 py-1 rounded-md text-xs font-bold font-mono transition-all ${
+                                    isNusukMatch
+                                      ? "bg-emerald-600 text-white ring-2 ring-emerald-300"
+                                      : "bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-2xs"
+                                  }`}
+                                  title={`رقم مجموعة نسك: ${r.nusukGroupNumber}`}
+                                >
+                                  {r.nusukGroupNumber}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => copyToClipboard(r.nusukGroupNumber!, e)}
+                                  className="text-gray-400 hover:text-emerald-700 p-1 cursor-pointer transition-colors"
+                                  title="نسخ رقم نسك"
+                                >
+                                  {copiedNusuk === r.nusukGroupNumber ? (
+                                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                  ) : (
+                                    <Copy className="w-3.5 h-3.5" />
+                                  )}
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-gray-400 text-xs italic font-mono px-1">قيد التسجيل</span>
+                            )}
 
-                          {/* اسم المجموعة تحت رقم نسك */}
-                          {r.groupName && (
-                            <div
-                              className="text-[11px] font-bold text-gray-800 truncate max-w-[170px] mt-1 select-all"
-                              title={`اسم المجموعة: ${r.groupName}`}
-                            >
-                              {r.groupName}
-                            </div>
-                          )}
+                            {/* اسم المجموعة في مستطيل مستقل زيه زي رقم نسك مع زر نسخ */}
+                            {r.groupName && (
+                              <div className="inline-flex items-center gap-1.5 font-mono">
+                                <span
+                                  className={`px-2.5 py-1 rounded-md text-xs font-bold font-mono transition-all max-w-[175px] truncate select-all ${
+                                    isGroupNameMatch
+                                      ? "bg-indigo-600 text-white ring-2 ring-indigo-300"
+                                      : "bg-indigo-50 text-indigo-900 border border-indigo-300 shadow-2xs hover:border-indigo-400"
+                                  }`}
+                                  title={`اسم المجموعة: ${r.groupName}`}
+                                >
+                                  {r.groupName}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => copyText(r.groupName!, `groupName-${r.id}`, e)}
+                                  className="text-gray-400 hover:text-indigo-700 p-1 cursor-pointer transition-colors"
+                                  title="نسخ اسم المجموعة"
+                                >
+                                  {copiedKey === `groupName-${r.id}` ? (
+                                    <Check className="w-3.5 h-3.5 text-indigo-600" />
+                                  ) : (
+                                    <Copy className="w-3.5 h-3.5" />
+                                  )}
+                                </button>
+                              </div>
+                            )}
+                          </div>
                           {isTravelerMatched && (
                             <div
                               className="mt-1 flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-900 border border-purple-300 max-w-[170px] truncate"
