@@ -56,7 +56,7 @@ import {
   getDistinctDateOptions,
   HOSTING_OPTIONS,
 } from "@/components/requests/TableColumnFilters";
-import { getTravelArchiveCategory } from "@/lib/travelArchiveUtils";
+import { getTravelArchiveCategory, compareRequestsByDeparture } from "@/lib/travelArchiveUtils";
 
 // اقتطاع الاسم الثلاثي فقط (3 مقاطع كحد أقصى)
 function getThreePartName(fullName?: string): string {
@@ -944,7 +944,7 @@ ${travelersLines}
       return isRequestInvoicePaid(r);
 
     return true;
-  });
+  }).sort(compareRequestsByDeparture);
 
   if (authLoading || loading) {
     return (
