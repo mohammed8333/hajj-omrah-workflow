@@ -536,6 +536,16 @@ export const supabaseService = {
               .getPublicUrl(photoDoc.storage_path);
             photoUrl = pubData?.publicUrl;
           }
+          const passportDoc = docs?.find(
+            (d) => d.traveler_id === t.id && d.document_type === "Passport"
+          );
+          let passportDocUrl = passportDoc?.storage_url;
+          if (!passportDocUrl && passportDoc?.storage_path) {
+            const { data: pubData } = client.storage
+              .from(BUCKET_NAME)
+              .getPublicUrl(passportDoc.storage_path);
+            passportDocUrl = pubData?.publicUrl;
+          }
           const aff = extractAffiliation(t);
           return {
             id: t.id,
@@ -543,6 +553,8 @@ export const supabaseService = {
             passportNumber: t.passport_number || undefined,
             phoneNumber: t.phone_number || undefined,
             photoUrl: photoUrl || undefined,
+            passportDocumentId: passportDoc?.id || undefined,
+            passportDocumentUrl: passportDocUrl || undefined,
             affiliation: aff,
             notes: cleanNotes(t.notes),
           };

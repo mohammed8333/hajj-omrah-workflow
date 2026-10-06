@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
-import { AdminStats, GroupRequestSummary } from "@/types";
+import { AdminStats, GroupRequestSummary, TravelerSummaryItem } from "@/types";
 import { RequestStatusBadge } from "@/components/ui/StatusBadge";
 import {
   FilePlus,
@@ -35,6 +35,7 @@ import {
   MessageCircle,
   RotateCcw,
   Building,
+  FileText,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -271,7 +272,8 @@ export default function DashboardPage() {
       docUrl?.startsWith("data:image/") ||
       /\.(jpg|jpeg|png|webp|gif)/i.test(docUrl || "") ||
       title?.includes("صورة") ||
-      title?.includes("هوية");
+      title?.includes("هوية") ||
+      title?.includes("جواز");
     const ext = isImg ? ".jpg" : ".pdf";
     setDocPreviewModal({
       isOpen: true,
@@ -294,6 +296,59 @@ export default function DashboardPage() {
           variant: "danger",
         });
       }
+    }
+  };
+
+  // فتح صورة جواز المسافر عند الضغط على رقم الجواز
+  const handleViewTravelerPassport = async (
+    requestId: string,
+    traveler: TravelerSummaryItem,
+    e: React.MouseEvent
+  ) => {
+    e.stopPropagation();
+    e.preventDefault();
+
+    if (traveler.passportDocumentUrl || traveler.passportDocumentId) {
+      handleViewDoc(
+        traveler.passportDocumentId,
+        traveler.passportDocumentUrl,
+        `جواز سفر - ${traveler.fullName}${traveler.passportNumber ? ` (${traveler.passportNumber})` : ""}`,
+        e
+      );
+      return;
+    }
+
+    try {
+      const fullReq = await api.requests.getById(requestId);
+      const passportDoc =
+        fullReq.groupDocuments?.find(
+          (d) => d.travelerId === traveler.id && d.documentType === "Passport"
+        ) ||
+        fullReq.travelers
+          ?.find((tr) => tr.id === traveler.id)
+          ?.documents?.find((d) => d.documentType === "Passport");
+
+      if (passportDoc) {
+        handleViewDoc(
+          passportDoc.id,
+          passportDoc.storageUrl,
+          `جواز سفر - ${traveler.fullName}${traveler.passportNumber ? ` (${traveler.passportNumber})` : ""}`,
+          e
+        );
+      } else {
+        await alert({
+          title: "تنبيه",
+          message: `لا توجد صورة جواز سفر مرفوعة للمسافر (${traveler.fullName}) في هذه المعاملة حتى الآن.`,
+          variant: "warning",
+        });
+      }
+    } catch (err) {
+      console.error("Failed to load traveler passport doc:", err);
+      await alert({
+        title: "خطأ",
+        message: "تعذر فتح صورة الجواز، يرجى المحاولة لاحقاً.",
+        variant: "danger",
+      });
     }
   };
 
@@ -1581,6 +1636,17 @@ ${travelersLines}
                                   >
                                     {t.fullName}
                                   </span>
+                                  {t.passportNumber && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => handleViewTravelerPassport(r.id, t, e)}
+                                      className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-sky-700 hover:text-sky-900 hover:underline cursor-pointer transition-colors mt-0.5"
+                                      title="اضغط لمعاينة صورة الجواز المرفوعة"
+                                    >
+                                      <FileText className="w-2.5 h-2.5 text-sky-600 shrink-0" />
+                                      <span dir="ltr">{t.passportNumber}</span>
+                                    </button>
+                                  )}
                                 </div>
                               </div>
                             );
@@ -1757,6 +1823,17 @@ ${travelersLines}
                                     >
                                       {t.fullName}
                                     </span>
+                                    {t.passportNumber && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => handleViewTravelerPassport(r.id, t, e)}
+                                        className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-sky-700 hover:text-sky-900 hover:underline cursor-pointer transition-colors mt-0.5"
+                                        title="اضغط لمعاينة صورة الجواز المرفوعة"
+                                      >
+                                        <FileText className="w-2.5 h-2.5 text-sky-600 shrink-0" />
+                                        <span dir="ltr">{t.passportNumber}</span>
+                                      </button>
+                                    )}
                                   </div>
                                 </div>
                               );
@@ -2452,6 +2529,17 @@ ${travelersLines}
                                       >
                                         {t.fullName}
                                       </span>
+                                      {t.passportNumber && (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => handleViewTravelerPassport(r.id, t, e)}
+                                          className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-sky-700 hover:text-sky-900 hover:underline cursor-pointer transition-colors mt-0.5 group/pass"
+                                          title="اضغط لمعاينة صورة الجواز المرفوعة"
+                                        >
+                                          <FileText className="w-3 h-3 text-sky-600 group-hover/pass:text-sky-800 shrink-0" />
+                                          <span dir="ltr">{t.passportNumber}</span>
+                                        </button>
+                                      )}
                                     </div>
                                   </div>
                                 );

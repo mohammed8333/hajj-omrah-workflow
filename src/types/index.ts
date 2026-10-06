@@ -157,6 +157,8 @@ export interface TravelerSummaryItem {
   phoneNumber?: string;
   expiryDate?: string;
   photoUrl?: string;
+  passportDocumentId?: string;
+  passportDocumentUrl?: string;
   affiliation?: string;
   notes?: string;
 }

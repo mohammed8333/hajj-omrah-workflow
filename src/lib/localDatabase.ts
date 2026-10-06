@@ -958,12 +958,19 @@ class LocalDatabaseEngine {
           r.groupDocuments?.find(
             (d) => d.travelerId === t.id && d.documentType === "PersonalPhoto"
           );
+        const passportDoc =
+          t.documents?.find((d) => d.documentType === "Passport") ||
+          r.groupDocuments?.find(
+            (d) => d.travelerId === t.id && d.documentType === "Passport"
+          );
         return {
           id: t.id,
           fullName: t.fullName || "مسافر",
           passportNumber: t.passportNumber,
           phoneNumber: t.phoneNumber,
           photoUrl: (photoDoc as any)?.storageUrl || (photoDoc as any)?.fileDataUrl,
+          passportDocumentId: passportDoc?.id,
+          passportDocumentUrl: (passportDoc as any)?.storageUrl || (passportDoc as any)?.fileDataUrl,
           affiliation: t.affiliation,
           notes: t.notes,
         };
