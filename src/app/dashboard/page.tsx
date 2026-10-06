@@ -2240,9 +2240,9 @@ ${travelersLines}
                 <thead className="bg-gray-50/90 border-b border-gray-200 text-gray-700 font-bold">
                   <tr>
                     {/* 1. رقم مجموعة نسك */}
-                    <th className="py-3 px-3">
-                      <div className="flex items-center justify-between gap-1.5">
-                        <span>رقم مجموعة نسك</span>
+                    <th className="py-2.5 px-2 w-[140px] min-w-[130px] max-w-[150px]">
+                      <div className="flex items-center justify-between gap-1 text-[11px]">
+                        <span className="whitespace-nowrap font-bold">رقم مجموعة نسك</span>
                         <HeaderColumnFilter
                           title="رقم نسك"
                           type="text"
@@ -2256,8 +2256,8 @@ ${travelersLines}
                     </th>
 
                     {/* 2. الحالة */}
-                    <th className="py-3 px-2 text-center">
-                      <div className="flex items-center justify-center gap-1.5">
+                    <th className="py-2.5 px-1.5 text-center w-[100px] min-w-[90px]">
+                      <div className="flex items-center justify-center gap-1">
                         <span>الحالة</span>
                         <HeaderColumnFilter
                           title="الحالة"
@@ -2273,8 +2273,8 @@ ${travelersLines}
 
                     {/* 3. المرسل */}
                     {(role === "SafaEmployee" || role === "Admin") && (
-                      <th className="py-3 px-2 text-center">
-                        <div className="flex items-center justify-center gap-1.5">
+                      <th className="py-2.5 px-1.5 text-center w-[120px] min-w-[105px]">
+                        <div className="flex items-center justify-center gap-1">
                           <span>المرسل</span>
                           <HeaderColumnFilter
                             title="المرسل"
@@ -2293,8 +2293,8 @@ ${travelersLines}
                     )}
 
                     {/* 4. رحلة الذهاب */}
-                    <th className="py-3 px-3">
-                      <div className="flex items-center justify-between gap-1.5">
+                    <th className="py-2.5 px-2 w-[125px] min-w-[115px]">
+                      <div className="flex items-center justify-between gap-1">
                         <span>رحلة الذهاب</span>
                         <HeaderColumnFilter
                           title="تاريخ الذهاب"
@@ -2309,8 +2309,8 @@ ${travelersLines}
                     </th>
 
                     {/* 5. رحلة العودة */}
-                    <th className="py-3 px-3">
-                      <div className="flex items-center justify-between gap-1.5">
+                    <th className="py-2.5 px-2 w-[125px] min-w-[115px]">
+                      <div className="flex items-center justify-between gap-1">
                         <span>رحلة العودة</span>
                         <HeaderColumnFilter
                           title="تاريخ العودة"
@@ -2326,8 +2326,8 @@ ${travelersLines}
 
                     {/* 6. بيانات المسافرين */}
                     {(role === "Sender" || role === "SafaEmployee" || role === "Admin") && (
-                      <th className="py-3 px-3">
-                        <div className="flex items-center justify-between gap-1.5">
+                      <th className="py-2.5 px-2 min-w-[155px]">
+                        <div className="flex items-center justify-between gap-1">
                           <span>بيانات المسافرين</span>
                           <HeaderColumnFilter
                             title="المسافرين"
@@ -2344,8 +2344,8 @@ ${travelersLines}
 
                     {/* 7. بيانات المستضيف */}
                     {(role === "SaudiAgent" || role === "SafaEmployee" || role === "Admin") && (
-                      <th className="py-3 px-3">
-                        <div className="flex items-center justify-between gap-1.5">
+                      <th className="py-2.5 px-2 min-w-[155px]">
+                        <div className="flex items-center justify-between gap-1">
                           <span>بيانات المستضيف</span>
                           <HeaderColumnFilter
                             title="المستضيف"
@@ -2361,8 +2361,8 @@ ${travelersLines}
                     )}
 
                     {/* 8. المستندات والإجراء */}
-                    <th className="py-3 px-3 text-center">
-                      <div className="flex items-center justify-center gap-1.5">
+                    <th className="py-2.5 px-2 text-center w-[120px] min-w-[110px]">
+                      <div className="flex items-center justify-center gap-1">
                         <span>المستندات والإجراء</span>
                         {activeColFiltersCount > 0 && (
                           <button
@@ -2405,13 +2405,13 @@ ${travelersLines}
                         } hover:bg-sky-50/30`}
                       >
                         {/* 1. رقم مجموعة نسك واسم المجموعة */}
-                        <td className="py-2.5 px-3 align-middle border-l border-gray-100">
-                          <div className="flex flex-col gap-1.5 items-start">
+                        <td className="py-2 px-2 align-middle border-l border-gray-100 w-[140px] min-w-[130px] max-w-[150px]">
+                          <div className="flex flex-col gap-1 items-start">
                             {/* رقم مجموعة نسك */}
                             {r.nusukGroupNumber ? (
-                              <div className="inline-flex items-center gap-1.5 font-mono">
+                              <div className="inline-flex items-center gap-1 font-mono">
                                 <span
-                                  className={`px-2.5 py-1 rounded-md text-xs font-bold font-mono transition-all ${
+                                  className={`px-2 py-0.5 rounded-md text-xs font-bold font-mono transition-all ${
                                     isNusukMatch
                                       ? "bg-emerald-600 text-white ring-2 ring-emerald-300"
                                       : "bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-2xs"
@@ -2423,7 +2423,7 @@ ${travelersLines}
                                 <button
                                   type="button"
                                   onClick={(e) => copyToClipboard(r.nusukGroupNumber!, e)}
-                                  className="text-gray-400 hover:text-emerald-700 p-1 cursor-pointer transition-colors"
+                                  className="text-gray-400 hover:text-emerald-700 p-0.5 cursor-pointer transition-colors"
                                   title="نسخ رقم نسك"
                                 >
                                   {copiedNusuk === r.nusukGroupNumber ? (
@@ -2434,14 +2434,14 @@ ${travelersLines}
                                 </button>
                               </div>
                             ) : (
-                              <span className="text-gray-400 text-xs italic font-mono px-1">قيد التسجيل</span>
+                              <span className="text-gray-400 text-[11px] italic font-mono px-1">قيد التسجيل</span>
                             )}
 
                             {/* اسم المجموعة في مستطيل مستقل زيه زي رقم نسك مع زر نسخ */}
                             {r.groupName && (
-                              <div className="inline-flex items-center gap-1.5 font-mono">
+                              <div className="inline-flex items-center gap-1 font-mono">
                                 <span
-                                  className={`px-2.5 py-1 rounded-md text-xs font-bold font-mono transition-all max-w-[175px] truncate select-all ${
+                                  className={`px-2 py-0.5 rounded-md text-xs font-bold font-mono transition-all max-w-[120px] truncate select-all ${
                                     isGroupNameMatch
                                       ? "bg-indigo-600 text-white ring-2 ring-indigo-300"
                                       : "bg-indigo-50 text-indigo-900 border border-indigo-300 shadow-2xs hover:border-indigo-400"
@@ -2453,7 +2453,7 @@ ${travelersLines}
                                 <button
                                   type="button"
                                   onClick={(e) => copyText(r.groupName!, `groupName-${r.id}`, e)}
-                                  className="text-gray-400 hover:text-indigo-700 p-1 cursor-pointer transition-colors"
+                                  className="text-gray-400 hover:text-indigo-700 p-0.5 cursor-pointer transition-colors"
                                   title="نسخ اسم المجموعة"
                                 >
                                   {copiedKey === `groupName-${r.id}` ? (
