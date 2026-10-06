@@ -68,10 +68,9 @@ import { useDialog } from "@/lib/dialog-context";
 import { FileDropArea } from "@/components/ui/FileDropArea";
 import { getWhatsAppUrl, getTelUrl, normalizePhone, validateHostPhone, validateTravelerPhone } from "@/lib/phoneUtils";
 import { WhatsAppModal } from "@/components/ui/WhatsAppModal";
-import { checkPassportValidity } from "@/lib/passportValidation";
 import { formatOfficialGroupName, resolveSenderCode } from "@/lib/groupNaming";
-import { WhatsAppGroupSendButton } from "@/components/requests/WhatsAppGroupSendButton";
 import { downloadFile } from "@/lib/fileDownload";
+import { sendWhatsAppGroupPackage } from "@/lib/whatsappGroupSend";
 
 export default function RequestDetailPage({
   requestId: propRequestId,
@@ -1297,7 +1296,37 @@ export default function RequestDetailPage({
         request.nusukGroupNumber = nusukInput.trim();
         request.status = "ReadyForSaudiAgent";
       }
-      setSuccess("تم اعتماد رقم نسك وتحويل المعاملة للوكيل السعودي بنجاح 🕋");
+
+      // إرسال الحزمة لمجموعة الواتساب تلقائياً فور الاعتماد
+      try {
+        const ticketDoc =
+          (request?.flightTicketDocumentId
+            ? request?.groupDocuments?.find((d) => d.id === request.flightTicketDocumentId)
+            : undefined) ||
+          request?.flightTicketDocument ||
+          request?.groupDocuments?.filter((d) => d.documentType === "FlightTicket").slice(-1)[0] ||
+          request?.travelers?.[0]?.documents?.find((d) => d.documentType === "FlightTicket");
+
+        const hostDoc =
+          (request?.hostingInfo?.hostIdDocumentId
+            ? request?.groupDocuments?.find((d) => d.id === request.hostingInfo.hostIdDocumentId)
+            : undefined) ||
+          request?.hostingInfo?.hostIdDocument ||
+          request?.groupDocuments?.filter((d) => d.documentType === "HostId").slice(-1)[0];
+
+        await sendWhatsAppGroupPackage({
+          nusukNumber: nusukInput.trim(),
+          hasHosting: Boolean(request?.hasHosting),
+          hostPhone: request?.hostingInfo?.hostPhone || request?.contactPhone,
+          contactPhone: request?.contactPhone,
+          ticketDocId: ticketDoc?.id,
+          hostDocId: hostDoc?.id,
+        });
+      } catch (waErr) {
+        console.warn("WhatsApp group auto-send error:", waErr);
+      }
+
+      setSuccess("تم اعتماد رقم نسك وتحويل المعاملة للوكيل السعودي وإرسالها للواتس بنجاح 📲🕋");
       setShowNusukModal(false);
       await loadRequest();
     } catch (err: unknown) {
@@ -1838,10 +1867,6 @@ export default function RequestDetailPage({
         {/* Row 2: Metadata / Quick info */}
         <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-gray-600 pt-2 border-t border-gray-100">
           <span className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1 rounded-lg border border-gray-150">
-            <Phone className="w-3.5 h-3.5 text-gray-400" />
-            <span dir="ltr" className="font-mono font-bold text-gray-700">{request.contactPhone}</span>
-          </span>
-          <span className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1 rounded-lg border border-gray-150">
             <Users className="w-3.5 h-3.5 text-gray-400" />
             <span className="font-bold text-gray-700">{request.travelers.length} مسافرين</span>
           </span>
@@ -1934,28 +1959,6 @@ export default function RequestDetailPage({
               <Building className="w-3.5 h-3.5" />
               <span>تعديل رقم نسك</span>
             </button>
-          )}
-
-          {/* زر إرسال حزمة المعاملة لمجموعة الواتساب (يتفعل تلقائياً بعد إحالة المعاملة للوكيل السعودي) */}
-          {isSafaReviewer && request.status !== "Draft" && (
-            <WhatsAppGroupSendButton
-              request={request}
-              ticketDoc={
-                (request.flightTicketDocumentId
-                  ? request.groupDocuments?.find((d) => d.id === request.flightTicketDocumentId)
-                  : undefined) ||
-                request.flightTicketDocument ||
-                request.groupDocuments?.filter((d) => d.documentType === "FlightTicket").slice(-1)[0] ||
-                request.travelers?.[0]?.documents?.find((d) => d.documentType === "FlightTicket")
-              }
-              hostDoc={
-                (request.hostingInfo?.hostIdDocumentId
-                  ? request.groupDocuments?.find((d) => d.id === request.hostingInfo.hostIdDocumentId)
-                  : undefined) ||
-                request.hostingInfo?.hostIdDocument ||
-                request.groupDocuments?.filter((d) => d.documentType === "HostId").slice(-1)[0]
-              }
-            />
           )}
 
           {/* Workflow Action 1: تم ربط البرنامج (الوكيل السعودي أو الآدمن فقط) */}
@@ -2184,17 +2187,6 @@ export default function RequestDetailPage({
               </button>
             </div>
           )}
-
-          {/* Direct WhatsApp Messaging Trigger */}
-          <button
-            type="button"
-            onClick={() => setShowWhatsAppModal(true)}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
-            title="إرسال رسالة واتساب بنماذج جاهزة ذكية"
-          >
-            <MessageCircle className="w-3.5 h-3.5" />
-            <span>إرسال واتساب</span>
-          </button>
         </div>
       </div>
 
@@ -3830,7 +3822,7 @@ export default function RequestDetailPage({
             </div>
 
             <p className="text-xs text-gray-500">
-              أدخل رقم مجموعة نسك المعتمد لتثبيته وتحويل المعاملة فوراً إلى الوكيل السعودي للمصادقة وإصدار التأشيرات.
+              أدخل رقم مجموعة نسك المعتمد لتثبيته وتحويل المعاملة فوراً إلى الوكيل السعودي وإرسال حزمة المعاملة لمجموعة الواتساب 📲.
             </p>
 
             <div>
@@ -3923,7 +3915,7 @@ export default function RequestDetailPage({
                 className="px-4 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed text-white rounded-xl shadow-xs cursor-pointer flex items-center gap-1.5"
               >
                 <Send className="w-3.5 h-3.5" />
-                <span>اعتماد رقم نسك وتحويل للوكيل السعودي</span>
+                <span>اعتماد وتحويل وإرسال للواتس 📲</span>
               </button>
             </div>
           </div>

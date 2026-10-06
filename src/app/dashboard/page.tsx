@@ -33,8 +33,8 @@ import {
   Download,
   Eye,
   MessageCircle,
-  PhoneCall,
   RotateCcw,
+  Building,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -42,6 +42,7 @@ import { RequestLifecycleTimer } from "@/components/ui/RequestLifecycleTimer";
 import { useDialog } from "@/lib/dialog-context";
 import { getWhatsAppUrl } from "@/lib/phoneUtils";
 import { WhatsAppModal } from "@/components/ui/WhatsAppModal";
+import { NusukApprovalModal } from "@/components/requests/NusukApprovalModal";
 import { notificationsService } from "@/lib/notificationsService";
 import { downloadFile } from "@/lib/fileDownload";
 import { matchesRequestSearch, getMatchingTravelers, isTravelerMatch } from "@/lib/searchUtils";
@@ -182,6 +183,7 @@ export default function DashboardPage() {
   const [copiedNusuk, setCopiedNusuk] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [mobileCardTab, setMobileCardTab] = useState<Record<string, "host" | "travelers">>({});
+  const [nusukModalRequest, setNusukModalRequest] = useState<GroupRequestSummary | null>(null);
   const [whatsAppModalRequest, setWhatsAppModalRequest] = useState<GroupRequestSummary | null>(null);
   const [docPreviewModal, setDocPreviewModal] = useState<{
     isOpen: boolean;
@@ -2070,6 +2072,19 @@ ${travelersLines}
                                 </button>
                               )}
                             </div>
+                          ) : isRequestNew(r) ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setNusukModalRequest(r);
+                              }}
+                              className="px-2.5 py-1 text-xs font-black text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 rounded-xl cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95 whitespace-nowrap"
+                              title="اعتماد رقم نسك وتحويل المعاملة للوكيل السعودي وإرسالها للواتس"
+                            >
+                              <Building className="w-3.5 h-3.5" />
+                              <span>اعتماد رقم نسك</span>
+                            </button>
                           ) : (
                             <button
                               type="button"
@@ -2092,20 +2107,6 @@ ${travelersLines}
                           </button>
                         </div>
                       )}
-
-                      {/* زر واتساب الذكي بنماذج جاهزة */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setWhatsAppModalRequest(r);
-                        }}
-                        className="px-2.5 py-1 text-xs font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-xl transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
-                        title="إرسال رسالة واتساب ذكية"
-                      >
-                        <MessageSquare className="w-3.5 h-3.5 fill-emerald-600 text-emerald-600" />
-                        <span>واتساب</span>
-                      </button>
 
                       <button
                         type="button"
@@ -2769,6 +2770,19 @@ ${travelersLines}
                                       </button>
                                     )}
                                   </div>
+                                ) : isRequestNew(r) ? (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setNusukModalRequest(r);
+                                    }}
+                                    className="px-2.5 py-1 text-xs font-black text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 border border-emerald-600 rounded-lg cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95 whitespace-nowrap"
+                                    title="اعتماد رقم نسك وتحويل المعاملة للوكيل السعودي وإرسالها للواتس"
+                                  >
+                                    <Building className="w-3.5 h-3.5" />
+                                    <span>اعتماد رقم نسك</span>
+                                  </button>
                                 ) : (
                                   <button
                                     type="button"
@@ -2791,20 +2805,6 @@ ${travelersLines}
                                 </button>
                               </div>
                             )}
-
-                            {/* زر واتساب الذكي بنماذج جاهزة */}
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setWhatsAppModalRequest(r);
-                              }}
-                              className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-2.5 py-1.5 rounded-lg transition-colors shadow-2xs cursor-pointer"
-                              title="إرسال رسالة واتساب ذكية"
-                            >
-                              <MessageSquare className="w-3.5 h-3.5 fill-emerald-600 text-emerald-600" />
-                              <span>واتساب</span>
-                            </button>
 
                             {/* زر فتح/عرض المعاملة */}
                             <Link
@@ -2923,6 +2923,18 @@ ${travelersLines}
           request={whatsAppModalRequest}
         />
       )}
+
+      {/* Nusuk Approval & WhatsApp Auto-Send Modal */}
+      <NusukApprovalModal
+        isOpen={Boolean(nusukModalRequest)}
+        onClose={() => setNusukModalRequest(null)}
+        request={nusukModalRequest}
+        currentUser={user}
+        onSuccess={(msg) => {
+          setSuccess(msg || "تم اعتماد رقم نسك بنجاح");
+          loadRequests();
+        }}
+      />
     </div>
   );
 }
