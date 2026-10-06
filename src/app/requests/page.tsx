@@ -52,7 +52,11 @@ import {
   getDistinctDateOptions,
   HOSTING_OPTIONS,
 } from "@/components/requests/TableColumnFilters";
-import { getTravelArchiveCategory, compareRequestsByDeparture } from "@/lib/travelArchiveUtils";
+import {
+  getTravelArchiveCategory,
+  compareRequestsByDeparture,
+  getDefaultActiveWorkflowTab,
+} from "@/lib/travelArchiveUtils";
 
 // اقتطاع الاسم الثلاثي فقط (3 مقاطع كحد أقصى)
 function getThreePartName(fullName?: string): string {
@@ -175,7 +179,12 @@ export default function RequestsListPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [nusukFilter, setNusukFilter] = useState<"ALL" | "WITH_NUSUK" | "WITHOUT_NUSUK">("ALL");
-  const [activeTab, setActiveTab] = useState<string>("ALL");
+  const defaultWorkflowTab = React.useMemo(() => {
+    return getDefaultActiveWorkflowTab(requests, role, user);
+  }, [requests, role, user]);
+  const [selectedTab, setSelectedTab] = useState<string | null>(null);
+  const activeTab = selectedTab ?? defaultWorkflowTab;
+  const setActiveTab = (tab: string) => setSelectedTab(tab);
   const [copiedNusuk, setCopiedNusuk] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [mobileCardTab, setMobileCardTab] = useState<Record<string, "host" | "travelers">>({});
@@ -243,6 +252,8 @@ export default function RequestsListPage() {
       }
       const nusukOnly = params.get("nusukOnly");
       if (nusukOnly === "true") setNusukFilter("WITH_NUSUK");
+      const tabParam = params.get("tab");
+      if (tabParam) setSelectedTab(tabParam);
     }
   }, []);
 

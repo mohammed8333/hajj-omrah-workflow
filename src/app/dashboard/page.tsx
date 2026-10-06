@@ -56,7 +56,11 @@ import {
   getDistinctDateOptions,
   HOSTING_OPTIONS,
 } from "@/components/requests/TableColumnFilters";
-import { getTravelArchiveCategory, compareRequestsByDeparture } from "@/lib/travelArchiveUtils";
+import {
+  getTravelArchiveCategory,
+  compareRequestsByDeparture,
+  getDefaultActiveWorkflowTab,
+} from "@/lib/travelArchiveUtils";
 
 // اقتطاع الاسم الثلاثي فقط (3 مقاطع كحد أقصى)
 function getThreePartName(fullName?: string): string {
@@ -177,7 +181,12 @@ export default function DashboardPage() {
   const [requests, setRequests] = useState<GroupRequestSummary[]>([]);
   const [adminStats, setAdminStats] = useState<AdminStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<string>("ALL");
+  const defaultWorkflowTab = React.useMemo(() => {
+    return getDefaultActiveWorkflowTab(requests, role, user);
+  }, [requests, role, user]);
+  const [selectedTab, setSelectedTab] = useState<string | null>(null);
+  const activeTab = selectedTab ?? defaultWorkflowTab;
+  const setActiveTab = (tab: string) => setSelectedTab(tab);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [nusukFilter, setNusukFilter] = useState<"ALL" | "WITH_NUSUK" | "WITHOUT_NUSUK">("ALL");
@@ -234,6 +243,14 @@ export default function DashboardPage() {
     if (colFilters.hosting && colFilters.hosting !== "ALL") count++;
     return count;
   }, [colFilters]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get("tab");
+      if (tabParam) setSelectedTab(tabParam);
+    }
+  }, []);
 
   const copyToClipboard = (nusuk: string, e: React.MouseEvent) => {
     e.stopPropagation();

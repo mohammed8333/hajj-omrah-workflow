@@ -118,3 +118,111 @@ export function compareRequestsByDeparture(
   const createdB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
   return createdB - createdA;
 }
+
+/**
+ * Determines the default active workflow tab according to user priority:
+ * 1. جديد (NEW) - لو فيه جديد (لغير الوكيل السعودي)
+ * 2. بانتظار ربط برنامج (TRANSFERRED_TO_AGENT) - لو ما فيش جديد
+ * 3. بانتظار قبول الإضافة / الاستضافة (PROGRAM_LINKED) - لو ما فيش بانتظار ربط برنامج
+ * 4. بانتظار دفع الفاتورة (HOSTING_ACCEPTED) - لو ما فيش بانتظار قبول الاستضافة
+ * 5. مكتملة (INVOICE_PAID) - لو ما فيش حاجة (معاملات مكتملة غير مؤرشفة)
+ * 6. الكل (ALL) - لو كل المكتمل مؤرشف أو لا توجد أي معاملات سابقة
+ */
+export function getDefaultActiveWorkflowTab(
+  requests: Array<any>,
+  role?: string,
+  currentUser?: { id?: string; fullName?: string; username?: string } | null
+): string {
+  if (!requests || requests.length === 0) return "ALL";
+
+  const agentEligibleStatuses = [
+    "ReadyForSaudiAgent",
+    "ReceivedBySaudiAgent",
+    "SaudiAgentProcessing",
+    "SaudiAgentCorrectionRequired",
+    "ProgramLinked",
+    "HostingAcceptanceRequested",
+    "HostingAcceptedBySender",
+    "HostingConfirmed",
+    "Completed",
+    "Archived",
+  ];
+
+  const isRequestOwnedBySender = (r: any) => {
+    if (!currentUser) return false;
+    if (r.senderId && r.senderId === currentUser.id) return true;
+    if (r.senderName) {
+      const sName = r.senderName.trim().toLowerCase();
+      if (currentUser.fullName && sName === currentUser.fullName.trim().toLowerCase()) return true;
+      if (currentUser.username && sName === currentUser.username.trim().toLowerCase()) return true;
+    }
+    return false;
+  };
+
+  const roleRequests =
+    role === "SaudiAgent"
+      ? requests.filter((r) => agentEligibleStatuses.includes(r.status))
+      : role === "Sender"
+      ? requests.filter(isRequestOwnedBySender)
+      : requests;
+
+  const activeRoleRequests = roleRequests.filter((r) => getTravelArchiveCategory(r) === "ACTIVE");
+
+  const hasHostingReq = (r: any) =>
+    Boolean(r.hasHosting || r.hostName || r.hostNationalId || r.hostIdDocumentId || r.hostIdDocumentUrl);
+
+  const isWaitingHosting = (r: any) =>
+    r.status === "HostingAcceptanceRequested" || (hasHostingReq(r) && r.status === "ProgramLinked");
+
+  const isReadyForPayment = (r: any) =>
+    r.status === "HostingAcceptedBySender" ||
+    r.status === "HostingConfirmed" ||
+    (!hasHostingReq(r) && r.status === "ProgramLinked");
+
+  const isRequestNew = (r: any) =>
+    !r.nusukGroupNumber &&
+    (r.status === "Draft" ||
+      r.status === "Submitted" ||
+      r.status === "UnderReview" ||
+      r.status === "DocumentsCompleted" ||
+      r.status === "CorrectionRequired" ||
+      r.status === "MissingDocuments");
+
+  const isRequestTransferredToAgent = (r: any) =>
+    r.status === "ReadyForSaudiAgent" ||
+    r.status === "ReceivedBySaudiAgent" ||
+    r.status === "SaudiAgentProcessing" ||
+    r.status === "SaudiAgentCorrectionRequired";
+
+  const isRequestProgramLinked = (r: any) => isWaitingHosting(r);
+  const isRequestHostingAccepted = (r: any) => isReadyForPayment(r);
+  const isRequestInvoicePaid = (r: any) =>
+    r.status === "Completed" ||
+    ((role === "SafaEmployee" || role === "Admin") && r.status === "SafaRegistrationCompleted");
+
+  // 1. جديد (إذا كان هناك طلبات جديدة، ولغير الوكيل السعودي)
+  if (role !== "SaudiAgent") {
+    const hasNew = activeRoleRequests.some(isRequestNew);
+    if (hasNew) return "NEW";
+  }
+
+  // 2. بانتظار ربط برنامج
+  const hasTransferred = activeRoleRequests.some(isRequestTransferredToAgent);
+  if (hasTransferred) return "TRANSFERRED_TO_AGENT";
+
+  // 3. بانتظار قبول الإضافة / الاستضافة
+  const hasProgramLinked = activeRoleRequests.some(isRequestProgramLinked);
+  if (hasProgramLinked) return "PROGRAM_LINKED";
+
+  // 4. بانتظار دفع الفاتورة
+  const hasHostingAccepted = activeRoleRequests.some(isRequestHostingAccepted);
+  if (hasHostingAccepted) return "HOSTING_ACCEPTED";
+
+  // 5. مكتملة (غير مؤرشفة)
+  const hasInvoicePaid = activeRoleRequests.some(isRequestInvoicePaid);
+  if (hasInvoicePaid) return "INVOICE_PAID";
+
+  // 6. لو كل المكتمل مؤرشف أو لا توجد أي معاملات سابقة -> الكل
+  return "ALL";
+}
+
