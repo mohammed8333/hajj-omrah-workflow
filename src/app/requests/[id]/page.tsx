@@ -874,6 +874,15 @@ export default function RequestDetailPage({
   };
 
   const handleDeleteTraveler = async (travelerId: string, travelerName: string) => {
+    if (role === "Sender") {
+      await alert({
+        title: "غير مصرح",
+        message: "غير مسموح للمرسل بحذف المسافرين من المعاملة، يُسمح بالإضافة فقط.",
+        variant: "warning",
+      });
+      return;
+    }
+
     const isConfirmed = await confirm({
       title: "تأكيد حذف المسافر",
       message: `هل أنت متأكد من رغبتك في حذف المسافر "${travelerName}" وجميع مستنداته من هذه المعاملة نهائياً؟`,
@@ -1165,6 +1174,15 @@ export default function RequestDetailPage({
   };
 
   const handleDeleteDocument = async (docId: string) => {
+    if (role === "Sender") {
+      await alert({
+        title: "غير مصرح",
+        message: "غير مسموح للمرسل بحذف المستندات من المعاملة.",
+        variant: "warning",
+      });
+      return;
+    }
+
     const ok = await confirm({
       title: "حذف المستند",
       message: "هل أنت متأكد من رغبتك في حذف هذا المستند نهائياً؟",
@@ -1815,6 +1833,13 @@ export default function RequestDetailPage({
     canSenderEditWithoutNusuk ||
     canEditDocs ||
     hasItemsNeedingCorrection;
+
+  const canAddTraveler =
+    role === "Admin" ||
+    (role === "Sender" &&
+      request.status !== "Cancelled" &&
+      request.status !== "Archived") ||
+    canEditAnyData;
 
   const isAdmin = role === "Admin";
   const isSafaEmployee = role === "SafaEmployee";
@@ -2934,7 +2959,7 @@ export default function RequestDetailPage({
                             </label>
                           )}
 
-                          {canEditAnyData && (
+                          {canEditAnyData && role !== "Sender" && (
                             <button
                               type="button"
                               onClick={async (e) => {
@@ -3317,7 +3342,7 @@ export default function RequestDetailPage({
                           </label>
                         )}
 
-                        {canEditAnyData && (
+                        {canEditAnyData && role !== "Sender" && (
                           <button
                             type="button"
                             onClick={async (e) => {
@@ -3400,7 +3425,7 @@ export default function RequestDetailPage({
           </h2>
 
           <div className="flex items-center gap-2 flex-wrap">
-            {canEditAnyData && (
+            {canAddTraveler && (
               <button
                 type="button"
                 onClick={() => {
@@ -3705,7 +3730,7 @@ export default function RequestDetailPage({
                   </button>
                 )}
 
-                {canEditAnyData && (
+                {canEditAnyData && role !== "Sender" && (
                   <button
                     type="button"
                     onClick={() => handleDeleteTraveler(traveler.id, traveler.fullName)}
@@ -3825,7 +3850,7 @@ export default function RequestDetailPage({
                               )}
 
 
-                              {canEditAnyData && (
+                              {canEditAnyData && role !== "Sender" && (
                                 <button
                                   type="button"
                                   onClick={(e) => {
