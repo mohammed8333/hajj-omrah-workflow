@@ -336,11 +336,55 @@ export default function RequestDetailPage({
   ) => {
     try {
       setActionLoading(true);
+      setUploadingFor({ travelerId, docType });
       setError(null);
+
+      // 1. Delete previous document(s) of the same type to ensure only the newly uploaded file remains
+      if (docType === "HostId") {
+        const oldHostDocs = request?.groupDocuments?.filter((d) => d.documentType === "HostId") || [];
+        for (const oldDoc of oldHostDocs) {
+          try {
+            await api.documents.delete(oldDoc.id);
+          } catch (delErr) {
+            console.warn("Could not delete previous host ID document:", delErr);
+          }
+        }
+        if (request?.hostingInfo?.hostIdDocumentId) {
+          try {
+            await api.documents.delete(request.hostingInfo.hostIdDocumentId);
+          } catch {}
+        }
+      } else if (docType === "FlightTicket") {
+        const oldTicketDocs = request?.groupDocuments?.filter((d) => d.documentType === "FlightTicket") || [];
+        for (const oldDoc of oldTicketDocs) {
+          try {
+            await api.documents.delete(oldDoc.id);
+          } catch (delErr) {
+            console.warn("Could not delete previous flight ticket document:", delErr);
+          }
+        }
+        if (request?.flightTicketDocumentId) {
+          try {
+            await api.documents.delete(request.flightTicketDocumentId);
+          } catch {}
+        }
+      } else if (travelerId) {
+        const currentTrv = request?.travelers?.find((t) => t.id === travelerId);
+        const oldDocs = currentTrv?.documents?.filter((d) => d.documentType === docType) || [];
+        for (const oldDoc of oldDocs) {
+          try {
+            await api.documents.delete(oldDoc.id);
+          } catch (delErr) {
+            console.warn("Could not delete previous traveler document:", delErr);
+          }
+        }
+      }
+
+      // 2. Upload the new document
       await api.documents.upload(requestId, file, docType, travelerId);
 
-      // If uploading a Host ID image, scan OCR and update hostingInfo
-      if (docType === "HostId" && file.type.startsWith("image/")) {
+      // 3. AI Scan & extract data to overwrite / update with the correct information
+      if (docType === "HostId") {
         try {
           const scanResult = await scanHostId(file);
           if (
@@ -359,43 +403,50 @@ export default function RequestDetailPage({
               hostPhone: request?.hostingInfo?.hostPhone,
             });
             setSuccess(
-              `تم رفع هوية المستضيف واستخراج البيانات بنجاح: ${scanResult.hostName || ""} ${
+              `تم استبدال هوية المستضيف واستخراج البيانات بنجاح: ${scanResult.hostName || ""} ${
                 scanResult.hostNationality ? `[${scanResult.hostNationality}]` : ""
-              } ${scanResult.hostBirthDate ? `(تاريخ الميلاد: ${scanResult.hostBirthDate})` : ""}`
+              } ${scanResult.hostBirthDate ? `(تاريخ الميلاد: ${scanResult.hostBirthDate})` : ""} ${
+                scanResult.idNumber ? `(رقم الهوية: ${scanResult.idNumber})` : ""
+              }`
             );
           } else {
-            setSuccess(`تم رفع مستند (${DOCUMENT_TYPE_LABELS[docType]}) بنجاح.`);
+            setSuccess(`تم تحديث مستند (${DOCUMENT_TYPE_LABELS[docType]}) بنجاح.`);
           }
         } catch (hostScanErr) {
           console.warn("Host ID auto-scan error:", hostScanErr);
-          setSuccess(`تم رفع مستند (${DOCUMENT_TYPE_LABELS[docType]}) بنجاح.`);
+          setSuccess(`تم استبدال مستند (${DOCUMENT_TYPE_LABELS[docType]}) بنجاح.`);
         }
-      } else if (docType === "Passport" && travelerId && file.type.startsWith("image/")) {
+      } else if (docType === "Passport" && travelerId) {
         try {
           const scanResult = await scanPassportMRZ(file);
-          if (scanResult && scanResult.fullNameArabic) {
+          if (
+            scanResult &&
+            (scanResult.fullNameArabic || scanResult.fullNameEnglish || scanResult.passportNumber)
+          ) {
             const currentTraveler = request?.travelers?.find((t) => t.id === travelerId);
-            const isGenericName =
-              !currentTraveler?.fullName ||
-              /^مسافر\s*#?\d*$/i.test(currentTraveler.fullName.trim()) ||
-              /^المسافر\s*#?\d*$/i.test(currentTraveler.fullName.trim());
-            if (isGenericName) {
-              await api.travelers.update(travelerId, {
-                fullName: scanResult.fullNameArabic,
-                passportNumber: scanResult.passportNumber || currentTraveler?.passportNumber,
-                nationality: scanResult.nationality || currentTraveler?.nationality,
-                dateOfBirth: scanResult.dateOfBirth || currentTraveler?.dateOfBirth,
-              });
-              setSuccess(`تم رفع الجواز واستخراج اسم المسافر تلقائياً: (${scanResult.fullNameArabic})`);
-            } else {
-              setSuccess(`تم رفع مستند (${DOCUMENT_TYPE_LABELS[docType]}) بنجاح.`);
-            }
+            const targetFullName =
+              scanResult.fullNameArabic ||
+              scanResult.fullNameEnglish ||
+              currentTraveler?.fullName;
+
+            await api.travelers.update(travelerId, {
+              fullName: targetFullName,
+              passportNumber: scanResult.passportNumber || currentTraveler?.passportNumber,
+              nationality: scanResult.nationality || currentTraveler?.nationality,
+              dateOfBirth: scanResult.dateOfBirth || currentTraveler?.dateOfBirth,
+              expiryDate: scanResult.expiryDate || currentTraveler?.expiryDate,
+            });
+            setSuccess(
+              `تم استبدال الجواز وتحديث بيانات المسافر بنجاح: (${targetFullName || ""}) ${
+                scanResult.passportNumber ? `| رقم الجواز: ${scanResult.passportNumber}` : ""
+              }`
+            );
           } else {
-            setSuccess(`تم رفع مستند (${DOCUMENT_TYPE_LABELS[docType]}) بنجاح.`);
+            setSuccess(`تم تحديث مستند (${DOCUMENT_TYPE_LABELS[docType]}) بنجاح.`);
           }
         } catch (mrzErr) {
           console.warn("MRZ auto-scan error:", mrzErr);
-          setSuccess(`تم رفع مستند (${DOCUMENT_TYPE_LABELS[docType]}) بنجاح.`);
+          setSuccess(`تم استبدال مستند (${DOCUMENT_TYPE_LABELS[docType]}) بنجاح.`);
         }
       } else if (docType === "FlightTicket") {
         try {
@@ -426,29 +477,29 @@ export default function RequestDetailPage({
               airportArrivalTime: arrivalTime || request?.airportArrivalTime,
             });
             setSuccess(
-              `تم رفع تذكرة الطيران واستخراج البيانات بنجاح: ${scanResult.airline || ""} ${
+              `تم استبدال تذكرة الطيران واستخراج البيانات بنجاح: ${scanResult.airline || ""} ${
                 scanResult.flightNumber ? `(رحلة ${scanResult.flightNumber})` : ""
               } ${scanResult.departureDate ? `| الذهاب: ${scanResult.departureDate}` : ""} ${
                 scanResult.flightDepartureTime ? `| الإقلاع: ${scanResult.flightDepartureTime}` : ""
               }`
             );
           } else {
-            setSuccess(`تم رفع مستند (${DOCUMENT_TYPE_LABELS[docType]}) بنجاح.`);
+            setSuccess(`تم تحديث مستند (${DOCUMENT_TYPE_LABELS[docType]}) بنجاح.`);
           }
         } catch (ticketScanErr) {
           console.warn("Flight ticket auto-scan error:", ticketScanErr);
-          setSuccess(`تم رفع مستند (${DOCUMENT_TYPE_LABELS[docType]}) بنجاح.`);
+          setSuccess(`تم استبدال مستند (${DOCUMENT_TYPE_LABELS[docType]}) بنجاح.`);
         }
       } else {
-        setSuccess(`تم رفع مستند (${DOCUMENT_TYPE_LABELS[docType]}) بنجاح.`);
+        setSuccess(`تم استبدال مستند (${DOCUMENT_TYPE_LABELS[docType]}) بنجاح.`);
       }
 
-      await loadRequest();
+      await loadRequest(false);
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message);
       } else {
-        setError("فشل رفع المستند.");
+        setError("فشل استبدال المستند.");
       }
     } finally {
       setActionLoading(false);
@@ -561,22 +612,23 @@ export default function RequestDetailPage({
     if (file.type.startsWith("image/")) {
       const url = URL.createObjectURL(file);
       setHostModalFilePreview(url);
-      try {
-        setIsScanningHostModalFile(true);
-        const scanResult = await scanHostId(file);
-        if (scanResult) {
-          if (scanResult.hostName && !hostModalName) setHostModalName(scanResult.hostName);
-          if (scanResult.idNumber && !hostModalNationalId) setHostModalNationalId(scanResult.idNumber);
-          if (scanResult.hostNationality) setHostModalNationality(scanResult.hostNationality);
-          if (scanResult.hostBirthDate && !hostModalBirthDate) setHostModalBirthDate(scanResult.hostBirthDate);
-        }
-      } catch (err) {
-        console.warn("Host ID modal scan error:", err);
-      } finally {
-        setIsScanningHostModalFile(false);
-      }
     } else {
       setHostModalFilePreview(null);
+    }
+
+    try {
+      setIsScanningHostModalFile(true);
+      const scanResult = await scanHostId(file);
+      if (scanResult) {
+        if (scanResult.hostName) setHostModalName(scanResult.hostName);
+        if (scanResult.idNumber) setHostModalNationalId(scanResult.idNumber);
+        if (scanResult.hostNationality) setHostModalNationality(scanResult.hostNationality);
+        if (scanResult.hostBirthDate) setHostModalBirthDate(scanResult.hostBirthDate);
+      }
+    } catch (err) {
+      console.warn("Host ID modal scan error:", err);
+    } finally {
+      setIsScanningHostModalFile(false);
     }
   };
 
@@ -609,8 +661,19 @@ export default function RequestDetailPage({
         hostBirthDate: hostModalBirthDate.trim() || undefined,
       });
 
-      // 2. Upload file if selected
+      // 2. Upload file if selected (deleting previous HostId documents first)
       if (hostModalFile) {
+        const oldHostDocs = request.groupDocuments?.filter((d) => d.documentType === "HostId") || [];
+        for (const oldDoc of oldHostDocs) {
+          try {
+            await api.documents.delete(oldDoc.id);
+          } catch {}
+        }
+        if (request.hostingInfo?.hostIdDocumentId) {
+          try {
+            await api.documents.delete(request.hostingInfo.hostIdDocumentId);
+          } catch {}
+        }
         await api.documents.upload(requestId, hostModalFile, "HostId");
       }
 

@@ -1252,13 +1252,24 @@ export const supabaseService = {
           .update({ flight_ticket_document_id: docId })
           .eq("id", requestId);
 
-        // Remove previous group FlightTicket documents to prevent conflicts
-        await client
+        // Remove previous group FlightTicket documents from storage and DB
+        const { data: oldTicketDocs } = await client
           .from("documents")
-          .delete()
+          .select("id, storage_path")
           .eq("group_request_id", requestId)
           .eq("document_type", "FlightTicket")
           .neq("id", docId);
+
+        if (oldTicketDocs && oldTicketDocs.length > 0) {
+          const oldPaths = oldTicketDocs.map((d) => d.storage_path).filter(Boolean);
+          if (oldPaths.length > 0) {
+            try { await client.storage.from(BUCKET_NAME).remove(oldPaths); } catch {}
+          }
+          await client
+            .from("documents")
+            .delete()
+            .in("id", oldTicketDocs.map((d) => d.id));
+        }
       } else if (documentType === "HostId") {
         const { data: hostRow } = await client
           .from("hosting_infos")
@@ -1283,13 +1294,43 @@ export const supabaseService = {
             });
         }
 
-        // Remove previous HostId documents to ensure singular, consistent active host identity
-        await client
+        // Remove previous HostId documents from storage and DB
+        const { data: oldHostDocs } = await client
           .from("documents")
-          .delete()
+          .select("id, storage_path")
           .eq("group_request_id", requestId)
           .eq("document_type", "HostId")
           .neq("id", docId);
+
+        if (oldHostDocs && oldHostDocs.length > 0) {
+          const oldPaths = oldHostDocs.map((d) => d.storage_path).filter(Boolean);
+          if (oldPaths.length > 0) {
+            try { await client.storage.from(BUCKET_NAME).remove(oldPaths); } catch {}
+          }
+          await client
+            .from("documents")
+            .delete()
+            .in("id", oldHostDocs.map((d) => d.id));
+        }
+      } else if (travelerId) {
+        // Remove previous documents of same type for this traveler from storage and DB
+        const { data: oldTrvDocs } = await client
+          .from("documents")
+          .select("id, storage_path")
+          .eq("traveler_id", travelerId)
+          .eq("document_type", documentType)
+          .neq("id", docId);
+
+        if (oldTrvDocs && oldTrvDocs.length > 0) {
+          const oldPaths = oldTrvDocs.map((d) => d.storage_path).filter(Boolean);
+          if (oldPaths.length > 0) {
+            try { await client.storage.from(BUCKET_NAME).remove(oldPaths); } catch {}
+          }
+          await client
+            .from("documents")
+            .delete()
+            .in("id", oldTrvDocs.map((d) => d.id));
+        }
       }
 
       return mapDoc(inserted);

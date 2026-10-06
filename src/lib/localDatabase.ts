@@ -1920,6 +1920,12 @@ class LocalDatabaseEngine {
       const trv = req.travelers.find((t) => t.id === travelerId);
       if (trv) {
         if (!trv.documents) trv.documents = [];
+        // Delete previous documents of the same type for this traveler
+        const oldDocs = trv.documents.filter((d) => d.documentType === documentType);
+        oldDocs.forEach((d) => {
+          deleteFileFromIndexedDB(d.id).catch(() => {});
+        });
+        trv.documents = trv.documents.filter((d) => d.documentType !== documentType);
         trv.documents.push(docItem);
       }
     } else {
@@ -1937,12 +1943,20 @@ class LocalDatabaseEngine {
         req.hostingInfo.hostIdDocument = docItem;
 
         // Remove any previous HostId documents from groupDocuments to keep singular active host identity
+        const oldHostDocs = req.groupDocuments.filter((d) => d.documentType === "HostId");
+        oldHostDocs.forEach((d) => {
+          deleteFileFromIndexedDB(d.id).catch(() => {});
+        });
         req.groupDocuments = req.groupDocuments.filter((d) => d.documentType !== "HostId");
       } else if (documentType === "FlightTicket") {
         req.flightTicketDocumentId = docId;
         req.flightTicketDocument = docItem;
 
         // Remove any previous group FlightTicket documents from groupDocuments
+        const oldTicketDocs = req.groupDocuments.filter((d) => d.documentType === "FlightTicket");
+        oldTicketDocs.forEach((d) => {
+          deleteFileFromIndexedDB(d.id).catch(() => {});
+        });
         req.groupDocuments = req.groupDocuments.filter((d) => d.documentType !== "FlightTicket");
       }
       req.groupDocuments.push(docItem);
