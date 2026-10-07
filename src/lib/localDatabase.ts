@@ -853,6 +853,14 @@ class LocalDatabaseEngine {
       }
     }
 
+    // 4. Auto-clean host data for requests without hosting
+    for (const req of this.requests) {
+      if (req.hasHosting === false && req.hostingInfo) {
+        req.hostingInfo = undefined;
+        stateChanged = true;
+      }
+    }
+
     if (stateChanged) {
       this.persistRequests();
     }
@@ -983,12 +991,15 @@ class LocalDatabaseEngine {
         r.flightTicketDocument ||
         r.groupDocuments?.filter((d) => d.documentType === "FlightTicket").slice(-1)[0];
 
-      const hostDoc =
-        (r.hostingInfo?.hostIdDocumentId
-          ? r.groupDocuments?.find((d) => d.id === r.hostingInfo.hostIdDocumentId)
-          : undefined) ||
-        r.hostingInfo?.hostIdDocument ||
-        r.groupDocuments?.filter((d) => d.documentType === "HostId").slice(-1)[0];
+      const isHosting = r.hasHosting === false ? false : Boolean(r.hasHosting || r.hostingInfo?.hostName || r.hostingInfo?.hostPhone);
+
+      const hostDoc = isHosting
+        ? ((r.hostingInfo?.hostIdDocumentId
+            ? r.groupDocuments?.find((d) => d.id === r.hostingInfo.hostIdDocumentId)
+            : undefined) ||
+          r.hostingInfo?.hostIdDocument ||
+          r.groupDocuments?.filter((d) => d.documentType === "HostId").slice(-1)[0])
+        : undefined;
 
       const isSV314 =
         r.flightNumber === "SV314" ||
@@ -1008,13 +1019,13 @@ class LocalDatabaseEngine {
         assignedSaudiAgentName: r.assignedSaudiAgentName,
         status: r.status,
         nusukGroupNumber: r.nusukGroupNumber,
-        hasHosting: Boolean(r.hasHosting || r.hostingInfo?.hostName || r.hostingInfo?.hostPhone || hostDoc),
-        hostName: r.hostingInfo?.hostName,
-        hostPhone: r.hostingInfo?.hostPhone || (r.hasHosting ? r.contactPhone : undefined),
-        hostNationalId: r.hostingInfo?.hostNationalId,
-        hostBirthDate: r.hostingInfo?.hostBirthDate,
-        hostIdDocumentId: hostDoc?.id || r.hostingInfo?.hostIdDocumentId,
-        hostIdDocumentUrl: (hostDoc as any)?.storageUrl || (hostDoc as any)?.fileDataUrl,
+        hasHosting: isHosting,
+        hostName: isHosting ? r.hostingInfo?.hostName : undefined,
+        hostPhone: isHosting ? (r.hostingInfo?.hostPhone || (r.hasHosting ? r.contactPhone : undefined)) : undefined,
+        hostNationalId: isHosting ? r.hostingInfo?.hostNationalId : undefined,
+        hostBirthDate: isHosting ? r.hostingInfo?.hostBirthDate : undefined,
+        hostIdDocumentId: isHosting ? (hostDoc?.id || r.hostingInfo?.hostIdDocumentId) : undefined,
+        hostIdDocumentUrl: isHosting ? ((hostDoc as any)?.storageUrl || (hostDoc as any)?.fileDataUrl) : undefined,
         flightTicketDocumentId: flightTicketDoc?.id || r.flightTicketDocumentId,
         flightTicketDocumentUrl: (flightTicketDoc as any)?.storageUrl || (flightTicketDoc as any)?.fileDataUrl,
         contactPhone: r.contactPhone,
@@ -1298,10 +1309,15 @@ class LocalDatabaseEngine {
     if (data.nusukGroupNumber !== undefined) req.nusukGroupNumber = data.nusukGroupNumber;
     if (data.destination !== undefined) req.destination = data.destination;
     if (data.notes !== undefined) req.notes = data.notes;
-    if (data.hasHosting !== undefined) req.hasHosting = data.hasHosting;
+    if (data.hasHosting !== undefined) {
+      req.hasHosting = data.hasHosting;
+      if (!data.hasHosting) {
+        req.hostingInfo = undefined;
+      }
+    }
     req.updatedAt = new Date().toISOString();
 
-    if (data.hasHosting || req.hasHosting) {
+    if (req.hasHosting) {
       if (!req.hostingInfo) {
         req.hostingInfo = {
           id: "host-" + Date.now(),

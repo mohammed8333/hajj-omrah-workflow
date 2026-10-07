@@ -2527,15 +2527,17 @@ export default function RequestDetailPage({
     );
   }
 
-  const hasHostingReq = Boolean(
-    request?.hasHosting ||
-    request?.hostingInfo?.hostName ||
-    request?.hostingInfo?.hostPhone ||
-    request?.hostName ||
-    request?.hostNationalId ||
-    request?.hostIdDocumentId ||
-    request?.hostIdDocumentUrl
-  );
+  const hasHostingReq = request?.hasHosting === false
+    ? false
+    : Boolean(
+        request?.hasHosting ||
+        request?.hostingInfo?.hostName ||
+        request?.hostingInfo?.hostPhone ||
+        request?.hostName ||
+        request?.hostNationalId ||
+        request?.hostIdDocumentId ||
+        request?.hostIdDocumentUrl
+      );
 
   const handleLinkProgram = async () => {
     if (!isSaudiAgent && !isAdmin) return;
@@ -3262,7 +3264,15 @@ export default function RequestDetailPage({
                       if (confirmed) {
                         try {
                           setActionLoading(true);
-                          await api.requests.update(requestId, { hasHosting: false });
+                          await api.requests.update(requestId, {
+                            hasHosting: false,
+                            hostName: "",
+                            hostPhone: "",
+                            hostNationalId: "",
+                            hostBirthDate: "",
+                            hostNationality: "",
+                            hostAddress: "",
+                          });
                           setSuccess("تم تحويل المعاملة إلى سفر عادي بدون مستضيف بنجاح.");
                           await loadRequest(false);
                         } catch (err: unknown) {

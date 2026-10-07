@@ -168,8 +168,10 @@ export function getDefaultActiveWorkflowTab(
 
   const activeRoleRequests = roleRequests.filter((r) => getTravelArchiveCategory(r) === "ACTIVE");
 
-  const hasHostingReq = (r: any) =>
-    Boolean(r.hasHosting || r.hostName || r.hostNationalId || r.hostIdDocumentId || r.hostIdDocumentUrl);
+  const hasHostingReq = (r: any) => {
+    if (r.hasHosting === false) return false;
+    return Boolean(r.hasHosting || r.hostName || r.hostNationalId || r.hostIdDocumentId || r.hostIdDocumentUrl);
+  };
 
   const isWaitingHosting = (r: any) =>
     r.status === "HostingAcceptanceRequested" || (hasHostingReq(r) && r.status === "ProgramLinked");

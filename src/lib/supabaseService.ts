@@ -566,11 +566,12 @@ export const supabaseService = {
         const tCount = matchingTravelers.length;
         const dCount = docs?.filter((d) => d.group_request_id === r.id).length || 0;
         const cCount = corrections?.filter((c) => c.group_request_id === r.id).length || 0;
-        const hostRow = hostingInfos?.find((h) => h.group_request_id === r.id);
-        const hostPhone = hostRow?.host_phone || (r.has_hosting ? r.contact_phone : undefined);
-        const hostName = hostRow?.host_name || undefined;
-        const hostNationalId = hostRow?.host_national_id || undefined;
-        const hostBirthDate = hostRow?.host_birth_date || undefined;
+        const isHosting = Boolean(r.has_hosting);
+        const hostRow = isHosting ? hostingInfos?.find((h) => h.group_request_id === r.id) : undefined;
+        const hostPhone = isHosting ? (hostRow?.host_phone || (r.has_hosting ? r.contact_phone : undefined)) : undefined;
+        const hostName = isHosting ? (hostRow?.host_name || undefined) : undefined;
+        const hostNationalId = isHosting ? (hostRow?.host_national_id || undefined) : undefined;
+        const hostBirthDate = isHosting ? (hostRow?.host_birth_date || undefined) : undefined;
 
         // Resolve exact flight ticket document (prioritize explicitly linked ID, fallback to newest)
         const ticketDoc =
@@ -582,13 +583,14 @@ export const supabaseService = {
           );
 
         // Resolve exact host ID document (prioritize explicitly linked ID, fallback to newest)
-        const hostDoc =
-          (hostRow?.host_id_document_id
-            ? docs?.find((d) => d.id === hostRow.host_id_document_id)
-            : undefined) ||
-          docs?.find(
-            (d) => d.group_request_id === r.id && d.document_type === "HostId"
-          );
+        const hostDoc = isHosting
+          ? ((hostRow?.host_id_document_id
+              ? docs?.find((d) => d.id === hostRow.host_id_document_id)
+              : undefined) ||
+            docs?.find(
+              (d) => d.group_request_id === r.id && d.document_type === "HostId"
+            ))
+          : undefined;
 
         let ticketUrl = ticketDoc?.storage_url;
         if (!ticketUrl && ticketDoc?.storage_path) {
@@ -656,13 +658,13 @@ export const supabaseService = {
           assignedSaudiAgentName: r.assigned_saudi_agent_name || undefined,
           status: r.status as RequestStatus,
           nusukGroupNumber: r.nusuk_group_number || undefined,
-          hasHosting: Boolean(r.has_hosting),
+          hasHosting: isHosting,
           hostName: hostName,
           hostPhone: hostPhone,
           hostNationalId: hostNationalId,
           hostBirthDate: hostBirthDate,
-          hostIdDocumentId: hostDoc?.id || hostRow?.host_id_document_id || undefined,
-          hostIdDocumentUrl: hostDocUrl || undefined,
+          hostIdDocumentId: isHosting ? (hostDoc?.id || hostRow?.host_id_document_id || undefined) : undefined,
+          hostIdDocumentUrl: isHosting ? (hostDocUrl || undefined) : undefined,
           flightTicketDocumentId: ticketDoc?.id || r.flight_ticket_document_id || undefined,
           flightTicketDocumentUrl: ticketUrl || undefined,
           returnFlightNumber: r.return_flight_number || (isSV314 ? "SV317" : undefined),
@@ -720,9 +722,10 @@ export const supabaseService = {
       const travelers = (travelerRows || []).map((t) => mapTraveler(t, allDocs));
       const groupDocs = allDocs.filter((d) => !d.travelerId);
 
-      const hostRow = hostingRows?.[0];
+      const isHosting = Boolean(req.has_hosting);
+      const hostRow = isHosting ? hostingRows?.[0] : undefined;
       let hostingInfo: HostingInfo | undefined = undefined;
-      if (hostRow) {
+      if (isHosting && hostRow) {
         const hostDoc =
           (hostRow.host_id_document_id ? allDocs.find((d) => d.id === hostRow.host_id_document_id) : undefined) ||
           allDocs.find((d) => d.documentType === "HostId");
@@ -895,7 +898,9 @@ export const supabaseService = {
       if (reqErr) throw new Error(reqErr.message);
 
       // Handle hosting info
-      if (data.hasHosting || data.hostName !== undefined || data.hostPhone !== undefined) {
+      if (data.hasHosting === false) {
+        await client.from("hosting_infos").delete().eq("group_request_id", id);
+      } else if (data.hasHosting || data.hostName !== undefined || data.hostPhone !== undefined) {
         const { data: existingHost } = await client
           .from("hosting_infos")
           .select("id")
