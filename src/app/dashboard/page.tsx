@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { AdminStats, GroupRequestSummary, TravelerSummaryItem } from "@/types";
@@ -63,6 +63,7 @@ import {
 } from "@/lib/travelArchiveUtils";
 import { RequestVisaActionButtons } from "@/components/requests/RequestVisaActionButtons";
 import { resolveSenderCode } from "@/lib/groupNaming";
+import { useRealtimeSync } from "@/lib/realtimeSync";
 
 // اقتطاع الاسم الثلاثي فقط (3 مقاطع كحد أقصى)
 function getThreePartName(fullName?: string): string {
@@ -762,9 +763,11 @@ ${travelersLines}
     }
   };
 
-  const loadData = async () => {
+  const loadData = async (isInitial = true) => {
     try {
-      setLoading(true);
+      if (isInitial) {
+        setLoading(true);
+      }
       if (role === "Admin") {
         const [statsRes, reqsRes] = await Promise.all([
           api.admin.getStats(),
@@ -781,9 +784,19 @@ ${travelersLines}
     } catch (err) {
       console.error("Error loading dashboard:", err);
     } finally {
-      setLoading(false);
+      if (isInitial) {
+        setLoading(false);
+      }
     }
   };
+
+  useRealtimeSync(
+    useCallback(() => {
+      if (user) {
+        loadData(false);
+      }
+    }, [user, role])
+  );
 
   useEffect(() => {
     if (!authLoading && !user) {

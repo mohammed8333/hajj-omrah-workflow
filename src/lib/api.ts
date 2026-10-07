@@ -15,6 +15,15 @@ import {
 import { localDB } from "./localDatabase";
 import { isSupabaseConfigured } from "./supabaseClient";
 import { supabaseService } from "./supabaseService";
+import { realtimeSync } from "./realtimeSync";
+
+const syncMutation = (table: string, action: string, id?: string) => {
+  try {
+    realtimeSync.notifyMutation({ table, action, id });
+  } catch (err) {
+    console.warn("realtimeSync error:", err);
+  }
+};
 
 export const getToken = (): string | null => {
   if (typeof window === "undefined") return null;
@@ -127,8 +136,8 @@ export const api = {
     },
 
     create: async (data: {
-      groupName: string;
-      contactPhone: string;
+      groupName?: string;
+      contactPhone?: string;
       travelDate?: string;
       departureDate?: string;
       returnDate?: string;
@@ -152,11 +161,15 @@ export const api = {
       hostAddress?: string;
     }): Promise<GroupRequestDetail> => {
       const current = await api.auth.getMe();
+      let res: GroupRequestDetail;
       if (isSupabaseConfigured()) {
-        return await supabaseService.requests.create(data, current);
+        res = await supabaseService.requests.create(data, current);
+      } else {
+        await delay();
+        res = localDB.createRequest(data, current);
       }
-      await delay();
-      return localDB.createRequest(data, current);
+      syncMutation("group_requests", "create", res.id);
+      return res;
     },
 
     update: async (
@@ -192,20 +205,26 @@ export const api = {
     ): Promise<void> => {
       const current = await api.auth.getMe();
       if (isSupabaseConfigured()) {
-        return await supabaseService.requests.update(id, data, current);
+        await supabaseService.requests.update(id, data, current);
+      } else {
+        await delay();
+        localDB.updateRequest(id, data, current);
       }
-      await delay();
-      localDB.updateRequest(id, data, current);
+      syncMutation("group_requests", "update", id);
     },
 
     submit: async (id: string): Promise<{ message: string }> => {
       const current = await api.auth.getMe();
+      let res: { message: string };
       if (isSupabaseConfigured()) {
-        return await supabaseService.requests.submit(id, current);
+        res = await supabaseService.requests.submit(id, current);
+      } else {
+        await delay();
+        localDB.submitRequest(id, current);
+        res = { message: "تم تقديم المعاملة بنجاح للمراجعة والتدقيق" };
       }
-      await delay();
-      localDB.submitRequest(id, current);
-      return { message: "تم تقديم المعاملة بنجاح للمراجعة والتدقيق" };
+      syncMutation("group_requests", "submit", id);
+      return res;
     },
 
     transition: async (
@@ -214,12 +233,16 @@ export const api = {
       note?: string
     ): Promise<{ message: string }> => {
       const current = await api.auth.getMe();
+      let res: { message: string };
       if (isSupabaseConfigured()) {
-        return await supabaseService.requests.transition(id, newStatus, note, current);
+        res = await supabaseService.requests.transition(id, newStatus, note, current);
+      } else {
+        await delay();
+        localDB.transitionStatus(id, newStatus, note, current);
+        res = { message: `تم تحديث حالة المعاملة بنجاح إلى: ${newStatus}` };
       }
-      await delay();
-      localDB.transitionStatus(id, newStatus, note, current);
-      return { message: `تم تحديث حالة المعاملة بنجاح إلى: ${newStatus}` };
+      syncMutation("group_requests", "transition", id);
+      return res;
     },
 
     safaComplete: async (
@@ -229,12 +252,16 @@ export const api = {
       groupName?: string
     ): Promise<{ message: string }> => {
       const current = await api.auth.getMe();
+      let res: { message: string };
       if (isSupabaseConfigured()) {
-        return await supabaseService.requests.safaComplete(id, nusukGroupNumber, note, current, groupName);
+        res = await supabaseService.requests.safaComplete(id, nusukGroupNumber, note, current, groupName);
+      } else {
+        await delay();
+        localDB.safaComplete(id, nusukGroupNumber, note, current, groupName);
+        res = { message: "تم اعتماد رقم نسك وتحويل المعاملة للوكيل السعودي بنجاح" };
       }
-      await delay();
-      localDB.safaComplete(id, nusukGroupNumber, note, current, groupName);
-      return { message: "تم اعتماد رقم نسك وتحويل المعاملة للوكيل السعودي بنجاح" };
+      syncMutation("group_requests", "safaComplete", id);
+      return res;
     },
 
     sendToAgent: async (
@@ -243,12 +270,16 @@ export const api = {
       note?: string
     ): Promise<{ message: string }> => {
       const current = await api.auth.getMe();
+      let res: { message: string };
       if (isSupabaseConfigured()) {
-        return await supabaseService.requests.sendToAgent(id, agentId, note, current);
+        res = await supabaseService.requests.sendToAgent(id, agentId, note, current);
+      } else {
+        await delay();
+        localDB.sendToSaudiAgent(id, agentId, note, current);
+        res = { message: "تم إرسال المعاملة للوكيل السعودي بنجاح" };
       }
-      await delay();
-      localDB.sendToSaudiAgent(id, agentId, note, current);
-      return { message: "تم إرسال المعاملة للوكيل السعودي بنجاح" };
+      syncMutation("group_requests", "sendToAgent", id);
+      return res;
     },
 
     agentReceive: async (
@@ -256,12 +287,16 @@ export const api = {
       note?: string
     ): Promise<{ message: string }> => {
       const current = await api.auth.getMe();
+      let res: { message: string };
       if (isSupabaseConfigured()) {
-        return await supabaseService.requests.agentReceive(id, note, current);
+        res = await supabaseService.requests.agentReceive(id, note, current);
+      } else {
+        await delay();
+        localDB.agentReceive(id, note, current);
+        res = { message: "تم استلام المعاملة وبدء المعالجة" };
       }
-      await delay();
-      localDB.agentReceive(id, note, current);
-      return { message: "تم استلام المعاملة وبدء المعالجة" };
+      syncMutation("group_requests", "agentReceive", id);
+      return res;
     },
 
     agentComplete: async (
@@ -269,12 +304,16 @@ export const api = {
       note?: string
     ): Promise<{ message: string }> => {
       const current = await api.auth.getMe();
+      let res: { message: string };
       if (isSupabaseConfigured()) {
-        return await supabaseService.requests.agentComplete(id, note, current);
+        res = await supabaseService.requests.agentComplete(id, note, current);
+      } else {
+        await delay();
+        localDB.agentComplete(id, note, current);
+        res = { message: "تم إكمال واعتماد المعاملة نهائياً بنجاح" };
       }
-      await delay();
-      localDB.agentComplete(id, note, current);
-      return { message: "تم إكمال واعتماد المعاملة نهائياً بنجاح" };
+      syncMutation("group_requests", "agentComplete", id);
+      return res;
     },
 
     linkProgram: async (
@@ -282,12 +321,16 @@ export const api = {
       note?: string
     ): Promise<{ message: string }> => {
       const current = await api.auth.getMe();
+      let res: { message: string };
       if (isSupabaseConfigured()) {
-        return await supabaseService.requests.linkProgram(id, note, current);
+        res = await supabaseService.requests.linkProgram(id, note, current);
+      } else {
+        await delay();
+        localDB.linkProgram(id, note, current);
+        res = { message: "تم ربط البرنامج بنجاح من قبل الوكيل السعودي" };
       }
-      await delay();
-      localDB.linkProgram(id, note, current);
-      return { message: "تم ربط البرنامج بنجاح من قبل الوكيل السعودي" };
+      syncMutation("group_requests", "linkProgram", id);
+      return res;
     },
 
     requestHostingAcceptance: async (
@@ -295,12 +338,16 @@ export const api = {
       note?: string
     ): Promise<{ message: string }> => {
       const current = await api.auth.getMe();
+      let res: { message: string };
       if (isSupabaseConfigured()) {
-        return await supabaseService.requests.requestHostingAcceptance(id, note, current);
+        res = await supabaseService.requests.requestHostingAcceptance(id, note, current);
+      } else {
+        await delay();
+        localDB.requestHostingAcceptance(id, note, current);
+        res = { message: "تم إرسال طلب قبول الاستضافة بنجاح للمرسل" };
       }
-      await delay();
-      localDB.requestHostingAcceptance(id, note, current);
-      return { message: "تم إرسال طلب قبول الاستضافة بنجاح للمرسل" };
+      syncMutation("group_requests", "requestHostingAcceptance", id);
+      return res;
     },
 
     acceptHosting: async (
@@ -308,12 +355,16 @@ export const api = {
       note?: string
     ): Promise<{ message: string }> => {
       const current = await api.auth.getMe();
+      let res: { message: string };
       if (isSupabaseConfigured()) {
-        return await supabaseService.requests.acceptHosting(id, note, current);
+        res = await supabaseService.requests.acceptHosting(id, note, current);
+      } else {
+        await delay();
+        localDB.acceptHosting(id, note, current);
+        res = { message: "تم قبول طلب الاستضافة بنجاح من قبل المرسل" };
       }
-      await delay();
-      localDB.acceptHosting(id, note, current);
-      return { message: "تم قبول طلب الاستضافة بنجاح من قبل المرسل" };
+      syncMutation("group_requests", "acceptHosting", id);
+      return res;
     },
 
     confirmHosting: async (
@@ -321,12 +372,16 @@ export const api = {
       note?: string
     ): Promise<{ message: string }> => {
       const current = await api.auth.getMe();
+      let res: { message: string };
       if (isSupabaseConfigured()) {
-        return await supabaseService.requests.confirmHosting(id, note, current);
+        res = await supabaseService.requests.confirmHosting(id, note, current);
+      } else {
+        await delay();
+        localDB.confirmHosting(id, note, current);
+        res = { message: "تم تأكيد الاستضافة وإعادتها للوكيل للاعتماد النهائي" };
       }
-      await delay();
-      localDB.confirmHosting(id, note, current);
-      return { message: "تم تأكيد الاستضافة وإعادتها للوكيل للاعتماد النهائي" };
+      syncMutation("group_requests", "confirmHosting", id);
+      return res;
     },
 
     requestCorrection: async (
@@ -339,55 +394,75 @@ export const api = {
       }
     ): Promise<{ message: string }> => {
       const current = await api.auth.getMe();
+      let res: { message: string };
       if (isSupabaseConfigured()) {
-        return await supabaseService.requests.requestCorrection(requestId, data, current);
+        res = await supabaseService.requests.requestCorrection(requestId, data, current);
+      } else {
+        await delay();
+        localDB.requestCorrection(requestId, data, current);
+        res = { message: "تم إرسال طلب التصحيح بنجاح" };
       }
-      await delay();
-      localDB.requestCorrection(requestId, data, current);
-      return { message: "تم إرسال طلب التصحيح بنجاح" };
+      syncMutation("group_requests", "requestCorrection", requestId);
+      return res;
     },
 
     resolveCorrection: async (
       correctionId: string,
       notes?: string
     ): Promise<{ message: string }> => {
+      let res: { message: string };
       if (isSupabaseConfigured()) {
-        return await supabaseService.requests.resolveCorrection(correctionId, notes);
+        res = await supabaseService.requests.resolveCorrection(correctionId, notes);
+      } else {
+        await delay();
+        const current = await api.auth.getMe();
+        localDB.resolveCorrection(correctionId, notes, current);
+        res = { message: "تم حل طلب التصحيح بنجاح" };
       }
-      await delay();
-      const current = await api.auth.getMe();
-      localDB.resolveCorrection(correctionId, notes, current);
-      return { message: "تم حل طلب التصحيح بنجاح" };
+      syncMutation("group_requests", "resolveCorrection", correctionId);
+      return res;
     },
 
     delete: async (id: string): Promise<{ message: string }> => {
+      let res: { message: string };
       if (isSupabaseConfigured()) {
-        return await supabaseService.requests.delete(id);
+        res = await supabaseService.requests.delete(id);
+      } else {
+        await delay();
+        const current = await api.auth.getMe();
+        localDB.deleteRequest(id, current);
+        res = { message: "تم حذف المعاملة بنجاح" };
       }
-      await delay();
-      const current = await api.auth.getMe();
-      localDB.deleteRequest(id, current);
-      return { message: "تم حذف المعاملة بنجاح" };
+      syncMutation("group_requests", "delete", id);
+      return res;
     },
 
     archive: async (id: string, note?: string): Promise<{ message: string }> => {
       const current = await api.auth.getMe();
+      let res: { message: string };
       if (isSupabaseConfigured()) {
-        return await supabaseService.requests.archive(id, note, current);
+        res = await supabaseService.requests.archive(id, note, current);
+      } else {
+        await delay();
+        localDB.archiveRequest(id, note, current);
+        res = { message: "تم أرشفة المعاملة بنجاح" };
       }
-      await delay();
-      localDB.archiveRequest(id, note, current);
-      return { message: "تم أرشفة المعاملة بنجاح" };
+      syncMutation("group_requests", "archive", id);
+      return res;
     },
 
     unarchive: async (id: string): Promise<{ message: string }> => {
       const current = await api.auth.getMe();
+      let res: { message: string };
       if (isSupabaseConfigured()) {
-        return await supabaseService.requests.unarchive(id, current);
+        res = await supabaseService.requests.unarchive(id, current);
+      } else {
+        await delay();
+        localDB.unarchiveRequest(id, current);
+        res = { message: "تم إلغاء أرشفة المعاملة بنجاح" };
       }
-      await delay();
-      localDB.unarchiveRequest(id, current);
-      return { message: "تم إلغاء أرشفة المعاملة بنجاح" };
+      syncMutation("group_requests", "unarchive", id);
+      return res;
     },
 
     runAutoMaintenance: async (): Promise<{ deletedCount: number; archivedCount: number }> => {
@@ -410,12 +485,16 @@ export const api = {
         notes?: string;
       }
     ): Promise<Traveler> => {
+      let res: Traveler;
       if (isSupabaseConfigured()) {
-        return await supabaseService.travelers.add(requestId, data);
+        res = await supabaseService.travelers.add(requestId, data);
+      } else {
+        await delay();
+        const current = await api.auth.getMe();
+        res = localDB.addTraveler(requestId, data, current);
       }
-      await delay();
-      const current = await api.auth.getMe();
-      return localDB.addTraveler(requestId, data, current);
+      syncMutation("travelers", "add", requestId);
+      return res;
     },
 
     update: async (
@@ -434,9 +513,28 @@ export const api = {
         visaIssueDate?: string;
       }
     ): Promise<Traveler> => {
+      let res: Traveler;
       if (isSupabaseConfigured()) {
         await supabaseService.travelers.update(travelerId, data);
-        return {
+        res = {
+          id: travelerId,
+          groupRequestId: "",
+          fullName: data.fullName || "",
+          passportNumber: data.passportNumber,
+          phoneNumber: data.phoneNumber,
+          nationality: data.nationality,
+          dateOfBirth: data.dateOfBirth,
+          status: "Pending",
+          affiliation: data.affiliation,
+          notes: data.notes,
+          createdAt: new Date().toISOString(),
+          documents: [],
+        };
+      } else {
+        await delay();
+        const current = await api.auth.getMe();
+        const updated = localDB.updateTraveler(travelerId, data, current);
+        res = updated || {
           id: travelerId,
           groupRequestId: "",
           fullName: data.fullName || "",
@@ -451,35 +549,19 @@ export const api = {
           documents: [],
         };
       }
-      await delay();
-      const current = await api.auth.getMe();
-      const updated = localDB.updateTraveler(travelerId, data, current);
-      return (
-        updated || {
-          id: travelerId,
-          groupRequestId: "",
-          fullName: data.fullName || "",
-          passportNumber: data.passportNumber,
-          phoneNumber: data.phoneNumber,
-          nationality: data.nationality,
-          dateOfBirth: data.dateOfBirth,
-          status: "Pending",
-          affiliation: data.affiliation,
-          notes: data.notes,
-          createdAt: new Date().toISOString(),
-          documents: [],
-        }
-      );
+      syncMutation("travelers", "update", travelerId);
+      return res;
     },
 
     delete: async (travelerId: string): Promise<{ message: string }> => {
       if (isSupabaseConfigured()) {
         await supabaseService.travelers.delete(travelerId);
-        return { message: "تم حذف المسافر بنجاح" };
+      } else {
+        await delay();
+        const current = await api.auth.getMe();
+        localDB.deleteTraveler(travelerId, current);
       }
-      await delay();
-      const current = await api.auth.getMe();
-      localDB.deleteTraveler(travelerId, current);
+      syncMutation("travelers", "delete", travelerId);
       return { message: "تم حذف المسافر بنجاح" };
     },
   },
@@ -492,8 +574,18 @@ export const api = {
       travelerId?: string
     ): Promise<DocumentItem> => {
       const current = await api.auth.getMe();
+      let res: DocumentItem;
       if (isSupabaseConfigured()) {
-        return await supabaseService.documents.upload(
+        res = await supabaseService.documents.upload(
+          requestId,
+          file,
+          documentType,
+          travelerId,
+          current
+        );
+      } else {
+        await delay();
+        res = await localDB.uploadDocument(
           requestId,
           file,
           documentType,
@@ -501,14 +593,8 @@ export const api = {
           current
         );
       }
-      await delay();
-      return await localDB.uploadDocument(
-        requestId,
-        file,
-        documentType,
-        travelerId,
-        current
-      );
+      syncMutation("documents", "upload", requestId);
+      return res;
     },
 
     getStreamUrl: async (documentId: string): Promise<string> => {
@@ -520,11 +606,13 @@ export const api = {
 
     delete: async (documentId: string): Promise<void> => {
       if (isSupabaseConfigured()) {
-        return await supabaseService.documents.delete(documentId);
+        await supabaseService.documents.delete(documentId);
+      } else {
+        await delay();
+        const current = await api.auth.getMe();
+        localDB.deleteDocument(documentId, current);
       }
-      await delay();
-      const current = await api.auth.getMe();
-      localDB.deleteDocument(documentId, current);
+      syncMutation("documents", "delete", documentId);
     },
 
     review: async (
@@ -534,11 +622,12 @@ export const api = {
     ): Promise<{ message: string }> => {
       if (isSupabaseConfigured()) {
         await supabaseService.documents.review(documentId, reviewStatus, reviewNote);
-        return { message: "تم تحديث حالة تدقيق المستند بنجاح" };
+      } else {
+        await delay();
+        const current = await api.auth.getMe();
+        localDB.reviewDocument(documentId, reviewStatus, reviewNote, current);
       }
-      await delay();
-      const current = await api.auth.getMe();
-      localDB.reviewDocument(documentId, reviewStatus, reviewNote, current);
+      syncMutation("documents", "review", documentId);
       return { message: "تم تحديث حالة تدقيق المستند بنجاح" };
     },
   },

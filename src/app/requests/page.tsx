@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { GroupRequestSummary, TravelerSummaryItem } from "@/types";
@@ -59,6 +59,7 @@ import {
 } from "@/lib/travelArchiveUtils";
 import { RequestVisaActionButtons } from "@/components/requests/RequestVisaActionButtons";
 import { resolveSenderCode } from "@/lib/groupNaming";
+import { useRealtimeSync } from "@/lib/realtimeSync";
 
 // اقتطاع الاسم الثلاثي فقط (3 مقاطع كحد أقصى)
 function getThreePartName(fullName?: string): string {
@@ -267,21 +268,31 @@ export default function RequestsListPage() {
     }
   }, []);
 
-  const loadRequests = async () => {
+  const loadRequests = async (isInitial = true) => {
     try {
-      setLoading(true);
+      if (isInitial) {
+        setLoading(true);
+      }
       const data = await api.requests.getAll();
       setRequests(data);
       notificationsService.checkAndGenerateUrgentFlightAlerts(data);
     } catch (err) {
       console.error(err);
     } finally {
-      setLoading(false);
+      if (isInitial) {
+        setLoading(false);
+      }
     }
   };
 
+  useRealtimeSync(
+    useCallback(() => {
+      loadRequests(false);
+    }, [])
+  );
+
   useEffect(() => {
-    loadRequests();
+    loadRequests(true);
   }, []);
 
   const copyToClipboard = (nusuk: string, e: React.MouseEvent) => {

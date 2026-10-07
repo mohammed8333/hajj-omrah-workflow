@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useParams } from "react-router-dom";
 import { useAuth } from "@/lib/auth-context";
@@ -89,6 +89,7 @@ import { formatOfficialGroupName, resolveSenderCode } from "@/lib/groupNaming";
 import { downloadFile } from "@/lib/fileDownload";
 import { sendWhatsAppGroupPackage } from "@/lib/whatsappGroupSend";
 import { checkPassportValidity, findDuplicatePassportOrId } from "@/lib/passportValidation";
+import { useRealtimeSync } from "@/lib/realtimeSync";
 
 export default function RequestDetailPage({
   requestId: propRequestId,
@@ -350,11 +351,13 @@ export default function RequestDetailPage({
       }
       const data = await api.requests.getById(requestId);
       setRequest(data);
-      if (data.nusukGroupNumber) {
-        setNusukInput(data.nusukGroupNumber);
-      }
-      if (data.groupName) {
-        setNusukGroupName(data.groupName);
+      if (!showNusukModal && !editingNusuk) {
+        if (data.nusukGroupNumber) {
+          setNusukInput(data.nusukGroupNumber);
+        }
+        if (data.groupName) {
+          setNusukGroupName(data.groupName);
+        }
       }
 
       // If URL contains docId (e.g. clicked from Excel export), auto-open preview modal
@@ -424,6 +427,14 @@ export default function RequestDetailPage({
   useEffect(() => {
     loadRequest(true);
   }, [requestId]);
+
+  useRealtimeSync(
+    useCallback(() => {
+      if (requestId) {
+        loadRequest(false);
+      }
+    }, [requestId])
+  );
 
   const handleFileUpload = async (
     file: File,
