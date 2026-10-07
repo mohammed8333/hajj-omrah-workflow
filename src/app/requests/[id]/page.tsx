@@ -245,19 +245,38 @@ export default function RequestDetailPage({
 
   useEffect(() => {
     let isMounted = true;
+    let createdBlobUrl: string | null = null;
+
     if (previewDoc) {
-      if (previewDoc.storageUrl) {
-        setPreviewDocUrl(previewDoc.storageUrl);
+      const applyUrl = (rawUrl: string | null) => {
+        if (!isMounted) return;
+        if (rawUrl && rawUrl.startsWith("data:application/pdf;base64,")) {
+          try {
+            const bstr = atob(rawUrl.split(",")[1]);
+            let n = bstr.length;
+            const u8arr = new Uint8Array(n);
+            while (n--) {
+              u8arr[n] = bstr.charCodeAt(n);
+            }
+            const blob = new Blob([u8arr], { type: "application/pdf" });
+            createdBlobUrl = URL.createObjectURL(blob);
+            setPreviewDocUrl(createdBlobUrl);
+            setPreviewDocLoading(false);
+            return;
+          } catch {}
+        }
+        setPreviewDocUrl(rawUrl);
         setPreviewDocLoading(false);
+      };
+
+      if (previewDoc.storageUrl) {
+        applyUrl(previewDoc.storageUrl);
       } else {
         setPreviewDocLoading(true);
         api.documents
           .getStreamUrl(previewDoc.id)
           .then((url) => {
-            if (isMounted) {
-              setPreviewDocUrl(url);
-              setPreviewDocLoading(false);
-            }
+            applyUrl(url);
           })
           .catch(() => {
             if (isMounted) {
@@ -272,6 +291,9 @@ export default function RequestDetailPage({
     }
     return () => {
       isMounted = false;
+      if (createdBlobUrl) {
+        URL.revokeObjectURL(createdBlobUrl);
+      }
     };
   }, [previewDoc]);
 

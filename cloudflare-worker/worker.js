@@ -227,13 +227,18 @@ async function handleSearchVisa(data) {
     );
     if (expiryMatch) expiryDate = expiryMatch[1].trim();
 
+    let inlinedHtml = resHtml;
+    try {
+      inlinedHtml = await inlineImages(resHtml, MOFA_BASE_URL, cookie);
+    } catch {}
+
     return new Response(
       JSON.stringify({
         success: true,
         visaNumber,
         issueDate: issueDate || undefined,
         expiryDate: expiryDate || undefined,
-        visaHtml: resHtml,
+        visaHtml: inlinedHtml,
         status: "Issued",
       }),
       { headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
@@ -264,4 +269,68 @@ async function handleSearchVisa(data) {
     }),
     { headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
   );
+}
+
+async function inlineImages(html, baseUrl, cookie) {
+  try {
+    const imgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
+    const matches = [...html.matchAll(imgRegex)];
+    const urlMap = new Map();
+
+    for (const match of matches) {
+      let src = match[1];
+      if (!src || src.startsWith("data:")) continue;
+
+      let fullUrl = src;
+      if (src.startsWith("/")) {
+        fullUrl = baseUrl + src;
+      } else if (!src.startsWith("http")) {
+        fullUrl = baseUrl + "/" + src;
+      }
+
+      if (!urlMap.has(src)) {
+        urlMap.set(src, fullUrl);
+      }
+    }
+
+    if (urlMap.size === 0) return html;
+
+    const fetchPromises = Array.from(urlMap.entries()).map(async ([src, fullUrl]) => {
+      try {
+        const res = await fetch(fullUrl, {
+          headers: {
+            Cookie: cookie || "",
+            Referer: baseUrl + "/visaservices/searchvisa",
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+          },
+        });
+        if (res.ok) {
+          const contentType = res.headers.get("content-type") || "image/png";
+          const buffer = await res.arrayBuffer();
+          const bytes = new Uint8Array(buffer);
+          let binary = "";
+          for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
+          }
+          const b64 = btoa(binary);
+          return { src, dataUrl: `data:${contentType};base64,${b64}` };
+        }
+      } catch (err) {
+        console.warn("Failed to inline image:", fullUrl, err);
+      }
+      return null;
+    });
+
+    const results = await Promise.all(fetchPromises);
+    let updatedHtml = html;
+    for (const item of results) {
+      if (item && item.dataUrl) {
+        updatedHtml = updatedHtml.replaceAll(item.src, item.dataUrl);
+      }
+    }
+    return updatedHtml;
+  } catch {
+    return html;
+  }
 }

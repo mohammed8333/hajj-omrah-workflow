@@ -4,9 +4,10 @@
  * and auto-solves Captchas using Google Gemini Vision AI.
  */
 
-import { Traveler } from "@/types";
+import { Traveler, DocumentItem } from "@/types";
 import { api } from "./api";
 import { callGeminiVision, ensureGeminiApiKey } from "./geminiVision";
+import { generateVisaPdfBlob, generateFallbackVisaPdf } from "./visaPdfGenerator";
 
 export const MOFA_WORKER_URL_KEY = "mofa_visa_worker_url";
 
@@ -207,7 +208,7 @@ export async function attachVisaDocumentToTraveler(
     visaIssueDate: result.issueDate,
   });
 
-  // 2. If visa HTML is returned, save it as a document attached to the traveler
+  // 2. If visa HTML is returned, convert to high-resolution A4 PDF and attach to traveler
   if (result.visaHtml) {
     try {
       const oldVisaDocs = traveler.documents?.filter((d) => d.documentType === "Visa") || [];
@@ -217,9 +218,23 @@ export async function attachVisaDocumentToTraveler(
         } catch {}
       }
 
-      const fileName = `visa-${result.visaNumber || traveler.passportNumber || traveler.id}.html`;
-      const blob = new Blob([result.visaHtml], { type: "text/html;charset=utf-8" });
-      const visaFile = new File([blob], fileName, { type: "text/html", lastModified: Date.now() });
+      const safeName = (traveler.fullName || "traveler").replace(/[\/\\:*?"<>|]/g, "_");
+      const vNum = result.visaNumber || traveler.passportNumber || traveler.id;
+      const fileName = `تأشيرة_${safeName}_${vNum}.pdf`;
+
+      // Convert HTML to real PDF Blob (with fallback if canvas fails)
+      let pdfBlob: Blob;
+      try {
+        pdfBlob = await generateVisaPdfBlob(result.visaHtml, traveler.fullName);
+      } catch (pdfErr) {
+        console.warn("Canvas PDF generation warning, using structured PDF fallback:", pdfErr);
+        pdfBlob = await generateFallbackVisaPdf(result, traveler);
+      }
+
+      const visaFile = new File([pdfBlob], fileName, {
+        type: "application/pdf",
+        lastModified: Date.now(),
+      });
 
       const uploaded = await api.documents.upload(requestId, visaFile, "Visa", traveler.id);
       return uploaded;
@@ -227,8 +242,8 @@ export async function attachVisaDocumentToTraveler(
       console.error("Failed to attach visa document file:", uploadErr);
       throw new Error(
         uploadErr instanceof Error
-          ? `تم جلب التأشيرة لكن تعذر حفظ الملف: ${uploadErr.message}`
-          : "تعذر حفظ مستند التأشيرة"
+          ? `تم جلب التأشيرة لكن تعذر إنشاء أو حفظ ملف الـ PDF: ${uploadErr.message}`
+          : "تعذر حفظ مستند التأشيرة بصيغة PDF"
       );
     }
   }
