@@ -6,7 +6,7 @@
 
 import QRCode from "qrcode";
 import { Traveler } from "@/types";
-import { VISA_ASSETS } from "./visaTemplateAssets";
+import { VISA_ASSETS, preloadVisaAssets } from "./visaTemplateAssets";
 import { generateCode39Svg } from "./barcodeHelper";
 import { convertNationalityToMofaCode } from "./mofaVisaService";
 
@@ -131,6 +131,7 @@ export function generateVisaMrzLines(data: Partial<OfficialVisaData>): { line1: 
  * Extract structured visa data from MOFA response HTML or Traveler record
  */
 export async function extractVisaData(html: string, traveler?: Traveler): Promise<OfficialVisaData> {
+  await preloadVisaAssets();
   const vNumMatch =
     html.match(/رقم التأشيرة[\s\S]*?class=['"][^'"]*col-3-2[^'"]*['"][^>]*>\s*([0-9]{10})\s*<\/div>/i) ||
     html.match(/Visa\s*No\.?[\s\S]*?class=['"][^'"]*col-3-2[^'"]*['"][^>]*>\s*([0-9]{10})\s*<\/div>/i) ||
@@ -286,6 +287,7 @@ export function renderOfficialVisaHtml(data: OfficialVisaData): string {
         background: #ffffff !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
+      }
       .page-container {
         padding: 10mm 15mm 8mm 15mm !important;
         box-shadow: none !important;
@@ -309,61 +311,29 @@ export function renderOfficialVisaHtml(data: OfficialVisaData): string {
       width: 210mm;
       min-height: 297mm;
       max-height: 297mm;
-      background: #ffffff;
+      background-color: #ffffff;
+      background-image: url('${VISA_ASSETS.watermarkPattern}');
+      background-repeat: no-repeat;
+      background-position: center 46%;
+      background-size: 175mm auto;
       padding: 10mm 15mm 8mm 15mm;
       position: relative;
       box-sizing: border-box;
       overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
       direction: ltr; /* Base LTR ensures Left elements stay on the Left and Right stay on Right */
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
     }
-    /* Subtle watermark background */
-    .watermark-bg {
-      position: absolute;
-      top: 48%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 175mm;
-      opacity: 0.085;
-      pointer-events: none;
-      z-index: 0;
-    }
-    .content-layer {
-      position: relative;
-      z-index: 1;
-      height: 100%;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-    }
-    /* Header */
-    .visa-header {
-      display: flex;
-      flex-direction: row;
-      justify-content: space-between;
-      align-items: center;
-      padding-bottom: 4px;
+    table {
+      border-collapse: collapse;
       width: 100%;
     }
-    .visa-header .left-logo img {
-      height: 50px;
-      object-fit: contain;
+    .header-table td {
+      padding: 0;
+      vertical-align: middle;
     }
-    .visa-header .right-logo img {
-      height: 48px;
-      object-fit: contain;
-    }
-    /* Top Section (Photo on Left + Table on Right) */
-    .top-section {
-      display: flex;
-      flex-direction: row;
-      gap: 16px;
-      margin-top: 4px;
-      width: 100%;
-      align-items: stretch;
+    .top-layout-table td {
+      padding: 0;
+      vertical-align: top;
     }
     .photo-box {
       width: 44.5mm;
@@ -372,21 +342,15 @@ export function renderOfficialVisaHtml(data: OfficialVisaData): string {
       border-radius: 4px;
       overflow: hidden;
       background: #f8fafc;
-      flex-shrink: 0;
+      box-sizing: border-box;
     }
     .top-table {
-      flex: 1;
-      border-collapse: collapse;
       width: 100%;
       height: 53.5mm;
     }
     .top-table tr {
       border-bottom: 1px solid #e5e7eb;
       height: 10.7mm;
-    }
-    .top-table td {
-      padding: 1px 6px;
-      vertical-align: middle;
     }
     .top-table td.col-en {
       width: 28%;
@@ -395,6 +359,8 @@ export function renderOfficialVisaHtml(data: OfficialVisaData): string {
       color: #374151;
       font-weight: 500;
       direction: ltr;
+      padding: 1px 6px;
+      vertical-align: middle;
     }
     .top-table td.col-val {
       width: 44%;
@@ -403,6 +369,8 @@ export function renderOfficialVisaHtml(data: OfficialVisaData): string {
       font-weight: 700;
       color: #000000;
       direction: ltr;
+      padding: 1px 6px;
+      vertical-align: middle;
     }
     .top-table td.col-ar {
       width: 28%;
@@ -411,20 +379,18 @@ export function renderOfficialVisaHtml(data: OfficialVisaData): string {
       color: #374151;
       font-weight: 600;
       direction: rtl;
+      padding: 1px 6px;
+      vertical-align: middle;
     }
-    /* Checkmarks Dividers */
+    .divider-box {
+      width: 100%;
+      margin: 3px 0;
+    }
     .divider-checkmarks {
       width: 100%;
       height: 4.2mm;
-      margin: 3px 0;
       display: block;
       object-fit: fill;
-    }
-    /* Middle Table */
-    .middle-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 1px 0;
     }
     .middle-table tr {
       border-bottom: 1px solid #e5e7eb;
@@ -458,54 +424,37 @@ export function renderOfficialVisaHtml(data: OfficialVisaData): string {
       font-weight: 600;
       direction: rtl;
     }
-    /* Barcodes Area */
-    .barcodes-container {
-      margin: 6px 0;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      width: 100%;
+    .barcodes-table {
+      margin: 5px 0;
     }
-    .barcode-row {
-      display: flex;
-      flex-direction: row;
-      align-items: center;
-      justify-content: center;
-      width: 100%;
+    .barcodes-table tr {
+      height: 14mm;
     }
-    .barcode-row .label-en {
-      width: 140px;
+    .barcodes-table td.label-en {
+      width: 25%;
+      text-align: right;
       font-size: 10.5px;
       color: #374151;
       font-weight: 500;
-      text-align: right;
+      direction: ltr;
       padding-right: 22px;
-      direction: ltr;
+      vertical-align: middle;
     }
-    .barcode-row .barcode-center {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
+    .barcodes-table td.barcode-center {
+      width: 50%;
+      text-align: center;
+      vertical-align: middle;
     }
-    .barcode-row .barcode-center .barcode-val {
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 1.5px;
-      margin-top: 2px;
-      color: #000000;
-      direction: ltr;
-    }
-    .barcode-row .label-ar {
-      width: 140px;
+    .barcodes-table td.label-ar {
+      width: 25%;
+      text-align: left;
       font-size: 11px;
       color: #374151;
       font-weight: 600;
-      text-align: left;
-      padding-left: 22px;
       direction: rtl;
+      padding-left: 22px;
+      vertical-align: middle;
     }
-    /* Warnings / Regulations */
     .regulations-box {
       text-align: center;
       margin: 3px 0;
@@ -538,252 +487,201 @@ export function renderOfficialVisaHtml(data: OfficialVisaData): string {
       margin: 1px 0 0 0;
       direction: ltr;
     }
-    /* Footer Area (2 QR codes) */
-    .footer-qr-row {
-      display: flex;
-      flex-direction: row;
-      justify-content: space-between;
-      align-items: center;
-      margin: 3px 0;
-      padding: 0 4px;
-      width: 100%;
+    .footer-table td {
+      vertical-align: middle;
     }
-    .umrah-guide-box img {
-      height: 18mm;
-      object-fit: contain;
+    .mrz-table {
+      margin-top: 5px;
     }
-    .visa-inquiry-box {
-      display: flex;
-      flex-direction: row;
-      align-items: center;
-      gap: 10px;
-    }
-    .visa-inquiry-text {
-      text-align: right;
-      direction: rtl;
-      line-height: 1.3;
-    }
-    .visa-inquiry-text .title-ar {
-      font-size: 11px;
-      font-weight: 800;
-      color: #111827;
-      margin: 0;
-    }
-    .visa-inquiry-text .sub-ar {
-      font-size: 8.5px;
-      color: #6b7280;
-      margin: 0;
-    }
-    .visa-inquiry-text .title-en {
-      font-size: 9.5px;
-      font-weight: 700;
-      color: #111827;
-      margin: 1px 0 0 0;
-      direction: ltr;
-    }
-    .visa-inquiry-text .sub-en {
-      font-size: 8px;
-      color: #6b7280;
-      margin: 0;
-      direction: ltr;
-    }
-    .visa-inquiry-box .qr-img {
-      width: 18mm;
-      height: 18mm;
-      object-fit: contain;
-      border: 1px solid #e5e7eb;
-      border-radius: 2px;
-    }
-    /* MRZ Zone */
-    .mrz-zone {
-      position: relative;
-      width: 100%;
-      text-align: center;
-      margin-top: 6px;
-      padding-top: 2px;
-    }
-    .mrz-text {
-      font-family: 'Courier New', Courier, 'OCR-B', monospace;
-      font-size: 11.2px;
-      font-weight: 700;
-      letter-spacing: 1.2px;
-      color: #111827;
-      direction: ltr;
-      text-align: center;
-      line-height: 1.38;
-      white-space: nowrap;
-    }
-    .hijri-note {
-      position: absolute;
-      right: 4px;
-      top: 1px;
-      font-size: 9.5px;
-      color: #a855f7;
-      font-weight: 500;
-      white-space: nowrap;
-      direction: rtl;
+    .mrz-table td {
+      vertical-align: middle;
     }
   </style>
 </head>
 <body>
   <div class="page-container">
-    <img src="${VISA_ASSETS.watermarkPattern}" class="watermark-bg" alt="Watermark" />
+    <!-- 1. Header Logos -->
+    <table class="header-table" style="margin-bottom: 4px;">
+      <tr>
+        <td style="width: 50%; text-align: left;">
+          <img src="${VISA_ASSETS.ksaVisaHeader}" alt="KSA VISA EVISA" style="height: 48px; object-fit: contain; display: block;" />
+        </td>
+        <td style="width: 50%; text-align: right;">
+          <img src="${VISA_ASSETS.saudiEmblemHeader}" alt="Kingdom of Saudi Arabia" style="height: 46px; object-fit: contain; display: block; margin-left: auto;" />
+        </td>
+      </tr>
+    </table>
 
-    <div class="content-layer">
-      <!-- 1. Header Logos -->
-      <div class="visa-header">
-        <div class="left-logo">
-          <img src="${VISA_ASSETS.ksaVisaHeader}" alt="KSA VISA EVISA" />
-        </div>
-        <div class="right-logo">
-          <img src="${VISA_ASSETS.saudiEmblemHeader}" alt="Kingdom of Saudi Arabia" />
-        </div>
-      </div>
+    <!-- 2. Top Section: Photo + Table -->
+    <table class="top-layout-table" style="margin-top: 4px;">
+      <tr>
+        <td style="width: 44.5mm;">
+          <div class="photo-box">
+            ${photoContent}
+          </div>
+        </td>
+        <td style="width: 16px;"></td>
+        <td>
+          <table class="top-table">
+            <tr>
+              <td class="col-en">Visa No.</td>
+              <td class="col-val">${data.visaNumber}</td>
+              <td class="col-ar">رقم التأشيرة</td>
+            </tr>
+            <tr>
+              <td class="col-en">Valid from</td>
+              <td class="col-val">${data.issueDate}</td>
+              <td class="col-ar">صالحة اعتباراً من</td>
+            </tr>
+            <tr>
+              <td class="col-en">Valid until</td>
+              <td class="col-val">${data.expiryDate}</td>
+              <td class="col-ar">صالحة لغاية</td>
+            </tr>
+            <tr>
+              <td class="col-en">Duration of Stay</td>
+              <td class="col-val">${data.durationOfStay}</td>
+              <td class="col-ar">مدة الإقامة</td>
+            </tr>
+            <tr>
+              <td class="col-en">Passport No.</td>
+              <td class="col-val">${data.passportNumber}</td>
+              <td class="col-ar">رقم الجواز</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
 
-      <!-- 2. Top Section: Photo + First Table -->
-      <div class="top-section">
-        <div class="photo-box">
-          ${photoContent}
-        </div>
-
-        <table class="top-table">
-          <tr>
-            <td class="col-en">Visa No.</td>
-            <td class="col-val">${data.visaNumber}</td>
-            <td class="col-ar">رقم التأشيرة</td>
-          </tr>
-          <tr>
-            <td class="col-en">Valid from</td>
-            <td class="col-val">${data.issueDate}</td>
-            <td class="col-ar">صالحة اعتباراً من</td>
-          </tr>
-          <tr>
-            <td class="col-en">Valid until</td>
-            <td class="col-val">${data.expiryDate}</td>
-            <td class="col-ar">صالحة لغاية</td>
-          </tr>
-          <tr>
-            <td class="col-en">Duration of Stay</td>
-            <td class="col-val">${data.durationOfStay}</td>
-            <td class="col-ar">مدة الإقامة</td>
-          </tr>
-          <tr>
-            <td class="col-en">Passport No.</td>
-            <td class="col-val">${data.passportNumber}</td>
-            <td class="col-ar">رقم الجواز</td>
-          </tr>
-        </table>
-      </div>
-
-      <!-- Divider 1 -->
+    <!-- Divider 1 -->
+    <div class="divider-box">
       <img src="${VISA_ASSETS.checkmarksDivider}" class="divider-checkmarks" alt="Divider" />
-
-      <!-- 3. Middle Section: Full-Width Table -->
-      <table class="middle-table">
-        <tr>
-          <td class="col-en">Place of issue</td>
-          <td class="col-val">${data.placeOfIssue}</td>
-          <td class="col-ar">مصدر التأشيرة</td>
-        </tr>
-        <tr>
-          <td class="col-en">Full Name</td>
-          <td class="col-val">${data.fullName}</td>
-          <td class="col-ar">الإسم</td>
-        </tr>
-        <tr>
-          <td class="col-en">Birth Date</td>
-          <td class="col-val">${data.birthDate}</td>
-          <td class="col-ar">تاريخ الميلاد</td>
-        </tr>
-        <tr>
-          <td class="col-en">Nationality</td>
-          <td class="col-val">${data.nationality}</td>
-          <td class="col-ar">الجنسية</td>
-        </tr>
-        <tr>
-          <td class="col-en">Type Of Visa</td>
-          <td class="col-val">${data.visaType}</td>
-          <td class="col-ar">نوع التأشيرة</td>
-        </tr>
-        <tr>
-          <td class="col-en">Umrah Operator</td>
-          <td class="col-val">${data.umrahOperator}</td>
-          <td class="col-ar">مكتب العمرة</td>
-        </tr>
-        <tr>
-          <td class="col-en">External Agent</td>
-          <td class="col-val">${data.externalAgent}</td>
-          <td class="col-ar">الوكيل الخارجي</td>
-        </tr>
-        <tr>
-          <td class="col-en">Border NO.</td>
-          <td class="col-val">${data.borderNumber || ""}</td>
-          <td class="col-ar">رقم الحدود</td>
-        </tr>
-      </table>
-
-      <!-- 4. Barcodes -->
-      <div class="barcodes-container">
-        <div class="barcode-row">
-          <div class="label-en">Visa No.</div>
-          <div class="barcode-center">
-            ${visaBarcodeSvg}
-            <div class="barcode-val">${data.visaNumber}</div>
-          </div>
-          <div class="label-ar">رقم التأشيرة</div>
-        </div>
-
-        <div class="barcode-row">
-          <div class="label-en">Application No.</div>
-          <div class="barcode-center">
-            ${appBarcodeSvg}
-            <div class="barcode-val">${data.applicationNumber}</div>
-          </div>
-          <div class="label-ar">رقم الطلب</div>
-        </div>
-      </div>
-
-      <!-- 5. Regulatory Warnings -->
-      <div class="regulations-box">
-        <div class="red-ar">غير مصرح بالحج او الدخول الى المملكة العربية السعودية أو البقاء فيها خلال المدة ( من 01 ذي القعدة إلى 14 ذي الحجة )</div>
-        <div class="red-en">Not permitted for Hajj or to enter or stay in the Kingdom of Saudi Arabia during the period ( from 01 Dhu al-Qi'dah to 14 Dhu al-Hijjah)</div>
-        <div class="gray-ar">بعد الدخول الأول يتطلب الحصول على تصريح عمرة مسبق وباقة عمرة مؤكدة من وزارة الحج والعمرة</div>
-        <div class="gray-en">After the first entry, it is required to obtain a prior Umrah permit and a confirmed Umrah package from the Ministry of Hajj and Umrah</div>
-      </div>
-
-      <!-- Divider 2 -->
-      <img src="${VISA_ASSETS.checkmarksDivider}" class="divider-checkmarks" alt="Divider" />
-
-      <!-- 6. Footer QR Codes -->
-      <div class="footer-qr-row">
-        <div class="umrah-guide-box">
-          <img src="${VISA_ASSETS.umrahGuideBox}" alt="Umrah Guide QR" />
-        </div>
-
-        <div class="visa-inquiry-box">
-          <div class="visa-inquiry-text">
-            <div class="title-ar">للإستعلام عن التأشيرة</div>
-            <div class="sub-ar">يرجى مسح رمز الاستجابة السريعة</div>
-            <div class="title-en">For Visa Inquiry</div>
-            <div class="sub-en">Please scan QR code</div>
-          </div>
-          ${
-            data.inquiryQrUrl
-              ? `<img src="${data.inquiryQrUrl}" class="qr-img" alt="Visa Inquiry QR" />`
-              : `<div class="qr-img" style="background:#f3f4f6;"></div>`
-          }
-        </div>
-      </div>
-
-      <!-- 7. MRZ Lines -->
-      <div class="mrz-zone">
-        <div class="mrz-text">
-          <div>${safeMrzLine1}</div>
-          <div>${safeMrzLine2}</div>
-        </div>
-        <div class="hijri-note">* حسب تقويم أم القرى</div>
-      </div>
     </div>
+
+    <!-- 3. Middle Section: Full-Width Table -->
+    <table class="middle-table" style="margin: 1px 0;">
+      <tr>
+        <td class="col-en">Place of issue</td>
+        <td class="col-val">${data.placeOfIssue}</td>
+        <td class="col-ar">مصدر التأشيرة</td>
+      </tr>
+      <tr>
+        <td class="col-en">Full Name</td>
+        <td class="col-val">${data.fullName}</td>
+        <td class="col-ar">الإسم</td>
+      </tr>
+      <tr>
+        <td class="col-en">Birth Date</td>
+        <td class="col-val">${data.birthDate}</td>
+        <td class="col-ar">تاريخ الميلاد</td>
+      </tr>
+      <tr>
+        <td class="col-en">Nationality</td>
+        <td class="col-val">${data.nationality}</td>
+        <td class="col-ar">الجنسية</td>
+      </tr>
+      <tr>
+        <td class="col-en">Type Of Visa</td>
+        <td class="col-val">${data.visaType}</td>
+        <td class="col-ar">نوع التأشيرة</td>
+      </tr>
+      <tr>
+        <td class="col-en">Umrah Operator</td>
+        <td class="col-val">${data.umrahOperator}</td>
+        <td class="col-ar">مكتب العمرة</td>
+      </tr>
+      <tr>
+        <td class="col-en">External Agent</td>
+        <td class="col-val">${data.externalAgent}</td>
+        <td class="col-ar">الوكيل الخارجي</td>
+      </tr>
+      <tr>
+        <td class="col-en">Border NO.</td>
+        <td class="col-val">${data.borderNumber || ""}</td>
+        <td class="col-ar">رقم الحدود</td>
+      </tr>
+    </table>
+
+    <!-- 4. Barcodes -->
+    <table class="barcodes-table">
+      <tr>
+        <td class="label-en">Visa No.</td>
+        <td class="barcode-center">
+          ${visaBarcodeSvg}
+          <div style="font-size: 11px; font-weight: 700; letter-spacing: 1.5px; margin-top: 2px; color: #000000; direction: ltr;">
+            ${data.visaNumber}
+          </div>
+        </td>
+        <td class="label-ar">رقم التأشيرة</td>
+      </tr>
+      <tr>
+        <td class="label-en">Application No.</td>
+        <td class="barcode-center">
+          ${appBarcodeSvg}
+          <div style="font-size: 11px; font-weight: 700; letter-spacing: 1.5px; margin-top: 2px; color: #000000; direction: ltr;">
+            ${data.applicationNumber}
+          </div>
+        </td>
+        <td class="label-ar">رقم الطلب</td>
+      </tr>
+    </table>
+
+    <!-- 5. Regulatory Warnings -->
+    <div class="regulations-box">
+      <div class="red-ar">غير مصرح بالحج او الدخول الى المملكة العربية السعودية أو البقاء فيها خلال المدة ( من 01 ذي القعدة إلى 14 ذي الحجة )</div>
+      <div class="red-en">Not permitted for Hajj or to enter or stay in the Kingdom of Saudi Arabia during the period ( from 01 Dhu al-Qi'dah to 14 Dhu al-Hijjah)</div>
+      <div class="gray-ar">بعد الدخول الأول يتطلب الحصول على تصريح عمرة مسبق وباقة عمرة مؤكدة من وزارة الحج والعمرة</div>
+      <div class="gray-en">After the first entry, it is required to obtain a prior Umrah permit and a confirmed Umrah package from the Ministry of Hajj and Umrah</div>
+    </div>
+
+    <!-- Divider 2 -->
+    <div class="divider-box">
+      <img src="${VISA_ASSETS.checkmarksDivider}" class="divider-checkmarks" alt="Divider" />
+    </div>
+
+    <!-- 6. Footer QR Codes -->
+    <table class="footer-table" style="margin: 3px 0;">
+      <tr>
+        <td style="width: 50%; text-align: left; padding: 0;">
+          <img src="${VISA_ASSETS.umrahGuideBox}" alt="Umrah Guide QR" style="height: 18mm; object-fit: contain; display: block;" />
+        </td>
+        <td style="width: 50%; text-align: right; padding: 0;">
+          <table style="display: inline-table; width: auto; border-collapse: collapse; margin-left: auto;">
+            <tr>
+              <td style="text-align: right; direction: rtl; line-height: 1.3; padding-right: 10px; vertical-align: middle;">
+                <div style="font-size: 11px; font-weight: 800; color: #111827; margin: 0;">للإستعلام عن التأشيرة</div>
+                <div style="font-size: 8.5px; color: #6b7280; margin: 0;">يرجى مسح رمز الاستجابة السريعة</div>
+                <div style="font-size: 9.5px; font-weight: 700; color: #111827; margin: 1px 0 0 0; direction: ltr;">For Visa Inquiry</div>
+                <div style="font-size: 8px; color: #6b7280; margin: 0; direction: ltr;">Please scan QR code</div>
+              </td>
+              <td style="vertical-align: middle; padding: 0;">
+                ${
+                  data.inquiryQrUrl
+                    ? `<img src="${data.inquiryQrUrl}" style="width: 18mm; height: 18mm; object-fit: contain; border: 1px solid #e5e7eb; border-radius: 2px; display: block;" alt="Visa Inquiry QR" />`
+                    : `<div style="width: 18mm; height: 18mm; background:#f3f4f6; border-radius: 2px;"></div>`
+                }
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+
+    <!-- 7. MRZ Lines -->
+    <table class="mrz-table" style="margin-top: 5px;">
+      <tr>
+        <td style="width: 80px; padding: 0;"></td>
+        <td style="text-align: center; vertical-align: middle; padding: 0;">
+          <div style="font-family: 'Courier New', Courier, 'OCR-B', monospace; font-size: 11.2px; font-weight: 700; letter-spacing: 1.2px; color: #111827; direction: ltr; text-align: center; line-height: 1.38; white-space: nowrap;">
+            <div>${safeMrzLine1}</div>
+            <div>${safeMrzLine2}</div>
+          </div>
+        </td>
+        <td style="width: 80px; text-align: right; vertical-align: top; font-size: 9.5px; color: #a855f7; font-weight: 500; white-space: nowrap; direction: rtl; padding: 0 4px 0 0;">
+          * حسب تقويم أم القرى
+        </td>
+      </tr>
+    </table>
   </div>
 </body>
 </html>`;

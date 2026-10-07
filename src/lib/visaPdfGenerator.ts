@@ -35,33 +35,53 @@ export async function generateVisaPdfBlob(
     fullOfficialHtml = extractCleanVisaHtml(visaHtml);
   }
 
-  // 2. Create offscreen container styled specifically for A4 proportions (794px width)
-  const container = document.createElement("div");
-  container.style.position = "fixed";
-  container.style.left = "-9999px";
-  container.style.top = "0";
-  container.style.width = "794px"; // 210mm at 96 DPI
-  container.style.backgroundColor = "#ffffff";
-  container.style.zIndex = "-9999";
-  container.style.direction = "rtl";
-  container.style.boxSizing = "border-box";
-  container.style.padding = "0";
-  container.style.margin = "0";
-
-  container.innerHTML = fullOfficialHtml;
-
-  document.body.appendChild(container);
+  // 2. Create offscreen iframe styled specifically for A4 proportions (794px width)
+  const iframe = document.createElement("iframe");
+  iframe.style.position = "fixed";
+  iframe.style.left = "-9999px";
+  iframe.style.top = "0";
+  iframe.style.width = "794px"; // 210mm at 96 DPI
+  iframe.style.height = "1123px"; // 297mm at 96 DPI
+  iframe.style.border = "none";
+  iframe.style.backgroundColor = "#ffffff";
+  iframe.style.zIndex = "-9999";
+  document.body.appendChild(iframe);
 
   try {
-    // Wait for DOM & images to settle
-    await new Promise((resolve) => setTimeout(resolve, 400));
+    const doc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (!doc) {
+      throw new Error("Unable to access iframe document");
+    }
 
-    const canvas = await html2canvas(container, {
+    doc.open();
+    doc.write(fullOfficialHtml);
+    doc.close();
+
+    // Wait for all images and fonts to finish loading in iframe
+    const images = Array.from(doc.images);
+    await Promise.all(
+      images.map((img) => {
+        if (img.complete) return Promise.resolve();
+        return new Promise<void>((resolve) => {
+          img.onload = () => resolve();
+          img.onerror = () => resolve();
+          setTimeout(resolve, 1500);
+        });
+      })
+    );
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    const targetEl =
+      (doc.querySelector(".page-container") as HTMLElement) || doc.body;
+
+    const canvas = await html2canvas(targetEl, {
       scale: 2, // 2x resolution for ultra-sharp text, emblem, and barcodes
       useCORS: true,
       allowTaint: true,
       backgroundColor: "#ffffff",
       logging: false,
+      width: 794,
+      windowWidth: 794,
     });
 
     const imgData = canvas.toDataURL("image/jpeg", 0.95);
@@ -72,33 +92,13 @@ export async function generateVisaPdfBlob(
       compress: true,
     });
 
-    const pageWidth = 210;
-    const pageHeight = 297;
-    const margin = 6; // 6mm margin
-    const targetWidth = pageWidth - margin * 2; // 198mm
-    const targetHeight = pageHeight - margin * 2; // 285mm
-
-    // Calculate proportional height
-    let renderWidth = targetWidth;
-    let renderHeight = (canvas.height * targetWidth) / canvas.width;
-
-    // Scale down proportionally if it exceeds A4 height to GUARANTEE 1 SINGLE PAGE
-    if (renderHeight > targetHeight) {
-      const scale = targetHeight / renderHeight;
-      renderWidth = renderWidth * scale;
-      renderHeight = targetHeight;
-    }
-
-    const xOffset = margin + (targetWidth - renderWidth) / 2;
-    const yOffset = margin;
-
-    // Draw single-page PDF
-    pdf.addImage(imgData, "JPEG", xOffset, yOffset, renderWidth, renderHeight, undefined, "FAST");
+    // Draw single-page PDF full bleed (0, 0, 210, 297) matching exact A4 dimensions
+    pdf.addImage(imgData, "JPEG", 0, 0, 210, 297, undefined, "FAST");
 
     return pdf.output("blob");
   } finally {
-    if (document.body.contains(container)) {
-      document.body.removeChild(container);
+    if (document.body.contains(iframe)) {
+      document.body.removeChild(iframe);
     }
   }
 }

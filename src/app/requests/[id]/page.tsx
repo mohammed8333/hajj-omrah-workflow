@@ -78,6 +78,7 @@ import {
   convertNationalityToMofaCode,
 } from "@/lib/mofaVisaService";
 import { printVisaDocument, printPdfDocumentUrl } from "@/lib/visaPrintHelper";
+import { generateVisaPdfBlob } from "@/lib/visaPdfGenerator";
 import { useDialog } from "@/lib/dialog-context";
 import { FileDropArea } from "@/components/ui/FileDropArea";
 import { getWhatsAppUrl, getTelUrl, normalizePhone, validateHostPhone, validateTravelerPhone } from "@/lib/phoneUtils";
@@ -251,6 +252,44 @@ export default function RequestDetailPage({
     let createdBlobUrl: string | null = null;
 
     if (previewDoc) {
+      // If it's a Visa document, always generate the fresh, pixel-perfect official Saudi eVisa
+      if (previewDoc.documentType === "Visa") {
+        const trv = request?.travelers.find((t) =>
+          t.documents?.some((d) => d.id === previewDoc.id)
+        );
+        if (trv && (trv.visaNumber || cachedVisaHtmlMap[trv.id])) {
+          setPreviewDocLoading(true);
+          generateVisaPdfBlob(cachedVisaHtmlMap[trv.id] || "", trv)
+            .then((freshBlob) => {
+              if (!isMounted) return;
+              createdBlobUrl = URL.createObjectURL(freshBlob);
+              setPreviewDocUrl(createdBlobUrl);
+              setPreviewDocLoading(false);
+            })
+            .catch(() => {
+              if (isMounted) {
+                if (previewDoc.storageUrl) {
+                  applyUrl(previewDoc.storageUrl);
+                } else {
+                  api.documents
+                    .getStreamUrl(previewDoc.id)
+                    .then(applyUrl)
+                    .catch(() => {
+                      setPreviewDocUrl(null);
+                      setPreviewDocLoading(false);
+                    });
+                }
+              }
+            });
+          return () => {
+            isMounted = false;
+            if (createdBlobUrl) {
+              URL.revokeObjectURL(createdBlobUrl);
+            }
+          };
+        }
+      }
+
       const applyUrl = (rawUrl: string | null) => {
         if (!isMounted) return;
         if (rawUrl && rawUrl.startsWith("data:application/pdf;base64,")) {
@@ -1345,10 +1384,10 @@ export default function RequestDetailPage({
   };
 
   const handlePrintVisa = async (traveler: Traveler) => {
-    // 1. If HTML is cached in memory, print directly with native print helper
+    // 1. Always generate and print the official pixel-perfect template if traveler has visa info
     const cachedHtml = cachedVisaHtmlMap[traveler.id];
-    if (cachedHtml) {
-      printVisaDocument(cachedHtml, traveler);
+    if (traveler.visaNumber || cachedHtml) {
+      printVisaDocument(cachedHtml || "", traveler);
       return;
     }
 
@@ -1448,6 +1487,20 @@ export default function RequestDetailPage({
   const handleDownloadDoc = async (doc: DocumentItem) => {
     try {
       setActionLoading(true);
+      // If it's a Visa document, generate and download the fresh official pixel-perfect PDF
+      if (doc.documentType === "Visa") {
+        const trv = request?.travelers.find((t) =>
+          t.documents?.some((d) => d.id === doc.id)
+        );
+        if (trv && (trv.visaNumber || cachedVisaHtmlMap[trv.id])) {
+          const freshBlob = await generateVisaPdfBlob(cachedVisaHtmlMap[trv.id] || "", trv);
+          const fileName = `تأشيرة_${trv.fullName || "المسافر"}_${trv.visaNumber || "doc"}.pdf`;
+          const blobUrl = URL.createObjectURL(freshBlob);
+          await downloadFile(blobUrl, fileName);
+          URL.revokeObjectURL(blobUrl);
+          return;
+        }
+      }
       const url = doc.storageUrl || (await api.documents.getStreamUrl(doc.id));
       const fileName =
         doc.originalFileName ||
@@ -4546,8 +4599,8 @@ export default function RequestDetailPage({
                         const trv = request?.travelers.find((t) =>
                           t.documents?.some((d) => d.id === previewDoc.id)
                         );
-                        if (trv && cachedVisaHtmlMap[trv.id]) {
-                          printVisaDocument(cachedVisaHtmlMap[trv.id], trv);
+                        if (trv && (trv.visaNumber || cachedVisaHtmlMap[trv.id])) {
+                          printVisaDocument(cachedVisaHtmlMap[trv.id] || "", trv);
                           return;
                         }
                       }
