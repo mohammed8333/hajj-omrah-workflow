@@ -4030,20 +4030,22 @@ export default function RequestDetailPage({
               <span>فحص وتنزيل تأشيرات المجموعة (MOFA) 🇸🇦</span>
             </button>
 
-            <button
-              type="button"
-              onClick={handlePrintAllVisas}
-              disabled={isPrintingAllVisas || request.travelers.length === 0}
-              className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-all"
-              title="طباعة كافة تأشيرات المسافرين الصادرة في هذه المعاملة في ملف واحد (صفحة لكل تأشيرة)"
-            >
-              {isPrintingAllVisas ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <Printer className="w-3.5 h-3.5" />
-              )}
-              <span>طباعة كافة التأشيرات في ملف واحد 🖨️</span>
-            </button>
+            {(request.status === "Completed" || request.status === "Archived") && (
+              <button
+                type="button"
+                onClick={handlePrintAllVisas}
+                disabled={isPrintingAllVisas || request.travelers.length === 0}
+                className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-all"
+                title="طباعة كافة تأشيرات المسافرين الصادرة في هذه المعاملة في ملف واحد (صفحة لكل تأشيرة)"
+              >
+                {isPrintingAllVisas ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Printer className="w-3.5 h-3.5" />
+                )}
+                <span>طباعة كافة التأشيرات في ملف واحد 🖨️</span>
+              </button>
+            )}
 
             <button
               type="button"

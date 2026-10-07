@@ -2041,13 +2041,16 @@ ${travelersLines}
                       </button>
                     </div>
 
-                    {/* التأشيرات: جلب كافة التأشيرات + طباعة الكل في ملف واحد */}
-                    <RequestVisaActionButtons
-                      requestId={r.id}
-                      requestNumber={r.requestNumber}
-                      groupName={r.groupName}
-                      onRefresh={loadData}
-                    />
+                    {/* التأشيرات: جلب كافة التأشيرات + طباعة الكل في ملف واحد (للمعاملات المكتملة فقط) */}
+                    {(r.status === "Completed" || r.status === "Archived") && (
+                      <RequestVisaActionButtons
+                        requestId={r.id}
+                        requestNumber={r.requestNumber}
+                        groupName={r.groupName}
+                        status={r.status}
+                        onRefresh={loadData}
+                      />
+                    )}
 
                     {/* أزرار الإجراءات */}
                     <div className="flex items-center gap-1.5 flex-wrap">
@@ -2795,13 +2798,16 @@ ${travelersLines}
                               </button>
                             </div>
 
-                            {/* التأشيرات: جلب كافة التأشيرات + طباعة الكل في ملف واحد */}
-                            <RequestVisaActionButtons
-                              requestId={r.id}
-                              requestNumber={r.requestNumber}
-                              groupName={r.groupName}
-                              onRefresh={loadData}
-                            />
+                            {/* التأشيرات: جلب كافة التأشيرات + طباعة الكل في ملف واحد (للمعاملات المكتملة فقط) */}
+                            {(r.status === "Completed" || r.status === "Archived") && (
+                              <RequestVisaActionButtons
+                                requestId={r.id}
+                                requestNumber={r.requestNumber}
+                                groupName={r.groupName}
+                                status={r.status}
+                                onRefresh={loadData}
+                              />
+                            )}
 
                             {/* أزرار الإجراء بحسب الدور */}
                             {role === "Sender" && isWaitingHosting(r) && (

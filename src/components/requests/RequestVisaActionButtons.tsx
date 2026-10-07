@@ -14,6 +14,7 @@ interface RequestVisaActionButtonsProps {
   requestId: string;
   requestNumber: string;
   groupName?: string;
+  status?: string;
   onRefresh?: () => Promise<void> | void;
 }
 
@@ -21,8 +22,13 @@ export const RequestVisaActionButtons: React.FC<RequestVisaActionButtonsProps> =
   requestId,
   requestNumber,
   groupName,
+  status,
   onRefresh,
 }) => {
+  if (status && status !== "Completed" && status !== "Archived") {
+    return null;
+  }
+
   const { alert, prompt } = useDialog();
   const [isFetching, setIsFetching] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
