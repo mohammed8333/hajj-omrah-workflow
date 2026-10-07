@@ -58,6 +58,7 @@ import {
   getDefaultActiveWorkflowTab,
 } from "@/lib/travelArchiveUtils";
 import { RequestVisaActionButtons } from "@/components/requests/RequestVisaActionButtons";
+import { resolveSenderCode } from "@/lib/groupNaming";
 
 // اقتطاع الاسم الثلاثي فقط (3 مقاطع كحد أقصى)
 function getThreePartName(fullName?: string): string {
@@ -2281,9 +2282,9 @@ ${travelersLines}
 
                     {/* 7. بيانات المستضيف */}
                     {(role === "SaudiAgent" || role === "SafaEmployee" || role === "Admin") && (
-                      <th className="py-2.5 px-1 w-[95px] min-w-[85px] max-w-[105px]">
-                        <div className="flex items-center justify-between gap-0.5 text-[11px]">
-                          <span className="truncate">المستضيف</span>
+                      <th className="py-2.5 px-2 min-w-[160px] max-w-[185px]">
+                        <div className="flex items-center justify-between gap-1 text-[11px]">
+                          <span>بيانات المستضيف</span>
                           <HeaderColumnFilter
                             title="المستضيف"
                             type="select"
@@ -2298,14 +2299,14 @@ ${travelersLines}
                     )}
 
                     {/* 8. المستندات والإجراء */}
-                    <th className="py-2.5 px-2 text-center min-w-[280px]">
+                    <th className="py-2.5 px-2 text-center w-[185px] min-w-[175px] max-w-[210px]">
                       <div className="flex items-center justify-center gap-1">
                         <span>المستندات والإجراء</span>
                         {activeColFiltersCount > 0 && (
                           <button
                             type="button"
                             onClick={resetColFilters}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-300 rounded-lg cursor-pointer transition-colors shadow-2xs"
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10.5px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-300 rounded-lg cursor-pointer transition-colors shadow-2xs"
                             title="مسح جميع فلاتر الأعمدة"
                           >
                             <RotateCcw className="w-3 h-3" />
@@ -2551,13 +2552,25 @@ ${travelersLines}
 
                         {/* 6. عمود بيانات المستضيف (للوكيل السعودي ولموظف صفا وللأدمن) */}
                         {(role === "SaudiAgent" || role === "SafaEmployee" || role === "Admin") && (
-                          <td className="py-2 px-1 align-middle border-l border-gray-100 w-[95px] min-w-[85px] max-w-[105px]">
-                            <div className="bg-amber-50/40 border border-amber-200/80 rounded-lg p-1.5 text-[10px] space-y-0.5 w-full">
+                          <td className="py-2.5 px-2 align-middle border-l border-gray-100 min-w-[160px] max-w-[185px]">
+                            <div className="bg-amber-50/40 border border-amber-200/80 rounded-xl p-2 text-[11px] space-y-1 w-full min-w-[155px]">
+                              {/* رمز المرسل */}
+                              <div className="flex items-center justify-between gap-1 border-b border-amber-100/90 pb-1 mb-1">
+                                <span className="text-[10px] text-gray-500 font-bold">المرسل:</span>
+                                <span
+                                  className="font-mono font-black text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded text-[10.5px]"
+                                  dir="ltr"
+                                  title={`رمز المرسل: ${r.senderCode || resolveSenderCode({ senderCode: r.senderCode, fullName: r.senderName })}`}
+                                >
+                                  {r.senderCode || resolveSenderCode({ senderCode: r.senderCode, fullName: r.senderName })}
+                                </span>
+                              </div>
+
                               {/* الهوية */}
-                              <div className="flex items-center justify-between gap-0.5 border-b border-amber-100/80 pb-0.5">
-                                <span className="text-gray-500 font-medium text-[9px] shrink-0">الهوية:</span>
-                                <div className="flex items-center gap-0.5 min-w-0">
-                                  <span className="font-mono font-bold text-gray-900 text-[10px] truncate" dir="ltr" title={r.hostNationalId || "-"}>
+                              <div className="flex items-center justify-between gap-1 border-b border-amber-100/80 pb-0.5">
+                                <span className="text-gray-500 font-medium shrink-0">الهوية:</span>
+                                <div className="flex items-center gap-1 min-w-0">
+                                  <span className="font-mono font-bold text-gray-900" dir="ltr" title={r.hostNationalId || "-"}>
                                     {r.hostNationalId || "-"}
                                   </span>
                                   {r.hostNationalId && (
@@ -2568,9 +2581,9 @@ ${travelersLines}
                                       title="نسخ رقم الهوية"
                                     >
                                       {copiedKey === `d-hostId-${r.id}` ? (
-                                        <Check className="w-2.5 h-2.5 text-emerald-600" />
+                                        <Check className="w-3 h-3 text-emerald-600" />
                                       ) : (
-                                        <Copy className="w-2.5 h-2.5" />
+                                        <Copy className="w-3 h-3" />
                                       )}
                                     </button>
                                   )}
@@ -2578,10 +2591,10 @@ ${travelersLines}
                               </div>
 
                               {/* تاريخ الميلاد */}
-                              <div className="flex items-center justify-between gap-0.5 border-b border-amber-100/80 pb-0.5">
-                                <span className="text-gray-500 font-medium text-[9px] shrink-0">الميلاد:</span>
-                                <div className="flex items-center gap-0.5 min-w-0">
-                                  <span className="font-mono font-bold text-gray-900 text-[10px] truncate" dir="ltr" title={r.hostBirthDate || "-"}>
+                              <div className="flex items-center justify-between gap-1 border-b border-amber-100/80 pb-0.5">
+                                <span className="text-gray-500 font-medium shrink-0">الميلاد:</span>
+                                <div className="flex items-center gap-1 min-w-0">
+                                  <span className="font-mono font-bold text-gray-900" dir="ltr" title={r.hostBirthDate || "-"}>
                                     {r.hostBirthDate || "-"}
                                   </span>
                                   {r.hostBirthDate && (
@@ -2592,9 +2605,9 @@ ${travelersLines}
                                       title="نسخ تاريخ الميلاد"
                                     >
                                       {copiedKey === `d-hostBirth-${r.id}` ? (
-                                        <Check className="w-2.5 h-2.5 text-emerald-600" />
+                                        <Check className="w-3 h-3 text-emerald-600" />
                                       ) : (
-                                        <Copy className="w-2.5 h-2.5" />
+                                        <Copy className="w-3 h-3" />
                                       )}
                                     </button>
                                   )}
@@ -2602,10 +2615,10 @@ ${travelersLines}
                               </div>
 
                               {/* هاتف المستضيف */}
-                              <div className="flex items-center justify-between gap-0.5 border-b border-amber-100/80 pb-0.5">
-                                <span className="text-gray-500 font-medium text-[9px] shrink-0">الهاتف:</span>
-                                <div className="flex items-center gap-0.5 min-w-0">
-                                  <span className="font-mono font-bold text-gray-900 text-[10px] truncate" dir="ltr" title={r.hostPhone || (r.hasHosting ? r.contactPhone : "-")}>
+                              <div className="flex items-center justify-between gap-1 border-b border-amber-100/80 pb-0.5">
+                                <span className="text-gray-500 font-medium shrink-0">الهاتف:</span>
+                                <div className="flex items-center gap-1 min-w-0">
+                                  <span className="font-mono font-bold text-gray-900" dir="ltr" title={r.hostPhone || (r.hasHosting ? r.contactPhone : "-")}>
                                     {r.hostPhone || (r.hasHosting ? r.contactPhone : "-")}
                                   </span>
                                   {(r.hostPhone || (r.hasHosting && r.contactPhone)) && (
@@ -2616,9 +2629,9 @@ ${travelersLines}
                                       title="نسخ رقم الهاتف"
                                     >
                                       {copiedKey === `d-hostPhone-${r.id}` ? (
-                                        <Check className="w-2.5 h-2.5 text-emerald-600" />
+                                        <Check className="w-3 h-3 text-emerald-600" />
                                       ) : (
-                                        <Copy className="w-2.5 h-2.5" />
+                                        <Copy className="w-3 h-3" />
                                       )}
                                     </button>
                                   )}
@@ -2626,10 +2639,10 @@ ${travelersLines}
                               </div>
 
                               {/* اسم المستضيف */}
-                              <div className="flex items-center justify-between gap-0.5">
-                                <span className="text-gray-500 font-medium text-[9px] shrink-0">الاسم:</span>
-                                <div className="flex items-center gap-0.5 min-w-0">
-                                  <span className="font-bold text-gray-900 text-[10px] truncate" title={r.hostName || "-"}>
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="text-gray-500 font-medium shrink-0">الاسم:</span>
+                                <div className="flex items-center gap-1 min-w-0">
+                                  <span className="font-bold text-gray-900 truncate max-w-[130px]" title={r.hostName || "-"}>
                                     {r.hostName || "-"}
                                   </span>
                                   {r.hostName && (
@@ -2640,9 +2653,9 @@ ${travelersLines}
                                       title="نسخ اسم المستضيف"
                                     >
                                       {copiedKey === `d-hostName-${r.id}` ? (
-                                        <Check className="w-2.5 h-2.5 text-emerald-600" />
+                                        <Check className="w-3 h-3 text-emerald-600" />
                                       ) : (
-                                        <Copy className="w-2.5 h-2.5" />
+                                        <Copy className="w-3.5 h-3.5" />
                                       )}
                                     </button>
                                   )}
@@ -2653,61 +2666,67 @@ ${travelersLines}
                         )}
 
                         {/* 6. المستندات والإجراء: سطر المستندات بالأعلى وسطر الإجراءات بالأسفل */}
-                        <td className="py-2.5 px-3 align-middle text-center min-w-[280px]">
-                          <div className="flex flex-col items-center justify-center gap-2 w-full">
+                        <td className="py-2.5 px-2 align-middle text-center w-[185px] min-w-[175px] max-w-[210px]">
+                          <div className="flex flex-col items-center justify-center gap-1.5 w-full">
                             {/* السطر الأول: المستندات (التذكرة + الهوية + التأشيرات) */}
-                            <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                              {/* تذكرة الطيران */}
-                              <div className="flex items-center gap-1 bg-sky-50 border border-sky-200 px-2 py-1 rounded-lg shadow-2xs shrink-0">
+                            <div className="flex items-center justify-center gap-1 flex-wrap">
+                              {/* تذكرة الطيران: شارة مقسومة (معاينة طيارة يمين / تحميل يسار) بدون كتابة */}
+                              <div
+                                className="inline-flex items-center bg-white border border-sky-300 rounded-lg shadow-2xs overflow-hidden shrink-0"
+                                title="تذكرة الطيران"
+                              >
                                 <button
                                   type="button"
                                   onClick={(e) => handleViewDoc(r.flightTicketDocumentId, r.flightTicketDocumentUrl, `تذكرة طيران - ${r.groupName}`, e)}
-                                  className={`p-1 text-sky-700 hover:bg-sky-100 rounded-md transition-colors cursor-pointer flex items-center gap-1 shrink-0 ${
-                                    !r.flightTicketDocumentId && !r.flightTicketDocumentUrl ? "opacity-40" : ""
+                                  className={`p-1 px-1.5 text-sky-700 hover:text-sky-900 hover:bg-sky-50 active:bg-sky-100 transition-colors cursor-pointer flex items-center justify-center shrink-0 ${
+                                    !r.flightTicketDocumentId && !r.flightTicketDocumentUrl ? "opacity-35" : ""
                                   }`}
                                   title="معاينة تذكرة الطيران"
                                 >
                                   <Plane className="w-3.5 h-3.5 text-sky-600 shrink-0" />
-                                  <span className="text-[11px] font-bold whitespace-nowrap">التذكرة</span>
                                 </button>
+                                <span className="w-px h-3.5 bg-sky-200 select-none shrink-0" />
                                 <button
                                   type="button"
                                   onClick={(e) => handleDownloadDoc(r.flightTicketDocumentId, r.flightTicketDocumentUrl, `ticket-${r.requestNumber}.pdf`, e)}
-                                  className={`p-1 text-sky-700 hover:bg-sky-100 rounded-md transition-colors cursor-pointer shrink-0 ${
-                                    !r.flightTicketDocumentId && !r.flightTicketDocumentUrl ? "opacity-40" : ""
+                                  className={`p-1 px-1.5 text-sky-700 hover:text-sky-900 hover:bg-sky-50 active:bg-sky-100 transition-colors cursor-pointer flex items-center justify-center shrink-0 ${
+                                    !r.flightTicketDocumentId && !r.flightTicketDocumentUrl ? "opacity-35" : ""
                                   }`}
                                   title="تحميل تذكرة الطيران"
                                 >
-                                  <Download className="w-3.5 h-3.5" />
+                                  <Download className="w-3.5 h-3.5 text-sky-600 shrink-0" />
                                 </button>
                               </div>
 
-                              {/* هوية المستضيف */}
-                              <div className="flex items-center gap-1 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg shadow-2xs shrink-0">
+                              {/* هوية المستضيف: شارة مقسومة (معاينة هوية يمين / تحميل يسار) بدون كتابة */}
+                              <div
+                                className="inline-flex items-center bg-white border border-amber-300 rounded-lg shadow-2xs overflow-hidden shrink-0"
+                                title="هوية المستضيف"
+                              >
                                 <button
                                   type="button"
                                   onClick={(e) => handleViewDoc(r.hostIdDocumentId, r.hostIdDocumentUrl, `هوية المستضيف - ${r.hostName || r.groupName}`, e)}
-                                  className={`p-1 text-amber-800 hover:bg-amber-100 rounded-md transition-colors cursor-pointer flex items-center gap-1 shrink-0 ${
-                                    !r.hostIdDocumentId && !r.hostIdDocumentUrl ? "opacity-40" : ""
+                                  className={`p-1 px-1.5 text-amber-800 hover:text-amber-950 hover:bg-amber-50 active:bg-amber-100 transition-colors cursor-pointer flex items-center justify-center shrink-0 ${
+                                    !r.hostIdDocumentId && !r.hostIdDocumentUrl ? "opacity-35" : ""
                                   }`}
                                   title="معاينة هوية المستضيف"
                                 >
                                   <IdCard className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-                                  <span className="text-[11px] font-bold whitespace-nowrap">الهوية</span>
                                 </button>
+                                <span className="w-px h-3.5 bg-amber-200 select-none shrink-0" />
                                 <button
                                   type="button"
                                   onClick={(e) => handleDownloadDoc(r.hostIdDocumentId, r.hostIdDocumentUrl, `host-id-${r.requestNumber}.jpg`, e)}
-                                  className={`p-1 text-amber-800 hover:bg-amber-100 rounded-md transition-colors cursor-pointer shrink-0 ${
-                                    !r.hostIdDocumentId && !r.hostIdDocumentUrl ? "opacity-40" : ""
+                                  className={`p-1 px-1.5 text-amber-800 hover:text-amber-950 hover:bg-amber-50 active:bg-amber-100 transition-colors cursor-pointer flex items-center justify-center shrink-0 ${
+                                    !r.hostIdDocumentId && !r.hostIdDocumentUrl ? "opacity-35" : ""
                                   }`}
                                   title="تحميل هوية المستضيف"
                                 >
-                                  <Download className="w-3.5 h-3.5" />
+                                  <Download className="w-3.5 h-3.5 text-amber-700 shrink-0" />
                                 </button>
                               </div>
 
-                              {/* التأشيرات: جلب كافة التأشيرات + طباعة الكل في ملف واحد (للمعاملات المكتملة فقط) */}
+                              {/* التأشيرات: جلب كافة التأشيرات + طباعة الكل في ملف واحد (للمعاملات المكتملة والمؤرشفة فقط) */}
                               {(r.status === "Completed" || r.status === "Archived") && (
                                 <RequestVisaActionButtons
                                   requestId={r.id}
@@ -2720,208 +2739,200 @@ ${travelersLines}
                             </div>
 
                             {/* السطر الثاني: أزرار الإجراء بحسب الدور وسير العمل */}
-                            <div className="flex items-center justify-center gap-1.5 flex-wrap pt-1 border-t border-gray-100/90 w-full">
-                            {role === "Sender" && isWaitingHosting(r) && (
-                              <button
-                                type="button"
-                                onClick={(e) => handleAcceptHosting(r, e)}
-                                className="px-3.5 py-1.5 text-xs font-black text-white bg-amber-600 hover:bg-amber-700 active:bg-amber-800 border border-amber-600 rounded-lg cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95 whitespace-nowrap"
-                                title="تأكيد قبول الاستضافة"
-                              >
-                                <Check className="w-3.5 h-3.5 stroke-[3]" />
-                                <span>تم قبول الاستضافة</span>
-                              </button>
-                            )}
+                            <div className="flex items-center justify-center gap-1 flex-wrap pt-1 border-t border-gray-100/90 w-full">
+                              {role === "Sender" && isWaitingHosting(r) && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleAcceptHosting(r, e)}
+                                  className="px-2.5 py-1 text-[11px] font-black text-white bg-amber-600 hover:bg-amber-700 active:bg-amber-800 border border-amber-600 rounded-lg cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95 whitespace-nowrap"
+                                  title="تأكيد قبول الاستضافة"
+                                >
+                                  <Check className="w-3 h-3 stroke-[3]" />
+                                  <span>قبول الاستضافة</span>
+                                </button>
+                              )}
 
-                            {role === "SaudiAgent" && (
-                              r.status === "Archived" ? (
-                                <span className="px-2.5 py-1 text-xs font-bold text-purple-700 bg-purple-50 border border-purple-200 rounded-lg flex items-center gap-1 shadow-2xs whitespace-nowrap">
-                                  <Archive className="w-3.5 h-3.5 text-purple-600" />
-                                  <span>مؤرشفة</span>
-                                </span>
-                              ) : r.status === "Completed" ? (
-                                <div className="flex items-center gap-1">
-                                  <span className="px-2.5 py-1 text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-300 rounded-lg flex items-center gap-1 shadow-2xs whitespace-nowrap">
-                                    <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[3]" />
-                                    <span>مكتملة (تم)</span>
+                              {role === "SaudiAgent" && (
+                                r.status === "Archived" ? (
+                                  <span className="px-2 py-1 text-[11px] font-bold text-purple-700 bg-purple-50 border border-purple-200 rounded-lg flex items-center gap-1 shadow-2xs whitespace-nowrap" title="المعاملة مؤرشفة">
+                                    <Archive className="w-3 h-3 text-purple-600" />
+                                    <span>مؤرشفة</span>
                                   </span>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => handleAgentArchive(r.id, r.requestNumber, e)}
-                                    className="px-2 py-1 text-xs font-bold text-stone-700 bg-stone-100 hover:bg-stone-200 border border-stone-300 rounded-lg cursor-pointer transition-colors flex items-center gap-1 shadow-2xs whitespace-nowrap"
-                                    title="نقل المعاملة إلى الأرشيف"
-                                  >
-                                    <Archive className="w-3.5 h-3.5 text-stone-600" />
-                                    <span>أرشفة</span>
-                                  </button>
-                                </div>
-                              ) : isWaitingHosting(r) ? (
-                                <span className="px-2.5 py-1 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-300 rounded-lg flex items-center gap-1 shadow-2xs whitespace-nowrap">
-                                  <Clock className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
-                                  <span>بانتظار قبول الاستضافة ⏳</span>
-                                </span>
-                              ) : isReadyForPayment(r) ? (
-                                <button
-                                  type="button"
-                                  onClick={(e) => handlePayInvoice(r, e)}
-                                  className="px-3.5 py-1.5 text-xs font-black text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 border border-emerald-600 rounded-lg cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95 whitespace-nowrap"
-                                  title="تأكيد دفع الفاتورة واكتمال المعاملة"
-                                >
-                                  <Check className="w-3.5 h-3.5 stroke-[3]" />
-                                  <span>تم دفع الفاتورة</span>
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={(e) => handleLinkProgram(r, e)}
-                                  className="px-3.5 py-1.5 text-xs font-black text-white bg-purple-600 hover:bg-purple-700 active:bg-purple-800 border border-purple-600 rounded-lg cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95 whitespace-nowrap"
-                                  title="تأكيد ربط البرنامج"
-                                >
-                                  <Check className="w-3.5 h-3.5 stroke-[3]" />
-                                  <span>تم ربط برنامج</span>
-                                </button>
-                              )
-                            )}
-
-                            {role === "Admin" && (
-                              <div className="flex items-center gap-1 flex-wrap">
-                                {r.status === "Archived" ? (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => handleAdminUnarchive(r.id, e)}
-                                    className="px-2.5 py-1 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg cursor-pointer transition-colors flex items-center gap-1 shadow-2xs whitespace-nowrap"
-                                    title="إلغاء الأرشفة"
-                                  >
-                                    <Archive className="w-3.5 h-3.5 text-amber-600" />
-                                    <span>استعادة</span>
-                                  </button>
                                 ) : r.status === "Completed" ? (
-                                  <div className="flex items-center gap-1 flex-wrap">
-                                    <span className="px-2 py-1 text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-300 rounded-lg flex items-center gap-1 shadow-2xs whitespace-nowrap">
-                                      <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[3]" />
+                                  <div className="flex items-center gap-1">
+                                    <span className="px-2 py-1 text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-300 rounded-lg flex items-center gap-1 shadow-2xs whitespace-nowrap">
+                                      <Check className="w-3 h-3 text-emerald-600 stroke-[3]" />
                                       <span>مكتملة</span>
                                     </span>
                                     <button
                                       type="button"
-                                      onClick={(e) => handleRevertInvoicePayment(r, e)}
-                                      className="px-2 py-1 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 active:bg-rose-800 rounded-lg cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95 whitespace-nowrap"
-                                      title="تراجع عن دفع الفاتورة وإعادة المعاملة لانتظار الدفع"
-                                    >
-                                      <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
-                                      <span>تراجع عن الدفع</span>
-                                    </button>
-                                    <button
-                                      type="button"
                                       onClick={(e) => handleAgentArchive(r.id, r.requestNumber, e)}
-                                      className="px-2 py-1 text-xs font-bold text-stone-700 bg-stone-100 hover:bg-stone-200 border border-stone-300 rounded-lg cursor-pointer transition-colors flex items-center gap-1 shadow-2xs whitespace-nowrap"
-                                      title="نقل المعاملة إلى الأرشيف"
+                                      className="p-1.5 text-stone-700 bg-stone-100 hover:bg-stone-200 active:bg-stone-300 border border-stone-300 rounded-lg cursor-pointer transition-colors flex items-center justify-center shadow-2xs shrink-0"
+                                      title="أرشفة المعاملة"
                                     >
                                       <Archive className="w-3.5 h-3.5 text-stone-600" />
-                                      <span>أرشفة</span>
                                     </button>
                                   </div>
                                 ) : isWaitingHosting(r) ? (
-                                  <div className="flex items-center gap-1 flex-wrap">
-                                    <button
-                                      type="button"
-                                      onClick={(e) => handleAcceptHosting(r, e)}
-                                      className="px-2.5 py-1 text-xs font-black text-white bg-amber-600 hover:bg-amber-700 active:bg-amber-800 border border-amber-600 rounded-lg cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95 whitespace-nowrap"
-                                      title="تمرير وقبول الاستضافة"
-                                    >
-                                      <Check className="w-3.5 h-3.5 stroke-[3]" />
-                                      <span>تم قبول الاستضافة</span>
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={(e) => handleRevertProgramLink(r, e)}
-                                      className="px-2 py-1 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 active:bg-rose-800 rounded-lg cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95 whitespace-nowrap"
-                                      title="تراجع عن ربط البرنامج وإعادة المعاملة لانتظار الربط"
-                                    >
-                                      <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
-                                      <span>تراجع عن الربط</span>
-                                    </button>
-                                  </div>
+                                  <span className="px-2 py-1 text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-300 rounded-lg flex items-center gap-1 shadow-2xs whitespace-nowrap">
+                                    <Clock className="w-3 h-3 text-amber-600 animate-pulse" />
+                                    <span>بانتظار الاستضافة</span>
+                                  </span>
                                 ) : isReadyForPayment(r) ? (
-                                  <div className="flex items-center gap-1 flex-wrap">
-                                    <button
-                                      type="button"
-                                      onClick={(e) => handlePayInvoice(r, e)}
-                                      className="px-2.5 py-1 text-xs font-black text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 border border-emerald-600 rounded-lg cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95 whitespace-nowrap"
-                                      title="تأكيد دفع الفاتورة واكتمال المعاملة"
-                                    >
-                                      <Check className="w-3.5 h-3.5 stroke-[3]" />
-                                      <span>دفع الفاتورة</span>
-                                    </button>
-                                    {hasHostingReq(r) ? (
-                                      <button
-                                        type="button"
-                                        onClick={(e) => handleRevertHostingAcceptance(r, e)}
-                                        className="px-2 py-1 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 active:bg-rose-800 rounded-lg cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95 whitespace-nowrap"
-                                        title="تراجع عن قبول الاستضافة وإعادة المعاملة لانتظار قبول الاستضافة"
-                                      >
-                                        <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
-                                        <span>تراجع عن الاستضافة</span>
-                                      </button>
-                                    ) : (
-                                      <button
-                                        type="button"
-                                        onClick={(e) => handleRevertProgramLink(r, e)}
-                                        className="px-2 py-1 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 active:bg-rose-800 rounded-lg cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95 whitespace-nowrap"
-                                        title="تراجع عن ربط البرنامج وإعادة المعاملة لانتظار الربط"
-                                      >
-                                        <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
-                                        <span>تراجع عن الربط</span>
-                                      </button>
-                                    )}
-                                  </div>
-                                ) : isRequestNew(r) ? (
                                   <button
                                     type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setNusukModalRequest(r);
-                                    }}
-                                    className="px-2.5 py-1 text-xs font-black text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 border border-emerald-600 rounded-lg cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95 whitespace-nowrap"
-                                    title="اعتماد رقم نسك وتحويل المعاملة للوكيل السعودي وإرسالها للواتس"
+                                    onClick={(e) => handlePayInvoice(r, e)}
+                                    className="px-2.5 py-1 text-[11px] font-black text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 border border-emerald-600 rounded-lg cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95 whitespace-nowrap"
+                                    title="تأكيد دفع الفاتورة واكتمال المعاملة"
                                   >
-                                    <Building className="w-3.5 h-3.5" />
-                                    <span>اعتماد رقم نسك</span>
+                                    <Check className="w-3 h-3 stroke-[3]" />
+                                    <span>دفع الفاتورة</span>
                                   </button>
                                 ) : (
                                   <button
                                     type="button"
                                     onClick={(e) => handleLinkProgram(r, e)}
-                                    className="px-2.5 py-1 text-xs font-black text-white bg-purple-600 hover:bg-purple-700 active:bg-purple-800 border border-purple-600 rounded-lg cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95 whitespace-nowrap"
+                                    className="px-2.5 py-1 text-[11px] font-black text-white bg-purple-600 hover:bg-purple-700 active:bg-purple-800 border border-purple-600 rounded-lg cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95 whitespace-nowrap"
                                     title="تأكيد ربط البرنامج"
                                   >
-                                    <Check className="w-3.5 h-3.5 stroke-[3]" />
-                                    <span>تم ربط برنامج</span>
+                                    <Check className="w-3 h-3 stroke-[3]" />
+                                    <span>ربط برنامج</span>
                                   </button>
-                                )}
+                                )
+                              )}
 
-                                <button
-                                  type="button"
-                                  onClick={(e) => handleAdminDelete(r.id, r.requestNumber, e)}
-                                  className="p-1.5 text-red-600 hover:bg-red-50 border border-red-200 rounded-lg cursor-pointer transition-colors shrink-0"
-                                  title="مسح المعاملة نهائياً"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            )}
+                              {role === "Admin" && (
+                                <div className="flex items-center gap-1 flex-wrap">
+                                  {r.status === "Archived" ? (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => handleAdminUnarchive(r.id, e)}
+                                      className="p-1.5 text-amber-800 bg-amber-50 hover:bg-amber-100 active:bg-amber-200 border border-amber-200 rounded-lg cursor-pointer transition-colors flex items-center justify-center shadow-2xs shrink-0"
+                                      title="إلغاء الأرشفة واستعادة المعاملة"
+                                    >
+                                      <Archive className="w-3.5 h-3.5 text-amber-600" />
+                                    </button>
+                                  ) : r.status === "Completed" ? (
+                                    <div className="flex items-center gap-1">
+                                      <span className="px-2 py-1 text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-300 rounded-lg flex items-center gap-1 shadow-2xs whitespace-nowrap">
+                                        <Check className="w-3 h-3 text-emerald-600 stroke-[3]" />
+                                        <span>مكتملة</span>
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => handleRevertInvoicePayment(r, e)}
+                                        className="p-1.5 text-rose-700 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 border border-rose-300 rounded-lg cursor-pointer transition-all flex items-center justify-center shadow-2xs hover:shadow-xs active:scale-95 shrink-0"
+                                        title="تراجع عن دفع الفاتورة"
+                                      >
+                                        <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => handleAgentArchive(r.id, r.requestNumber, e)}
+                                        className="p-1.5 text-stone-700 bg-stone-100 hover:bg-stone-200 active:bg-stone-300 border border-stone-300 rounded-lg cursor-pointer transition-colors flex items-center justify-center shadow-2xs shrink-0"
+                                        title="أرشفة المعاملة"
+                                      >
+                                        <Archive className="w-3.5 h-3.5 text-stone-600" />
+                                      </button>
+                                    </div>
+                                  ) : isWaitingHosting(r) ? (
+                                    <div className="flex items-center gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={(e) => handleAcceptHosting(r, e)}
+                                        className="px-2 py-1 text-[11px] font-black text-white bg-amber-600 hover:bg-amber-700 active:bg-amber-800 border border-amber-600 rounded-lg cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95 whitespace-nowrap"
+                                        title="تمرير وقبول الاستضافة"
+                                      >
+                                        <Check className="w-3 h-3 stroke-[3]" />
+                                        <span>قبول الاستضافة</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => handleRevertProgramLink(r, e)}
+                                        className="p-1.5 text-rose-700 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 border border-rose-300 rounded-lg cursor-pointer transition-all flex items-center justify-center shadow-2xs hover:shadow-xs active:scale-95 shrink-0"
+                                        title="تراجع عن ربط البرنامج"
+                                      >
+                                        <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
+                                      </button>
+                                    </div>
+                                  ) : isReadyForPayment(r) ? (
+                                    <div className="flex items-center gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={(e) => handlePayInvoice(r, e)}
+                                        className="px-2 py-1 text-[11px] font-black text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 border border-emerald-600 rounded-lg cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95 whitespace-nowrap"
+                                        title="تأكيد دفع الفاتورة واكتمال المعاملة"
+                                      >
+                                        <Check className="w-3.5 h-3.5 stroke-[3]" />
+                                        <span>دفع الفاتورة</span>
+                                      </button>
+                                      {hasHostingReq(r) ? (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => handleRevertHostingAcceptance(r, e)}
+                                          className="p-1.5 text-rose-700 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 border border-rose-300 rounded-lg cursor-pointer transition-all flex items-center justify-center shadow-2xs hover:shadow-xs active:scale-95 shrink-0"
+                                          title="تراجع عن قبول الاستضافة"
+                                        >
+                                          <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
+                                        </button>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => handleRevertProgramLink(r, e)}
+                                          className="p-1.5 text-rose-700 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 border border-rose-300 rounded-lg cursor-pointer transition-all flex items-center justify-center shadow-2xs hover:shadow-xs active:scale-95 shrink-0"
+                                          title="تراجع عن ربط البرنامج"
+                                        >
+                                          <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
+                                        </button>
+                                      )}
+                                    </div>
+                                  ) : isRequestNew(r) ? (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setNusukModalRequest(r);
+                                      }}
+                                      className="px-2 py-1 text-[11px] font-black text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 border border-emerald-600 rounded-lg cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95 whitespace-nowrap"
+                                      title="اعتماد رقم نسك وتحويل المعاملة للوكيل السعودي وإرسالها للواتس"
+                                    >
+                                      <Building className="w-3.5 h-3.5" />
+                                      <span>اعتماد نسك</span>
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => handleLinkProgram(r, e)}
+                                      className="px-2 py-1 text-[11px] font-black text-white bg-purple-600 hover:bg-purple-700 active:bg-purple-800 border border-purple-600 rounded-lg cursor-pointer transition-all flex items-center gap-1 shadow-xs hover:shadow-sm active:scale-95 whitespace-nowrap"
+                                      title="تأكيد ربط البرنامج"
+                                    >
+                                      <Check className="w-3.5 h-3.5 stroke-[3]" />
+                                      <span>ربط برنامج</span>
+                                    </button>
+                                  )}
 
-                            {/* زر فتح/عرض المعاملة */}
-                            <Link
-                              href={`/requests/${r.id}`}
-                              className="inline-flex items-center gap-1 text-xs font-bold text-gray-700 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 border border-gray-300 px-2.5 py-1.5 rounded-lg transition-colors shadow-2xs cursor-pointer shrink-0"
-                              title="عرض تفاصيل المعاملة"
-                            >
-                              <span>عرض</span>
-                              <ArrowRight className="w-3 h-3 rotate-180" />
-                            </Link>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => handleAdminDelete(r.id, r.requestNumber, e)}
+                                    className="p-1.5 text-red-600 hover:bg-red-50 border border-red-200 rounded-lg cursor-pointer transition-colors shrink-0"
+                                    title="مسح المعاملة نهائياً"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              )}
+
+                              {/* زر فتح/عرض المعاملة: رمز العين فقط مع تلميح */}
+                              <Link
+                                href={`/requests/${r.id}`}
+                                className="p-1.5 text-gray-700 hover:text-blue-900 bg-gray-100 hover:bg-blue-50 active:bg-blue-100 border border-gray-300 hover:border-blue-300 rounded-lg transition-colors shadow-2xs cursor-pointer shrink-0 flex items-center justify-center"
+                                title="عرض تفاصيل المعاملة"
+                              >
+                                <Eye className="w-3.5 h-3.5 text-gray-600 hover:text-blue-700" />
+                              </Link>
+                            </div>
                           </div>
-                        </div>
-                      </td>
+                        </td>
                       </tr>
                     );
                   })}
