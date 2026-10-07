@@ -28,8 +28,14 @@ function autoVersionPlugin() {
         })
       );
     },
-    transformIndexHtml(html: string) {
-      return html.replace(/%APP_BUILD_TIME%/g, String(buildTimestamp));
+    transformIndexHtml: {
+      order: "post" as const,
+      handler(html: string) {
+        let updated = html.replace(/%APP_BUILD_TIME%/g, String(buildTimestamp));
+        updated = updated.replace(/(src=["']\.?\/assets\/[^"']+\.js)(["'])/g, `$1?v=${buildTimestamp}$2`);
+        updated = updated.replace(/(href=["']\.?\/assets\/[^"']+\.css)(["'])/g, `$1?v=${buildTimestamp}$2`);
+        return updated;
+      },
     },
     generateBundle() {
       this.emitFile({
