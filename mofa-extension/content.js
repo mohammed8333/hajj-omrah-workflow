@@ -505,6 +505,9 @@
     if (tb1 && passport) {
       tb1.value = passport;
       tb1.setAttribute("value", passport);
+      tb1.classList.remove("error");
+      tb1.classList.add("valid");
+      tb1.setAttribute("aria-invalid", "false");
       tb1.dispatchEvent(new Event("input", { bubbles: true }));
       tb1.dispatchEvent(new Event("change", { bubbles: true }));
       tb1.style.borderColor = "#10b981";
@@ -519,6 +522,9 @@
     if (tb2 && firstName) {
       tb2.value = firstName;
       tb2.setAttribute("value", firstName);
+      tb2.classList.remove("error");
+      tb2.classList.add("valid");
+      tb2.setAttribute("aria-invalid", "false");
       tb2.dispatchEvent(new Event("input", { bubbles: true }));
       tb2.dispatchEvent(new Event("change", { bubbles: true }));
       tb2.style.borderColor = "#10b981";
@@ -527,16 +533,37 @@
 
     if (natSelect) {
       natSelect.value = targetNat === "EGY" ? "EGY" : targetNat;
+      Array.from(natSelect.options).forEach((opt) => {
+        if (opt.value === targetNat) {
+          opt.selected = true;
+          opt.setAttribute("selected", "selected");
+        } else {
+          opt.selected = false;
+          opt.removeAttribute("selected");
+        }
+      });
+      natSelect.classList.remove("error");
+      natSelect.classList.add("valid");
+      natSelect.setAttribute("aria-invalid", "false");
       natSelect.dispatchEvent(new Event("change", { bubbles: true }));
     }
 
     // تحديث مظهر Select2 v4 إلى "مصر"
     if (natContainer) {
-      natContainer.textContent = "مصر";
       natContainer.setAttribute("title", "مصر");
+      natContainer.setAttribute("aria-readonly", "true");
+      natContainer.innerHTML = '<span class="select2-selection__clear" title="قم بإزالة كل العناصر">×</span>مصر';
     }
 
-    // ب) حقن كود لتنفيذ دالة MRZCode_set الخاصة بالوزارة والتعامل مع jQuery و Select2
+    // إخفاء أي تنبيهات خطأ
+    const errLabels = document.querySelectorAll(
+      'label[for="NationalityId"].error, #NationalityId-error, label[for="tbFirstValue"].error, label[for="tbSecondValue"].error'
+    );
+    errLabels.forEach((el) => {
+      el.style.display = "none";
+    });
+
+    // ب) حقن كود لتطبيق الإعداد على jQuery و Select2 بدون استدعاء MRZCode_set (لتجنب الضغط المبكر على زر الاستعلام)
     try {
       const scriptCode = `
         (function() {
@@ -547,21 +574,62 @@
             var jq = window.jQuery || window.$;
 
             if (jq) {
-              jq('#ddlFirstValue').val('PassPortNo').trigger('change');
-              jq('#tbFirstValue').val(pass).trigger('input').trigger('change');
-
-              jq('#ddlSecondValue').val('fName').trigger('change');
-              jq('#tbSecondValue').val(fn).trigger('input').trigger('change');
-
-              jq('#NationalityId').val(nat).trigger('change');
-              if (typeof jq('#NationalityId').select2 === 'function') {
-                jq('#NationalityId').select2('val', nat);
+              // 1. رقم الجواز
+              var $d1 = jq('#ddlFirstValue');
+              if ($d1.length) $d1.val('PassPortNo').trigger('change');
+              var $t1 = jq('#tbFirstValue');
+              if ($t1.length && pass) {
+                $t1.val(pass).removeClass('error').addClass('valid').attr('aria-invalid', 'false').trigger('input').trigger('change');
               }
-              jq('#select2-NationalityId-container').text('مصر').attr('title', 'مصر');
-            }
 
-            if (typeof window.MRZCode_set === 'function' && pass && fn) {
-              window.MRZCode_set(fn, '', pass, nat);
+              // 2. الاسم الأول
+              var $d2 = jq('#ddlSecondValue');
+              if ($d2.length) $d2.val('fName').trigger('change');
+              var $t2 = jq('#tbSecondValue');
+              if ($t2.length && fn) {
+                $t2.val(fn).removeClass('error').addClass('valid').attr('aria-invalid', 'false').trigger('input').trigger('change');
+              }
+
+              // 3. الجنسية - مصر
+              var $nat = jq('#NationalityId');
+              if ($nat.length) {
+                $nat.val(nat);
+                $nat.find('option').prop('selected', false).removeAttr('selected');
+                $nat.find('option[value="' + nat + '"]').prop('selected', true).attr('selected', 'selected');
+                $nat.removeClass('error').addClass('valid').attr('aria-invalid', 'false');
+                $nat.trigger('change');
+                $nat.trigger('change.select2');
+
+                try {
+                  $nat.trigger({
+                    type: 'select2:select',
+                    params: {
+                      data: { id: nat, text: 'مصر' }
+                    }
+                  });
+                } catch(e) {}
+              }
+
+              // 4. تحديث حاوية Select2 v4
+              var $cont = jq('#select2-NationalityId-container');
+              if ($cont.length) {
+                $cont.attr('title', 'مصر').attr('aria-readonly', 'true');
+                $cont.html('<span class="select2-selection__clear" title="قم بإزالة كل العناصر">×</span>مصر');
+              }
+
+              // 5. إخفاء رسائل الخطأ
+              jq('label[for="NationalityId"].error, #NationalityId-error, label[for="tbFirstValue"].error, label[for="tbSecondValue"].error')
+                .hide()
+                .css('display', 'none');
+
+              try {
+                if (jq('#myform').length && jq('#myform').data('validator')) {
+                  var validator = jq('#myform').data('validator');
+                  if (typeof validator.resetElements === 'function') {
+                    validator.resetElements(jq('#NationalityId, #tbFirstValue, #tbSecondValue'));
+                  }
+                }
+              } catch(e) {}
             }
           } catch(e) {}
         })();
@@ -585,10 +653,28 @@
     }
     const tb1 = document.getElementById("tbFirstValue");
     const ddl1 = document.getElementById("ddlFirstValue");
+    const natSelect = document.getElementById("NationalityId");
+    const natCont = document.getElementById("select2-NationalityId-container");
+
     if (ctx && ctx.passport) {
-      if ((tb1 && tb1.value === "") || (ddl1 && ddl1.value !== "PassPortNo")) {
+      if ((tb1 && tb1.value === "") || (ddl1 && ddl1.value !== "PassPortNo") || (natSelect && natSelect.value !== "EGY")) {
         applyFormFill(ctx);
       }
+    }
+
+    // التأكد من استمرار إخفاء أي تنبيه خطأ وظهور خيار مصر
+    const errNat = document.querySelector('label[for="NationalityId"].error');
+    if (errNat && errNat.style.display !== "none") {
+      errNat.style.display = "none";
+    }
+    if (natCont && !natCont.textContent.includes("مصر")) {
+      natCont.setAttribute("title", "مصر");
+      natCont.setAttribute("aria-readonly", "true");
+      natCont.innerHTML = '<span class="select2-selection__clear" title="قم بإزالة كل العناصر">×</span>مصر';
+    }
+    if (natSelect && natSelect.classList.contains("error")) {
+      natSelect.classList.remove("error");
+      natSelect.classList.add("valid");
     }
   }, 400);
 
