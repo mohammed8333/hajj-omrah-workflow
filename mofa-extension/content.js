@@ -6,6 +6,34 @@
 (function () {
   console.log("🇸🇦 [MOFA Helper] Extension loaded on:", window.location.href);
 
+  // حقن نمط CSS لمنع ظهور أي رسائل خطأ للجنسية نهائياً
+  try {
+    const hideNatErrorStyle = document.createElement("style");
+    hideNatErrorStyle.id = "mofa-hide-nat-error-css";
+    hideNatErrorStyle.textContent = `
+      label[for="NationalityId"],
+      label#NationalityId-error,
+      #NationalityId-error,
+      label.error[for="NationalityId"],
+      .col-md-3 label.error,
+      span[data-valmsg-for="NationalityId"] {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        height: 0 !important;
+        width: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        font-size: 0 !important;
+        line-height: 0 !important;
+        position: absolute !important;
+        left: -9999px !important;
+        pointer-events: none !important;
+      }
+    `;
+    (document.head || document.documentElement).appendChild(hideNatErrorStyle);
+  } catch (e) {}
+
   // 1. استخراج أو استرجاع بيانات المسافر الحالية
   function getContext() {
     let ctx = null;
@@ -481,6 +509,49 @@
     }
   }
 
+  // دالة متقدمة لحذف وإخفاء أي أثر لتنبيه "حقل إجباري" للجنسية
+  function purgeNationalityError() {
+    try {
+      // 1. حذف عناصر أخطاء التحقق الصريحة للجنسية من DOM
+      const errs = document.querySelectorAll(
+        'label[for="NationalityId"], #NationalityId-error, .col-md-3 label.error, span[data-valmsg-for="NationalityId"]'
+      );
+      errs.forEach((el) => {
+        el.style.setProperty("display", "none", "important");
+        el.textContent = "";
+        el.remove();
+      });
+
+      // 2. فحص أي عنصر يحمل نص "حقل إجباري" داخل عمود الجنسية
+      const natContainer = document.getElementById("select2-NationalityId-container");
+      if (natContainer) {
+        const parentCol = natContainer.closest(".col-md-3") || natContainer.closest(".form-group") || natContainer.parentElement;
+        if (parentCol) {
+          parentCol.querySelectorAll("*").forEach((el) => {
+            if (
+              el !== natContainer &&
+              !el.classList.contains("select2-selection__rendered") &&
+              el.textContent &&
+              el.textContent.includes("حقل إجباري")
+            ) {
+              el.style.setProperty("display", "none", "important");
+              el.textContent = "";
+              el.remove();
+            }
+          });
+        }
+      }
+
+      // 3. تأكيد فئة valid على قائمة الجنسية
+      const natSelect = document.getElementById("NationalityId");
+      if (natSelect) {
+        natSelect.classList.remove("error");
+        natSelect.classList.add("valid");
+        natSelect.setAttribute("aria-invalid", "false");
+      }
+    } catch (e) {}
+  }
+
   // 4. تعبئة الحقول الأساسية وتثبيتها ضد محاولات المسح
   function applyFormFill(context) {
     if (!context) return false;
@@ -555,13 +626,7 @@
       natContainer.innerHTML = '<span class="select2-selection__clear" title="قم بإزالة كل العناصر">×</span>مصر';
     }
 
-    // إخفاء أي تنبيهات خطأ
-    const errLabels = document.querySelectorAll(
-      'label[for="NationalityId"].error, #NationalityId-error, label[for="tbFirstValue"].error, label[for="tbSecondValue"].error'
-    );
-    errLabels.forEach((el) => {
-      el.style.display = "none";
-    });
+    purgeNationalityError();
 
     // ب) حقن كود لتطبيق الإعداد على jQuery و Select2 بدون استدعاء MRZCode_set (لتجنب الضغط المبكر على زر الاستعلام)
     try {
@@ -608,6 +673,24 @@
                     }
                   });
                 } catch(e) {}
+
+                // التحقق رسمياً عبر jQuery Validate لإلغاء حالة الخطأ
+                try {
+                  if (jq('#myform').length && typeof jq('#myform').validate === 'function') {
+                    var val = jq('#myform').validate();
+                    if (val) {
+                      if (typeof val.element === 'function') {
+                        val.element($nat);
+                      }
+                      if (val.errorMap) delete val.errorMap['NationalityId'];
+                      if (val.errorList && val.errorList.length) {
+                        val.errorList = val.errorList.filter(function(x) {
+                          return x.element && x.element.id !== 'NationalityId';
+                        });
+                      }
+                    }
+                  }
+                } catch(e) {}
               }
 
               // 4. تحديث حاوية Select2 v4
@@ -617,19 +700,20 @@
                 $cont.html('<span class="select2-selection__clear" title="قم بإزالة كل العناصر">×</span>مصر');
               }
 
-              // 5. إخفاء رسائل الخطأ
-              jq('label[for="NationalityId"].error, #NationalityId-error, label[for="tbFirstValue"].error, label[for="tbSecondValue"].error')
-                .hide()
-                .css('display', 'none');
+              // 5. إزالة رسائل الخطأ من DOM
+              jq('label[for="NationalityId"], #NationalityId-error, .col-md-3 label.error, span[data-valmsg-for="NationalityId"]').each(function() {
+                jq(this).hide().css('display', 'none').text('').remove();
+              });
 
-              try {
-                if (jq('#myform').length && jq('#myform').data('validator')) {
-                  var validator = jq('#myform').data('validator');
-                  if (typeof validator.resetElements === 'function') {
-                    validator.resetElements(jq('#NationalityId, #tbFirstValue, #tbSecondValue'));
-                  }
+              // إزالة أي عنصر يحمل نص "حقل إجباري" داخل عمود الجنسية
+              if ($cont.length) {
+                var $parent = $cont.closest('.col-md-3');
+                if ($parent.length) {
+                  $parent.find('*').filter(function() {
+                    return jq(this).text().indexOf('حقل إجباري') !== -1 && !jq(this).hasClass('select2-selection__rendered');
+                  }).hide().css('display', 'none').text('').remove();
                 }
-              } catch(e) {}
+              }
             }
           } catch(e) {}
         })();
@@ -640,6 +724,7 @@
       scriptEl.remove();
     } catch (e) {}
 
+    purgeNationalityError();
     return true;
   }
 
@@ -647,7 +732,7 @@
   let guardCount = 0;
   const fillGuardTimer = setInterval(() => {
     guardCount++;
-    if (guardCount > 15) {
+    if (guardCount > 40) {
       clearInterval(fillGuardTimer);
       return;
     }
@@ -662,21 +747,14 @@
       }
     }
 
-    // التأكد من استمرار إخفاء أي تنبيه خطأ وظهور خيار مصر
-    const errNat = document.querySelector('label[for="NationalityId"].error');
-    if (errNat && errNat.style.display !== "none") {
-      errNat.style.display = "none";
-    }
+    purgeNationalityError();
+
     if (natCont && !natCont.textContent.includes("مصر")) {
       natCont.setAttribute("title", "مصر");
       natCont.setAttribute("aria-readonly", "true");
       natCont.innerHTML = '<span class="select2-selection__clear" title="قم بإزالة كل العناصر">×</span>مصر';
     }
-    if (natSelect && natSelect.classList.contains("error")) {
-      natSelect.classList.remove("error");
-      natSelect.classList.add("valid");
-    }
-  }, 400);
+  }, 300);
 
   // 5. إنشاء واجهة المساعد العائمة (Widget)
   function renderWidget(context, visaInfo) {
@@ -908,6 +986,7 @@
     if (submitSearchBtn) {
       submitSearchBtn.onclick = () => {
         applyFormFill(context);
+        purgeNationalityError();
         const submitBtn = document.getElementById("btnSubmit");
         if (submitBtn) submitBtn.click();
       };
@@ -1002,9 +1081,10 @@
     }
   }, 1200);
 
-  // مراقبة تحديث الصفحة (ظهور التأشيرة بعد الضغط على استعلام)
+  // مراقبة تحديث الصفحة (ظهور التأشيرة بعد الضغط على استعلام وإزالة أخطاء الجنسية فورياً)
   let lastWasVisa = false;
   const observer = new MutationObserver(() => {
+    purgeNationalityError();
     const vResult = detectVisaResult();
     if (vResult && vResult.isVisa && !lastWasVisa) {
       lastWasVisa = true;

@@ -1,3 +1,24 @@
+/* إخفاء رسالة خطأ الجنسية وأي تنبيهات تحقق على حقول المسافر نهائياً */
+label[for="NationalityId"],
+label#NationalityId-error,
+#NationalityId-error,
+label.error[for="NationalityId"],
+.col-md-3 label.error,
+span[data-valmsg-for="NationalityId"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  height: 0 !important;
+  width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  position: absolute !important;
+  left: -9999px !important;
+  pointer-events: none !important;
+}
+
 /* Assistant Floating Widget Styling */
 #mofa-helper-widget {
   position: fixed;
