@@ -79,6 +79,110 @@ import { sendWhatsAppGroupPackage } from "@/lib/whatsappGroupSend";
 import { checkPassportValidity, findDuplicatePassportOrId } from "@/lib/passportValidation";
 import { useRealtimeSync } from "@/lib/realtimeSync";
 
+export function cleanMofaVisaHtml(rawHtml: string): string {
+  if (!rawHtml || typeof window === "undefined") return rawHtml;
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(rawHtml, "text/html");
+
+    const selectorsToRemove = [
+      "#mofa-helper-widget",
+      ".page-header",
+      ".page-head",
+      ".page-header-top",
+      ".page-header-menu",
+      ".page-header-menu-mobile",
+      ".page-sub-header",
+      ".page-logo",
+      ".hor-menu",
+      ".header-login",
+      ".header-lang",
+      ".banner-beta",
+      ".hidden-print",
+      "#msg",
+      ".pre-footer",
+      ".page-footer",
+      ".footer-logo",
+      ".cookiealert",
+      ".page-loader",
+      "#dvLoader",
+      ".scroll-to-top",
+      "#dlgAlert",
+      "#dlgMessage",
+      ".dropdown-menu",
+      ".modal",
+      "script",
+      "noscript",
+    ];
+
+    selectorsToRemove.forEach((sel) => {
+      doc.querySelectorAll(sel).forEach((el) => el.remove());
+    });
+
+    doc.querySelectorAll("div, footer, section, nav").forEach((el) => {
+      const txt = el.textContent || "";
+      if (
+        (txt.includes("خريطة الموقع") ||
+          txt.includes("خدمات الزوار") ||
+          txt.includes("مواقع مهمة") ||
+          txt.includes("الدعم الفني")) &&
+        !el.querySelector(".evisa-container, .responsive-container")
+      ) {
+        el.remove();
+      }
+    });
+
+    const cleanStyle = doc.createElement("style");
+    cleanStyle.textContent = `
+      @page {
+        size: A4 portrait;
+        margin: 0;
+      }
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #ffffff !important;
+        min-height: 100vh !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: flex-start !important;
+      }
+      .page-container, .page-content, .page-content-inner {
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
+        background: transparent !important;
+      }
+      .responsive-container {
+        margin: 0 auto !important;
+        box-shadow: none !important;
+        width: 100% !important;
+        max-width: 21cm !important;
+      }
+      .banner-beta, .hidden-print, .page-header, .pre-footer, .page-footer, #mofa-helper-widget {
+        display: none !important;
+      }
+      @media print {
+        body {
+          zoom: 1 !important;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+        .responsive-container {
+          width: 100% !important;
+          margin: 0 !important;
+        }
+      }
+    `;
+    doc.head?.appendChild(cleanStyle);
+
+    return "<!DOCTYPE html>\n" + doc.documentElement.outerHTML;
+  } catch (err) {
+    console.warn("Could not clean MOFA visa HTML:", err);
+    return rawHtml;
+  }
+}
+
 export default function RequestDetailPage({
   requestId: propRequestId,
   params,
@@ -251,7 +355,8 @@ export default function RequestDetailPage({
             const htmlText = meta.includes(";base64")
               ? decodeURIComponent(escape(atob(content)))
               : decodeURIComponent(content);
-            const blob = new Blob([htmlText], { type: "text/html;charset=utf-8" });
+            const cleanText = cleanMofaVisaHtml(htmlText);
+            const blob = new Blob([cleanText], { type: "text/html;charset=utf-8" });
             createdBlobUrl = URL.createObjectURL(blob);
             setPreviewDocUrl(createdBlobUrl);
             setPreviewDocLoading(false);
@@ -455,7 +560,8 @@ export default function RequestDetailPage({
             }
           }
 
-          const htmlBlob = new Blob([data.visaHtml], { type: "text/html;charset=utf-8" });
+          const cleanHtml = cleanMofaVisaHtml(data.visaHtml);
+          const htmlBlob = new Blob([cleanHtml], { type: "text/html;charset=utf-8" });
           const safeName = (targetTraveler.passportNumber || targetTraveler.fullName || "mofa").replace(
             /[\/\\:*?"<>|]/g,
             "_"

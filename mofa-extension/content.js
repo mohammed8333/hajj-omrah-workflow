@@ -114,8 +114,111 @@
     return {
       isVisa: true,
       visaNumber: visaNumber || "",
-      html: document.documentElement.outerHTML,
+      html: getCleanVisaHtml(),
     };
+  }
+
+  // دالة استخراج وثيقة التأشيرة النقية بدون عناصر موقع الوزارة (الهيدر، الفوتر، القوائم الجانبية)
+  function getCleanVisaHtml() {
+    try {
+      const clone = document.documentElement.cloneNode(true);
+
+      const selectorsToRemove = [
+        "#mofa-helper-widget",
+        ".page-header",
+        ".page-head",
+        ".page-header-top",
+        ".page-header-menu",
+        ".page-header-menu-mobile",
+        ".page-sub-header",
+        ".page-logo",
+        ".hor-menu",
+        ".header-login",
+        ".header-lang",
+        ".banner-beta",
+        ".hidden-print",
+        "#msg",
+        ".pre-footer",
+        ".page-footer",
+        ".footer-logo",
+        ".cookiealert",
+        ".page-loader",
+        "#dvLoader",
+        ".scroll-to-top",
+        "#dlgAlert",
+        "#dlgMessage",
+        ".dropdown-menu",
+        ".modal",
+        "script",
+        "noscript"
+      ];
+
+      selectorsToRemove.forEach((sel) => {
+        clone.querySelectorAll(sel).forEach((el) => el.remove());
+      });
+
+      clone.querySelectorAll("div, footer, section, nav").forEach((el) => {
+        const txt = el.innerText || el.textContent || "";
+        if (
+          (txt.includes("خريطة الموقع") ||
+            txt.includes("خدمات الزوار") ||
+            txt.includes("مواقع مهمة") ||
+            txt.includes("الدعم الفني")) &&
+          !el.querySelector(".evisa-container, .responsive-container")
+        ) {
+          el.remove();
+        }
+      });
+
+      const cleanStyle = document.createElement("style");
+      cleanStyle.textContent = `
+        @page {
+          size: A4 portrait;
+          margin: 0;
+        }
+        html, body {
+          margin: 0 !important;
+          padding: 0 !important;
+          background: #ffffff !important;
+          min-height: 100vh !important;
+          display: flex !important;
+          justify-content: center !important;
+          align-items: flex-start !important;
+        }
+        .page-container, .page-content, .page-content-inner {
+          padding: 0 !important;
+          margin: 0 !important;
+          width: 100% !important;
+          background: transparent !important;
+        }
+        .responsive-container {
+          margin: 0 auto !important;
+          box-shadow: none !important;
+          width: 100% !important;
+          max-width: 21cm !important;
+        }
+        .banner-beta, .hidden-print, .page-header, .pre-footer, .page-footer, #mofa-helper-widget {
+          display: none !important;
+        }
+        @media print {
+          body {
+            zoom: 1 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          .responsive-container {
+            width: 100% !important;
+            margin: 0 !important;
+          }
+        }
+      `;
+      clone.querySelector("head")?.appendChild(cleanStyle);
+
+      return "<!DOCTYPE html>\\n" + clone.outerHTML;
+    } catch (e) {
+      console.warn("[MOFA Helper] Could not clean visa HTML:", e);
+      return document.documentElement.outerHTML;
+    }
   }
 
   // 3. قارئ الكابتشا الذكي (Canvas OCR) لأرقام التحقق
@@ -743,7 +846,7 @@
           detected = {
             isVisa: true,
             visaNumber: promptNum,
-            html: document.documentElement.outerHTML,
+            html: getCleanVisaHtml(),
           };
         }
         sendVisaToSystem(context, detected);
@@ -760,7 +863,7 @@
       reqId: context ? context.reqId : "",
       passportNumber: context ? context.passport : "",
       visaNumber: visaInfo ? visaInfo.visaNumber : "",
-      visaHtml: visaInfo ? visaInfo.html : document.documentElement.outerHTML,
+      visaHtml: (visaInfo && visaInfo.html) ? visaInfo.html : getCleanVisaHtml(),
       timestamp: Date.now(),
     };
 
