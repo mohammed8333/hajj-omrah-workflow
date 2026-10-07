@@ -2211,7 +2211,7 @@ ${travelersLines}
 
                     {/* 3. المرسل */}
                     {(role === "SafaEmployee" || role === "Admin") && (
-                      <th className="py-2.5 px-1.5 text-center w-[120px] min-w-[105px]">
+                      <th className="py-2.5 px-1.5 text-center w-[90px] min-w-[80px]">
                         <div className="flex items-center justify-center gap-1">
                           <span>المرسل</span>
                           <HeaderColumnFilter
@@ -2424,28 +2424,23 @@ ${travelersLines}
                           {renderWorkflowStatusBadge(r)}
                         </td>
 
-                        {/* 2.5 المرسل (لموظف صفا والأدمن فقط) */}
-                        {(role === "SafaEmployee" || role === "Admin") && (
-                          <td className="py-2.5 px-2 align-middle text-center border-l border-gray-100">
-                            <div className="flex flex-col items-center gap-1 max-w-[140px] mx-auto">
-                              <div className="inline-flex items-center gap-1.5 bg-blue-50/60 border border-blue-200/80 px-2 py-1 rounded-xl shadow-2xs w-full">
-                                <div className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 border border-blue-200 flex items-center justify-center font-bold text-[10px] shrink-0">
-                                  {r.senderName && r.senderName.trim() ? (
-                                    r.senderName.trim().charAt(0)
-                                  ) : (
-                                    <User className="w-3 h-3 text-blue-600" />
-                                  )}
-                                </div>
+                        {/* 2.5 المرسل (لموظف صفا والأدمن فقط): رمز المرسل */}
+                        {(role === "SafaEmployee" || role === "Admin") && (() => {
+                          const sCode = r.senderCode || resolveSenderCode({ senderCode: r.senderCode, fullName: r.senderName });
+                          return (
+                            <td className="py-2.5 px-2 align-middle text-center border-l border-gray-100 w-[90px] min-w-[80px]">
+                              <div className="flex flex-col items-center justify-center gap-1 mx-auto">
                                 <span
-                                  className="font-bold text-blue-950 text-xs truncate block"
-                                  title={r.senderName || "غير محدد"}
+                                  className="font-mono font-black text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md text-[11px] shadow-2xs tracking-wide"
+                                  dir="ltr"
+                                  title={`المرسل: ${r.senderName || sCode}`}
                                 >
-                                  {r.senderName || "غير محدد"}
+                                  {sCode}
                                 </span>
                               </div>
-                            </div>
-                          </td>
-                        )}
+                            </td>
+                          );
+                        })()}
 
                         {/* 3. رحلة الذهاب */}
                         <td className="py-2.5 px-3 align-middle border-l border-gray-100">
@@ -2554,18 +2549,6 @@ ${travelersLines}
                         {(role === "SaudiAgent" || role === "SafaEmployee" || role === "Admin") && (
                           <td className="py-2.5 px-2 align-middle border-l border-gray-100 min-w-[160px] max-w-[185px]">
                             <div className="bg-amber-50/40 border border-amber-200/80 rounded-xl p-2 text-[11px] space-y-1 w-full min-w-[155px]">
-                              {/* رمز المرسل */}
-                              <div className="flex items-center justify-between gap-1 border-b border-amber-100/90 pb-1 mb-1">
-                                <span className="text-[10px] text-gray-500 font-bold">المرسل:</span>
-                                <span
-                                  className="font-mono font-black text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded text-[10.5px]"
-                                  dir="ltr"
-                                  title={`رمز المرسل: ${r.senderCode || resolveSenderCode({ senderCode: r.senderCode, fullName: r.senderName })}`}
-                                >
-                                  {r.senderCode || resolveSenderCode({ senderCode: r.senderCode, fullName: r.senderName })}
-                                </span>
-                              </div>
-
                               {/* الهوية */}
                               <div className="flex items-center justify-between gap-1 border-b border-amber-100/80 pb-0.5">
                                 <span className="text-gray-500 font-medium shrink-0">الهوية:</span>

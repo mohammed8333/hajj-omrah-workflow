@@ -275,7 +275,9 @@ export function matchesColumnFilters(
   // 3. Sender Filter
   if (filters.sender) {
     const sName = (r.senderName || "").trim().toLowerCase();
-    if (sName !== filters.sender.trim().toLowerCase()) {
+    const sCode = (r.senderCode || "").trim().toLowerCase();
+    const target = filters.sender.trim().toLowerCase();
+    if (sName !== target && sCode !== target) {
       return false;
     }
   }
