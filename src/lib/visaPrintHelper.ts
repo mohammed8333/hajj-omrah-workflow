@@ -4,6 +4,16 @@
  * Strips all site banners, modals, errors, and footers.
  */
 
+import {
+  extractVisaData,
+  renderOfficialVisaHtml,
+  renderAllOfficialVisasHtml,
+  OfficialVisaData,
+} from "./officialVisaTemplate";
+import { preloadVisaAssets } from "./visaTemplateAssets";
+import { api } from "./api";
+import { Traveler } from "@/types";
+
 /**
  * Extracts and sanitizes the pure e-visa content from raw MOFA response HTML
  */
@@ -125,17 +135,6 @@ export function extractCleanVisaHtml(fullHtml: string): string {
 
   return found ? found.outerHTML : doc.body.innerHTML;
 }
-
-/**
-import {
-  extractVisaData,
-  renderOfficialVisaHtml,
-  renderAllOfficialVisasHtml,
-  OfficialVisaData,
-} from "./officialVisaTemplate";
-import { preloadVisaAssets } from "./visaTemplateAssets";
-import { api } from "./api";
-import { Traveler } from "@/types";
 
 /**
  * Triggers native browser print formatted specifically for A4 Single-Page official e-visa slip.
