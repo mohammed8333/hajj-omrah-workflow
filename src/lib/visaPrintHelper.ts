@@ -165,52 +165,7 @@ export async function printVisaDocument(
     htmlToPrint = extractCleanVisaHtml(visaHtml);
   }
 
-  // Create isolated hidden iframe for printing
-  const iframe = document.createElement("iframe");
-  iframe.id = "mofa-visa-print-iframe";
-  iframe.style.position = "fixed";
-  iframe.style.right = "0";
-  iframe.style.bottom = "0";
-  iframe.style.width = "0";
-  iframe.style.height = "0";
-  iframe.style.border = "none";
-  iframe.style.visibility = "hidden";
-
-  document.body.appendChild(iframe);
-
-  const frameDoc = iframe.contentWindow?.document || iframe.contentDocument;
-  if (!frameDoc) {
-    console.error("Could not access print iframe document");
-    return;
-  }
-
-  frameDoc.open();
-  frameDoc.write(htmlToPrint);
-  frameDoc.close();
-
-  // Give images & fonts 450ms to settle then trigger browser print
-  setTimeout(() => {
-    try {
-      iframe.contentWindow?.focus();
-      iframe.contentWindow?.print();
-    } catch (e) {
-      console.warn("Direct iframe print failed, trying window fallback:", e);
-      const win = window.open("", "_blank");
-      if (win) {
-        win.document.write(frameDoc.documentElement.outerHTML);
-        win.document.close();
-        win.focus();
-        win.print();
-      }
-    } finally {
-      // Remove iframe after sufficient window time
-      setTimeout(() => {
-        if (document.body.contains(iframe)) {
-          document.body.removeChild(iframe);
-        }
-      }, 60000);
-    }
-  }, 450);
+  printHtmlViaIframe(htmlToPrint);
 }
 
 /**

@@ -46,7 +46,7 @@ const CODE39_MAP: Record<string, string> = {
   "*": "100101101101",
 };
 
-export function generateCode39Svg(text: string, height: number = 38): string {
+export function generateCode39Svg(text: string, height: number = 24): string {
   if (!text) return "";
   const clean = text.toUpperCase().replace(/[^0-9A-Z\-\. ]/g, "");
   const fullText = `*${clean}*`;
@@ -63,8 +63,8 @@ export function generateCode39Svg(text: string, height: number = 38): string {
     }
   }
 
-  // Display width matches aspect ratio
-  const svgWidth = Math.round(binary.length * 1.55);
+  // Exact authentic width matching MOFA's proportion (approx 145px)
+  const svgWidth = 145;
 
   return `<svg viewBox="0 0 ${binary.length} ${height}" width="${svgWidth}" height="${height}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:0 auto;">${rects}</svg>`;
 }
