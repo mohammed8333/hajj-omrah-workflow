@@ -199,11 +199,51 @@ async function handleSearchVisa(data) {
 
   const resHtml = await res.text();
 
-  // 1. Check for Captcha error
+  // 1. Check if Visa document was found (First priority!)
+  const visaMatch =
+    resHtml.match(/رقم التأشيرة[\s\S]*?class=['"][^'"]*col-3-2[^'"]*['"][^>]*>\s*([0-9]{10})\s*<\/div>/i) ||
+    resHtml.match(/Visa\s*No\.?[\s\S]*?class=['"][^'"]*col-3-2[^'"]*['"][^>]*>\s*([0-9]{10})\s*<\/div>/i) ||
+    resHtml.match(/class=['"][^'"]*col-3-2[^'"]*['"][^>]*>\s*([0-9]{10})\s*<\/div>/i) ||
+    resHtml.match(/رقم التأشيرة[^0-9]*([0-9]{10})/i) ||
+    resHtml.match(/Visa\s*No[^0-9]*([0-9]{10})/i);
+
+  const hasVisaDetails =
+    resHtml.includes("evis-content") ||
+    resHtml.includes("evisa") ||
+    (visaMatch && resHtml.includes("col-3-2"));
+
+  if (hasVisaDetails && visaMatch) {
+    const visaNumber = visaMatch[1];
+
+    let issueDate = "";
+    const issueMatch = resHtml.match(
+      /صالحة اعتبار[ا|اً]\s*من[\s\S]*?class=['"][^'"]*col-3-2[^'"]*['"][^>]*>\s*([0-9\/\-\.]+)\s*<\/div>/i
+    );
+    if (issueMatch) issueDate = issueMatch[1].trim();
+
+    let expiryDate = "";
+    const expiryMatch = resHtml.match(
+      /صالحة\s*لغاية[\s\S]*?class=['"][^'"]*col-3-2[^'"]*['"][^>]*>\s*([0-9\/\-\.]+)\s*<\/div>/i
+    );
+    if (expiryMatch) expiryDate = expiryMatch[1].trim();
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        visaNumber,
+        issueDate: issueDate || undefined,
+        expiryDate: expiryDate || undefined,
+        visaHtml: resHtml,
+        status: "Issued",
+      }),
+      { headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
+    );
+  }
+
+  // 2. Check for Captcha error
   if (
-    resHtml.includes("رمز الصورة غير صحيح") ||
-    resHtml.includes("الرجاء إدخال رمز الصورة") ||
-    resHtml.includes("رمز التحقق غير صحيح")
+    resHtml.includes("ShowMessage") &&
+    (resHtml.includes("رمز الصورة غير صحيح") || resHtml.includes("رمز التحقق غير صحيح"))
   ) {
     return new Response(
       JSON.stringify({
@@ -215,51 +255,12 @@ async function handleSearchVisa(data) {
     );
   }
 
-  // 2. Check for Not Found
-  if (
-    resHtml.includes("لم يتم العثور على اي نتائج") ||
-    resHtml.includes("ResultNotFound") ||
-    resHtml.includes("لاتوجد تأشيرة صادرة")
-  ) {
-    return new Response(
-      JSON.stringify({
-        success: false,
-        errorType: "NOT_FOUND",
-        error: "لم يتم العثور على تأشيرة صادرة لهذا الجواز والاسم في منصة التأشيرات.",
-      }),
-      { headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
-    );
-  }
-
-  // 3. Extract Visa Details
-  // Typical 10-digit visa number: e.g. 600xxxxxxx or similar
-  let visaNumber = "";
-  const visaNoMatch = resHtml.match(/رقم التأشيرة[^0-9]*([0-9]{10})/i) ||
-    resHtml.match(/Visa\s*No[^0-9]*([0-9]{10})/i) ||
-    resHtml.match(/([0-9]{10})/);
-
-  if (visaNoMatch) {
-    visaNumber = visaNoMatch[1];
-  }
-
-  // Extract Dates if present
-  let issueDate = "";
-  let expiryDate = "";
-  const issueMatch = resHtml.match(/تاريخ الإصدار[^0-9]*([0-9]{4}[-/][0-9]{2}[-/][0-9]{2})/i);
-  if (issueMatch) issueDate = issueMatch[1];
-
-  const expiryMatch = resHtml.match(/صلاحية التأشيرة[^0-9]*([0-9]{4}[-/][0-9]{2}[-/][0-9]{2})/i);
-  if (expiryMatch) expiryDate = expiryMatch[1];
-
-  // Return success with extracted visa info and full HTML printable document
+  // 3. Fallback: Not Found
   return new Response(
     JSON.stringify({
-      success: true,
-      visaNumber: visaNumber || undefined,
-      issueDate: issueDate || undefined,
-      expiryDate: expiryDate || undefined,
-      visaHtml: resHtml,
-      status: "Issued",
+      success: false,
+      errorType: "NOT_FOUND",
+      error: "لم يتم العثور على تأشيرة صادرة لهذا الجواز والاسم في منصة التأشيرات.",
     }),
     { headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
   );
