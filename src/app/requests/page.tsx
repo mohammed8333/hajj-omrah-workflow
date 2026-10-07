@@ -69,6 +69,14 @@ function getThreePartName(fullName?: string): string {
   return parts.slice(0, 3).join(" ");
 }
 
+// استخراج الاسم الرباعي للمسافر (أو الاسم كاملاً إن كان 4 مقاطع أو أقل)
+function getFourPartName(fullName?: string): string {
+  if (!fullName) return "بدون اسم";
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length <= 4) return fullName.trim();
+  return parts.slice(0, 4).join(" ");
+}
+
 // اقتطاع الاسم الأول والثاني فقط (مقطعين كحد أقصى)
 function getTwoPartName(fullName?: string): string {
   if (!fullName) return "";
@@ -380,13 +388,18 @@ export default function RequestsListPage() {
 
     try {
       const fullReq = await api.requests.getById(requestId);
-      const passportDoc =
+      let passportDoc =
         fullReq.groupDocuments?.find(
           (d) => d.travelerId === traveler.id && d.documentType === "Passport"
         ) ||
         fullReq.travelers
           ?.find((tr) => tr.id === traveler.id)
           ?.documents?.find((d) => d.documentType === "Passport");
+
+      // Fallback: if single traveler or unlinked passport document
+      if (!passportDoc && (!fullReq.travelers || fullReq.travelers.length <= 1)) {
+        passportDoc = fullReq.groupDocuments?.find((d) => d.documentType === "Passport");
+      }
 
       if (passportDoc) {
         handleViewDoc(
@@ -1400,7 +1413,7 @@ ${travelersLines}
               const isCompleted = r.status === "Completed" || r.status === "Archived";
               const matchingTravelers = getMatchingTravelers(r, search);
               const isTravelerMatched = Boolean(search.trim()) && matchingTravelers.length > 0;
-              const currentMobileTab = mobileCardTab[r.id] ?? (isTravelerMatched ? "travelers" : "host");
+              const currentMobileTab = mobileCardTab[r.id] ?? (isTravelerMatched ? "travelers" : (role === "Sender" ? "travelers" : "host"));
               const reqTravelers =
                 r.travelersList && r.travelersList.length > 0
                   ? r.travelersList
@@ -1564,16 +1577,48 @@ ${travelersLines}
                       </div>
                     </div>
 
-                    {/* الجزء الأيسر: بيانات المسافرين لمرسل المعاملات، أو بيانات المستضيف للوكيل السعودي، أو كلاهما عبر تبديل سريع للأدمن وموظف صفا */}
-                    {role === "Sender" ? (
-                      <div className="bg-purple-50/40 border border-purple-200/80 rounded-xl p-2.5 flex flex-col justify-center text-xs overflow-hidden">
-                        <div className="space-y-2 max-h-36 overflow-y-auto pr-0.5">
+                    {/* الجزء الأيسر: تبديل بين المستضيف والمسافرين لجميع المستخدمين */}
+                    <div className="bg-amber-50/20 border border-amber-200/80 rounded-xl p-2 flex flex-col justify-between text-xs overflow-hidden">
+                      {/* التبديل العلوي */}
+                      <div className="flex items-center bg-gray-100/90 p-0.5 rounded-lg mb-1.5 shrink-0 text-[10px] font-bold">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setMobileCardTab((prev) => ({ ...prev, [r.id]: "host" }));
+                          }}
+                          className={`flex-1 py-0.5 text-center rounded-md transition-all cursor-pointer ${
+                            currentMobileTab === "host"
+                              ? "bg-white text-amber-900 shadow-2xs font-extrabold"
+                              : "text-gray-500 hover:text-gray-800"
+                          }`}
+                        >
+                          المستضيف
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setMobileCardTab((prev) => ({ ...prev, [r.id]: "travelers" }));
+                          }}
+                          className={`flex-1 py-0.5 text-center rounded-md transition-all cursor-pointer ${
+                            currentMobileTab === "travelers"
+                              ? "bg-purple-600 text-white shadow-2xs font-extrabold"
+                              : "text-gray-500 hover:text-gray-800"
+                          }`}
+                        >
+                          المسافرين ({reqTravelers.length})
+                        </button>
+                      </div>
+
+                      {currentMobileTab === "travelers" ? (
+                        <div className="space-y-1.5 max-h-32 overflow-y-auto pr-0.5 flex-1">
                           {reqTravelers.map((t, idx) => {
                             const isThisMatched = isTravelerMatch(t, search);
                             return (
                               <div
                                 key={t.id || idx}
-                                className={`flex items-center gap-2 min-w-0 p-1 rounded-lg transition-colors ${
+                                className={`flex items-center gap-1.5 min-w-0 p-1 rounded-lg transition-colors ${
                                   isThisMatched ? "bg-purple-100 ring-2 ring-purple-400" : ""
                                 }`}
                               >
@@ -1582,26 +1627,39 @@ ${travelersLines}
                                     src={t.photoUrl}
                                     alt={t.fullName}
                                     onClick={(e) => handleViewDoc(undefined, t.photoUrl, `صورة المسافر - ${t.fullName}`, e)}
-                                    className="w-8 h-8 rounded-full object-cover border border-purple-300 shrink-0 shadow-2xs cursor-pointer hover:opacity-80 transition-opacity"
+                                    className="w-7 h-7 rounded-full object-cover border border-purple-300 shrink-0 shadow-2xs cursor-pointer hover:opacity-80 transition-opacity"
                                     title="معاينة الصورة"
                                   />
                                 ) : (
-                                  <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-700 border border-purple-200 flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
+                                  <div className="w-7 h-7 rounded-full bg-purple-100 text-purple-700 border border-purple-200 flex items-center justify-center font-bold text-[10px] shrink-0 shadow-2xs">
                                     {t.fullName && t.fullName.trim() ? (
                                       t.fullName.trim().charAt(0)
                                     ) : (
-                                      <User className="w-4 h-4 text-purple-600" />
+                                      <User className="w-3.5 h-3.5 text-purple-600" />
                                     )}
                                   </div>
                                 )}
                                 <div className="min-w-0 flex-1">
                                   <span
-                                    className={`text-xs block truncate leading-tight ${
+                                    onClick={(e) => {
+                                      if (t.passportNumber || t.passportDocumentUrl || t.passportDocumentId) {
+                                        handleViewTravelerPassport(r.id, t, e);
+                                      }
+                                    }}
+                                    className={`text-[11px] block truncate leading-tight ${
+                                      t.passportNumber || t.passportDocumentUrl || t.passportDocumentId
+                                        ? "cursor-pointer hover:text-purple-700"
+                                        : ""
+                                    } ${
                                       isThisMatched ? "font-black text-purple-950" : "font-bold text-gray-900"
                                     }`}
-                                    title={t.fullName}
+                                    title={
+                                      t.passportNumber
+                                        ? `${t.fullName} (اضغط لمعاينة الجواز: ${t.passportNumber})`
+                                        : t.fullName
+                                    }
                                   >
-                                    {t.fullName}
+                                    {getFourPartName(t.fullName)}
                                   </span>
                                   {t.passportNumber && (
                                     <button
@@ -1619,294 +1677,106 @@ ${travelersLines}
                             );
                           })}
                         </div>
-                      </div>
-                    ) : role === "SaudiAgent" ? (
-                      <div className="bg-amber-50/30 border border-amber-200/80 rounded-xl p-2.5 flex flex-col justify-between text-xs space-y-1.5">
-                        {/* 1. رقم الهوية + نسخ */}
-                        <div className="flex items-center justify-between gap-1 border-b border-amber-100 pb-1">
-                          <div className="min-w-0 flex-1">
-                            <span className="text-[10px] text-gray-500 block leading-tight">رقم الهوية:</span>
-                            <span className="font-mono font-bold text-gray-900 text-[11px] truncate block" dir="ltr">
-                              {r.hostNationalId || "-"}
-                            </span>
-                          </div>
-                          {r.hostNationalId && (
-                            <button
-                              type="button"
-                              onClick={(e) => copyText(r.hostNationalId!, `m-hostId-${r.id}`, e)}
-                              className="text-gray-400 hover:text-amber-700 p-1 cursor-pointer shrink-0"
-                              title="نسخ رقم الهوية"
-                            >
-                              {copiedKey === `m-hostId-${r.id}` ? (
-                                <Check className="w-3.5 h-3.5 text-emerald-600" />
-                              ) : (
-                                <Copy className="w-3.5 h-3.5" />
-                              )}
-                            </button>
-                          )}
-                        </div>
-
-                        {/* 2. تاريخ ميلاد المستضيف + نسخ */}
-                        <div className="flex items-center justify-between gap-1 border-b border-amber-100 pb-1">
-                          <div className="min-w-0 flex-1">
-                            <span className="text-[10px] text-gray-500 block leading-tight">تاريخ الميلاد:</span>
-                            <span className="font-mono font-bold text-gray-900 text-[11px] truncate block" dir="ltr">
-                              {r.hostBirthDate || "-"}
-                            </span>
-                          </div>
-                          {r.hostBirthDate && (
-                            <button
-                              type="button"
-                              onClick={(e) => copyText(r.hostBirthDate!, `m-hostBirth-${r.id}`, e)}
-                              className="text-gray-400 hover:text-amber-700 p-1 cursor-pointer shrink-0"
-                              title="نسخ تاريخ الميلاد"
-                            >
-                              {copiedKey === `m-hostBirth-${r.id}` ? (
-                                <Check className="w-3.5 h-3.5 text-emerald-600" />
-                              ) : (
-                                <Copy className="w-3.5 h-3.5" />
-                              )}
-                            </button>
-                          )}
-                        </div>
-
-                        {/* 3. تليفون المستضيف + نسخ */}
-                        <div className="flex items-center justify-between gap-1 border-b border-amber-100 pb-1">
-                          <div className="min-w-0 flex-1">
-                            <span className="text-[10px] text-gray-500 block leading-tight">هاتف المستضيف:</span>
-                            <span className="font-mono font-bold text-gray-900 text-[11px] truncate block" dir="ltr">
-                              {r.hostPhone || (r.hasHosting ? r.contactPhone : "-")}
-                            </span>
-                          </div>
-                          {(r.hostPhone || (r.hasHosting && r.contactPhone)) && (
-                            <button
-                              type="button"
-                              onClick={(e) => copyText(r.hostPhone || r.contactPhone, `m-hostPhone-${r.id}`, e)}
-                              className="text-gray-400 hover:text-amber-700 p-1 cursor-pointer shrink-0"
-                              title="نسخ رقم الهاتف"
-                            >
-                              {copiedKey === `m-hostPhone-${r.id}` ? (
-                                <Check className="w-3.5 h-3.5 text-emerald-600" />
-                              ) : (
-                                <Copy className="w-3.5 h-3.5" />
-                              )}
-                            </button>
-                          )}
-                        </div>
-
-                        {/* 4. اسم المستضيف + نسخ */}
-                        <div className="flex items-center justify-between gap-1">
-                          <div className="min-w-0 flex-1">
-                            <span className="text-[10px] text-gray-500 block leading-tight">اسم المستضيف:</span>
-                            <span className="font-bold text-gray-900 text-[11px] truncate block">
-                              {r.hostName || "-"}
-                            </span>
-                          </div>
-                          {r.hostName && (
-                            <button
-                              type="button"
-                              onClick={(e) => copyText(r.hostName!, `m-hostName-${r.id}`, e)}
-                              className="text-gray-400 hover:text-amber-700 p-1 cursor-pointer shrink-0"
-                              title="نسخ اسم المستضيف"
-                            >
-                              {copiedKey === `m-hostName-${r.id}` ? (
-                                <Check className="w-3.5 h-3.5 text-emerald-600" />
-                              ) : (
-                                <Copy className="w-3.5 h-3.5" />
-                              )}
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      /* موظف صفا والأدمن: تبديل بين المستضيف والمسافرين للحفاظ تماماً على نفس أبعاد الصندوق على الموبايل */
-                      <div className="bg-amber-50/20 border border-amber-200/80 rounded-xl p-2 flex flex-col justify-between text-xs overflow-hidden">
-                        {/* التبديل العلوي */}
-                        <div className="flex items-center bg-gray-100/90 p-0.5 rounded-lg mb-1.5 shrink-0 text-[10px] font-bold">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setMobileCardTab((prev) => ({ ...prev, [r.id]: "host" }));
-                            }}
-                            className={`flex-1 py-0.5 text-center rounded-md transition-all cursor-pointer ${
-                              currentMobileTab === "host"
-                                ? "bg-white text-amber-900 shadow-2xs font-extrabold"
-                                : "text-gray-500 hover:text-gray-800"
-                            }`}
-                          >
-                            المستضيف
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setMobileCardTab((prev) => ({ ...prev, [r.id]: "travelers" }));
-                            }}
-                            className={`flex-1 py-0.5 text-center rounded-md transition-all cursor-pointer ${
-                              currentMobileTab === "travelers"
-                                ? "bg-purple-600 text-white shadow-2xs font-extrabold"
-                                : "text-gray-500 hover:text-gray-800"
-                            }`}
-                          >
-                            المسافرين ({reqTravelers.length})
-                          </button>
-                        </div>
-
-                        {currentMobileTab === "travelers" ? (
-                          <div className="space-y-1.5 max-h-32 overflow-y-auto pr-0.5 flex-1">
-                            {reqTravelers.map((t, idx) => {
-                              const isThisMatched = isTravelerMatch(t, search);
-                              return (
-                                <div
-                                  key={t.id || idx}
-                                  className={`flex items-center gap-1.5 min-w-0 p-1 rounded-lg transition-colors ${
-                                    isThisMatched ? "bg-purple-100 ring-2 ring-purple-400" : ""
-                                  }`}
-                                >
-                                  {t.photoUrl ? (
-                                    <img
-                                      src={t.photoUrl}
-                                      alt={t.fullName}
-                                      onClick={(e) => handleViewDoc(undefined, t.photoUrl, `صورة المسافر - ${t.fullName}`, e)}
-                                      className="w-7 h-7 rounded-full object-cover border border-purple-300 shrink-0 shadow-2xs cursor-pointer hover:opacity-80 transition-opacity"
-                                      title="معاينة الصورة"
-                                    />
-                                  ) : (
-                                    <div className="w-7 h-7 rounded-full bg-purple-100 text-purple-700 border border-purple-200 flex items-center justify-center font-bold text-[10px] shrink-0 shadow-2xs">
-                                      {t.fullName && t.fullName.trim() ? (
-                                        t.fullName.trim().charAt(0)
-                                      ) : (
-                                        <User className="w-3.5 h-3.5 text-purple-600" />
-                                      )}
-                                    </div>
-                                  )}
-                                  <div className="min-w-0 flex-1">
-                                    <span
-                                      className={`text-[11px] block truncate leading-tight ${
-                                        isThisMatched ? "font-black text-purple-950" : "font-bold text-gray-900"
-                                      }`}
-                                      title={t.fullName}
-                                    >
-                                      {t.fullName}
-                                    </span>
-                                    {t.passportNumber && (
-                                      <button
-                                        type="button"
-                                        onClick={(e) => handleViewTravelerPassport(r.id, t, e)}
-                                        className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-sky-700 hover:text-sky-900 hover:underline cursor-pointer transition-colors mt-0.5"
-                                        title="اضغط لمعاينة صورة الجواز المرفوعة"
-                                      >
-                                        <FileText className="w-2.5 h-2.5 text-sky-600 shrink-0" />
-                                        <span dir="ltr">{t.passportNumber}</span>
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <div className="space-y-1 flex-1 flex flex-col justify-between">
-                            {/* 1. رقم الهوية + نسخ */}
-                            <div className="flex items-center justify-between gap-1 border-b border-amber-100/70 pb-0.5">
-                              <div className="min-w-0 flex-1">
-                                <span className="text-[9px] text-gray-500 block leading-tight">الهوية:</span>
-                                <span className="font-mono font-bold text-gray-900 text-[10.5px] truncate block" dir="ltr">
-                                  {r.hostNationalId || "-"}
-                                </span>
-                              </div>
-                              {r.hostNationalId && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => copyText(r.hostNationalId!, `m-hostId-${r.id}`, e)}
-                                  className="text-gray-400 hover:text-amber-700 p-0.5 cursor-pointer shrink-0"
-                                  title="نسخ رقم الهوية"
-                                >
-                                  {copiedKey === `m-hostId-${r.id}` ? (
-                                    <Check className="w-3 h-3 text-emerald-600" />
-                                  ) : (
-                                    <Copy className="w-3 h-3" />
-                                  )}
-                                </button>
-                              )}
+                      ) : (
+                        <div className="space-y-1 flex-1 flex flex-col justify-between">
+                          {/* 1. رقم الهوية + نسخ */}
+                          <div className="flex items-center justify-between gap-1 border-b border-amber-100/70 pb-0.5">
+                            <div className="min-w-0 flex-1">
+                              <span className="text-[9px] text-gray-500 block leading-tight">الهوية:</span>
+                              <span className="font-mono font-bold text-gray-900 text-[10.5px] truncate block" dir="ltr">
+                                {r.hostNationalId || "-"}
+                              </span>
                             </div>
-
-                            {/* 2. تاريخ ميلاد المستضيف + نسخ */}
-                            <div className="flex items-center justify-between gap-1 border-b border-amber-100/70 pb-0.5">
-                              <div className="min-w-0 flex-1">
-                                <span className="text-[9px] text-gray-500 block leading-tight">الميلاد:</span>
-                                <span className="font-mono font-bold text-gray-900 text-[10.5px] truncate block" dir="ltr">
-                                  {r.hostBirthDate || "-"}
-                                </span>
-                              </div>
-                              {r.hostBirthDate && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => copyText(r.hostBirthDate!, `m-hostBirth-${r.id}`, e)}
-                                  className="text-gray-400 hover:text-amber-700 p-0.5 cursor-pointer shrink-0"
-                                  title="نسخ تاريخ الميلاد"
-                                >
-                                  {copiedKey === `m-hostBirth-${r.id}` ? (
-                                    <Check className="w-3 h-3 text-emerald-600" />
-                                  ) : (
-                                    <Copy className="w-3 h-3" />
-                                  )}
-                                </button>
-                              )}
-                            </div>
-
-                            {/* 3. تليفون المستضيف + نسخ */}
-                            <div className="flex items-center justify-between gap-1 border-b border-amber-100/70 pb-0.5">
-                              <div className="min-w-0 flex-1">
-                                <span className="text-[9px] text-gray-500 block leading-tight">الهاتف:</span>
-                                <span className="font-mono font-bold text-gray-900 text-[10.5px] truncate block" dir="ltr">
-                                  {r.hostPhone || (r.hasHosting ? r.contactPhone : "-")}
-                                </span>
-                              </div>
-                              {(r.hostPhone || (r.hasHosting && r.contactPhone)) && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => copyText(r.hostPhone || r.contactPhone, `m-hostPhone-${r.id}`, e)}
-                                  className="text-gray-400 hover:text-amber-700 p-0.5 cursor-pointer shrink-0"
-                                  title="نسخ رقم الهاتف"
-                                >
-                                  {copiedKey === `m-hostPhone-${r.id}` ? (
-                                    <Check className="w-3 h-3 text-emerald-600" />
-                                  ) : (
-                                    <Copy className="w-3 h-3" />
-                                  )}
-                                </button>
-                              )}
-                            </div>
-
-                            {/* 4. اسم المستضيف + نسخ */}
-                            <div className="flex items-center justify-between gap-1">
-                              <div className="min-w-0 flex-1">
-                                <span className="text-[9px] text-gray-500 block leading-tight">الاسم:</span>
-                                <span className="font-bold text-gray-900 text-[10.5px] truncate block">
-                                  {r.hostName || "-"}
-                                </span>
-                              </div>
-                              {r.hostName && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => copyText(r.hostName!, `m-hostName-${r.id}`, e)}
-                                  className="text-gray-400 hover:text-amber-700 p-0.5 cursor-pointer shrink-0"
-                                  title="نسخ اسم المستضيف"
-                                >
-                                  {copiedKey === `m-hostName-${r.id}` ? (
-                                    <Check className="w-3 h-3 text-emerald-600" />
-                                  ) : (
-                                    <Copy className="w-3.5 h-3.5" />
-                                  )}
-                                </button>
-                              )}
-                            </div>
+                            {r.hostNationalId && (
+                              <button
+                                type="button"
+                                onClick={(e) => copyText(r.hostNationalId!, `m-hostId-${r.id}`, e)}
+                                className="text-gray-400 hover:text-amber-700 p-0.5 cursor-pointer shrink-0"
+                                title="نسخ رقم الهوية"
+                              >
+                                {copiedKey === `m-hostId-${r.id}` ? (
+                                  <Check className="w-3 h-3 text-emerald-600" />
+                                ) : (
+                                  <Copy className="w-3 h-3" />
+                                )}
+                              </button>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    )}
+
+                          {/* 2. تاريخ ميلاد المستضيف + نسخ */}
+                          <div className="flex items-center justify-between gap-1 border-b border-amber-100/70 pb-0.5">
+                            <div className="min-w-0 flex-1">
+                              <span className="text-[9px] text-gray-500 block leading-tight">الميلاد:</span>
+                              <span className="font-mono font-bold text-gray-900 text-[10.5px] truncate block" dir="ltr">
+                                {r.hostBirthDate || "-"}
+                              </span>
+                            </div>
+                            {r.hostBirthDate && (
+                              <button
+                                type="button"
+                                onClick={(e) => copyText(r.hostBirthDate!, `m-hostBirth-${r.id}`, e)}
+                                className="text-gray-400 hover:text-amber-700 p-0.5 cursor-pointer shrink-0"
+                                title="نسخ تاريخ الميلاد"
+                              >
+                                {copiedKey === `m-hostBirth-${r.id}` ? (
+                                  <Check className="w-3 h-3 text-emerald-600" />
+                                ) : (
+                                  <Copy className="w-3 h-3" />
+                                )}
+                              </button>
+                            )}
+                          </div>
+
+                          {/* 3. تليفون المستضيف + نسخ */}
+                          <div className="flex items-center justify-between gap-1 border-b border-amber-100/70 pb-0.5">
+                            <div className="min-w-0 flex-1">
+                              <span className="text-[9px] text-gray-500 block leading-tight">الهاتف:</span>
+                              <span className="font-mono font-bold text-gray-900 text-[10.5px] truncate block" dir="ltr">
+                                {r.hostPhone || (r.hasHosting ? r.contactPhone : "-")}
+                              </span>
+                            </div>
+                            {(r.hostPhone || (r.hasHosting && r.contactPhone)) && (
+                              <button
+                                type="button"
+                                onClick={(e) => copyText(r.hostPhone || r.contactPhone, `m-hostPhone-${r.id}`, e)}
+                                className="text-gray-400 hover:text-amber-700 p-0.5 cursor-pointer shrink-0"
+                                title="نسخ رقم الهاتف"
+                              >
+                                {copiedKey === `m-hostPhone-${r.id}` ? (
+                                  <Check className="w-3 h-3 text-emerald-600" />
+                                ) : (
+                                  <Copy className="w-3 h-3" />
+                                )}
+                              </button>
+                            )}
+                          </div>
+
+                          {/* 4. اسم المستضيف + نسخ */}
+                          <div className="flex items-center justify-between gap-1">
+                            <div className="min-w-0 flex-1">
+                              <span className="text-[9px] text-gray-500 block leading-tight">الاسم:</span>
+                              <span className="font-bold text-gray-900 text-[10.5px] truncate block">
+                                {r.hostName || "-"}
+                              </span>
+                            </div>
+                            {r.hostName && (
+                              <button
+                                type="button"
+                                onClick={(e) => copyText(r.hostName!, `m-hostName-${r.id}`, e)}
+                                className="text-gray-400 hover:text-amber-700 p-0.5 cursor-pointer shrink-0"
+                                title="نسخ اسم المستضيف"
+                              >
+                                {copiedKey === `m-hostName-${r.id}` ? (
+                                  <Check className="w-3 h-3 text-emerald-600" />
+                                ) : (
+                                  <Copy className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* الشريط السفلي: تذكرة جنبها الهوية جنبها تم والأزرار */}
@@ -2274,40 +2144,36 @@ ${travelersLines}
                     </th>
 
                     {/* 6. بيانات المسافرين */}
-                    {(role === "Sender" || role === "SafaEmployee" || role === "Admin") && (
-                      <th className="py-2.5 px-2 min-w-[155px]">
-                        <div className="flex items-center justify-between gap-1">
-                          <span>بيانات المسافرين</span>
-                          <HeaderColumnFilter
-                            title="المسافرين"
-                            type="text"
-                            value={colFilters.traveler}
-                            onChange={(v) => handleColFilterChange("traveler", v)}
-                            onClear={() => handleColFilterChange("traveler", "")}
-                            placeholder="اسم المعتمر / الجواز..."
-                            align="right"
-                          />
-                        </div>
-                      </th>
-                    )}
+                    <th className="py-2.5 px-2 min-w-[170px] max-w-[210px]">
+                      <div className="flex items-center justify-between gap-1">
+                        <span>بيانات المسافرين</span>
+                        <HeaderColumnFilter
+                          title="المسافرين"
+                          type="text"
+                          value={colFilters.traveler}
+                          onChange={(v) => handleColFilterChange("traveler", v)}
+                          onClear={() => handleColFilterChange("traveler", "")}
+                          placeholder="اسم المعتمر / الجواز..."
+                          align="right"
+                        />
+                      </div>
+                    </th>
 
                     {/* 7. بيانات المستضيف */}
-                    {(role === "SaudiAgent" || role === "SafaEmployee" || role === "Admin") && (
-                      <th className="py-2.5 px-2 min-w-[160px] max-w-[185px]">
-                        <div className="flex items-center justify-between gap-1 text-[11px]">
-                          <span>بيانات المستضيف</span>
-                          <HeaderColumnFilter
-                            title="المستضيف"
-                            type="select"
-                            value={colFilters.hosting}
-                            onChange={(v) => handleColFilterChange("hosting", v)}
-                            onClear={() => handleColFilterChange("hosting", "ALL")}
-                            options={HOSTING_OPTIONS}
-                            align="left"
-                          />
-                        </div>
-                      </th>
-                    )}
+                    <th className="py-2.5 px-2 min-w-[160px] max-w-[185px]">
+                      <div className="flex items-center justify-between gap-1 text-[11px]">
+                        <span>بيانات المستضيف</span>
+                        <HeaderColumnFilter
+                          title="المستضيف"
+                          type="select"
+                          value={colFilters.hosting}
+                          onChange={(v) => handleColFilterChange("hosting", v)}
+                          onClear={() => handleColFilterChange("hosting", "ALL")}
+                          options={HOSTING_OPTIONS}
+                          align="left"
+                        />
+                      </div>
+                    </th>
 
                     {/* 8. المستندات والإجراء */}
                     <th className="py-2.5 px-2 text-center w-[185px] min-w-[175px] max-w-[210px]">
@@ -2499,66 +2365,81 @@ ${travelersLines}
                           </div>
                         </td>
 
-                        {/* 5. عمود بيانات المسافرين (للمرسل ولموظف صفا وللأدمن) */}
-                        {(role === "Sender" || role === "SafaEmployee" || role === "Admin") && (
-                          <td className="py-2.5 px-3 align-middle border-l border-gray-100">
-                            <div className="bg-purple-50/40 border border-purple-200/80 rounded-xl p-2 min-w-[170px] max-w-xs space-y-1.5 max-h-44 overflow-y-auto">
-                              {reqTravelers.map((t, idx) => {
-                                const isThisMatched = isTravelerMatch(t, search);
-                                return (
-                                  <div
-                                    key={t.id || idx}
-                                    className={`flex items-center gap-2.5 min-w-0 p-1 rounded-lg transition-colors ${
-                                      isThisMatched ? "bg-purple-100 ring-2 ring-purple-400" : ""
-                                    }`}
-                                  >
-                                    {t.photoUrl ? (
-                                      <img
-                                        src={t.photoUrl}
-                                        alt={t.fullName}
-                                        onClick={(e) => handleViewDoc(undefined, t.photoUrl, `صورة المسافر - ${t.fullName}`, e)}
-                                        className="w-9 h-9 rounded-full object-cover border border-purple-300 shrink-0 shadow-2xs cursor-pointer hover:opacity-80 transition-opacity"
-                                        title="معاينة الصورة"
-                                      />
-                                    ) : (
-                                      <div className="w-9 h-9 rounded-full bg-purple-100 text-purple-700 border border-purple-200 flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
-                                        {t.fullName && t.fullName.trim() ? (
-                                          t.fullName.trim().charAt(0)
-                                        ) : (
-                                          <User className="w-4 h-4 text-purple-600" />
-                                        )}
-                                      </div>
-                                    )}
-                                    <div className="min-w-0 flex-1 flex items-center gap-1.5">
-                                      <span
-                                        className={`text-xs truncate leading-tight ${
-                                          isThisMatched ? "font-black text-purple-950" : "font-bold text-gray-900"
-                                        }`}
-                                        title={t.fullName}
-                                      >
-                                        {getTwoPartName(t.fullName)}
-                                      </span>
-                                      {t.passportNumber && (
-                                        <button
-                                          type="button"
-                                          onClick={(e) => handleViewTravelerPassport(r.id, t, e)}
-                                          className="text-sky-600 hover:text-sky-800 hover:bg-sky-50 p-0.5 rounded cursor-pointer transition-colors shrink-0"
-                                          title={`معاينة جواز السفر (${t.passportNumber})`}
-                                        >
-                                          <FileText className="w-3.5 h-3.5" />
-                                        </button>
+                        {/* 5. عمود بيانات المسافرين (للجميع: مرسل، وكيل، صفا، وأدمن) */}
+                        <td className="py-2.5 px-3 align-middle border-l border-gray-100 min-w-[170px] max-w-[210px]">
+                          <div className="bg-purple-50/40 border border-purple-200/80 rounded-xl p-2 w-full space-y-2 max-h-48 overflow-y-auto">
+                            {reqTravelers.map((t, idx) => {
+                              const isThisMatched = isTravelerMatch(t, search);
+                              return (
+                                <div
+                                  key={t.id || idx}
+                                  className={`flex items-start gap-2 min-w-0 p-1.5 rounded-lg transition-colors ${
+                                    isThisMatched ? "bg-purple-100 ring-2 ring-purple-400" : "hover:bg-purple-100/50"
+                                  }`}
+                                >
+                                  {t.photoUrl ? (
+                                    <img
+                                      src={t.photoUrl}
+                                      alt={t.fullName}
+                                      onClick={(e) => handleViewDoc(undefined, t.photoUrl, `صورة المسافر - ${t.fullName}`, e)}
+                                      className="w-8 h-8 rounded-full object-cover border border-purple-300 shrink-0 shadow-2xs cursor-pointer hover:opacity-80 transition-opacity mt-0.5"
+                                      title="معاينة الصورة"
+                                    />
+                                  ) : (
+                                    <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-700 border border-purple-200 flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs mt-0.5">
+                                      {t.fullName && t.fullName.trim() ? (
+                                        t.fullName.trim().charAt(0)
+                                      ) : (
+                                        <User className="w-4 h-4 text-purple-600" />
                                       )}
                                     </div>
+                                  )}
+                                  <div className="min-w-0 flex-1 flex flex-col items-start gap-0.5">
+                                    <span
+                                      onClick={(e) => {
+                                        if (t.passportNumber || t.passportDocumentUrl || t.passportDocumentId) {
+                                          handleViewTravelerPassport(r.id, t, e);
+                                        }
+                                      }}
+                                      className={`text-xs leading-snug line-clamp-2 ${
+                                        t.passportNumber || t.passportDocumentUrl || t.passportDocumentId
+                                          ? "cursor-pointer hover:text-purple-700"
+                                          : ""
+                                      } ${
+                                        isThisMatched ? "font-black text-purple-950" : "font-bold text-gray-900"
+                                      }`}
+                                      title={
+                                        t.passportNumber
+                                          ? `${t.fullName} (اضغط لمعاينة الجواز: ${t.passportNumber})`
+                                          : t.fullName
+                                      }
+                                    >
+                                      {getFourPartName(t.fullName)}
+                                    </span>
+                                    {t.passportNumber ? (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => handleViewTravelerPassport(r.id, t, e)}
+                                        className="inline-flex items-center gap-1 font-mono text-[11px] font-bold text-sky-700 hover:text-sky-950 hover:bg-sky-100/90 px-1.5 py-0.5 rounded transition-colors cursor-pointer group/pass bg-sky-50 border border-sky-200/80 shadow-2xs mt-0.5"
+                                        title={`اضغط لمعاينة جواز السفر (${t.passportNumber})`}
+                                      >
+                                        <FileText className="w-3 h-3 text-sky-600 group-hover/pass:text-sky-800 shrink-0" />
+                                        <span dir="ltr" className="group-hover/pass:underline">
+                                          {t.passportNumber}
+                                        </span>
+                                      </button>
+                                    ) : (
+                                      <span className="text-[10px] text-gray-400 italic">بدون جواز</span>
+                                    )}
                                   </div>
-                                );
-                              })}
-                            </div>
-                          </td>
-                        )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </td>
 
-                        {/* 6. عمود بيانات المستضيف (للوكيل السعودي ولموظف صفا وللأدمن) */}
-                        {(role === "SaudiAgent" || role === "SafaEmployee" || role === "Admin") && (
-                          <td className="py-2.5 px-2 align-middle border-l border-gray-100 min-w-[160px] max-w-[185px]">
+                        {/* 6. عمود بيانات المستضيف (للجميع: مرسل، وكيل، صفا، وأدمن) */}
+                        <td className="py-2.5 px-2 align-middle border-l border-gray-100 min-w-[160px] max-w-[185px]">
                             <div className="bg-amber-50/40 border border-amber-200/80 rounded-xl p-2 text-[11px] space-y-1 w-full min-w-[155px]">
                               {/* الهوية */}
                               <div className="flex items-center justify-between gap-1 border-b border-amber-100/80 pb-0.5">
@@ -2657,7 +2538,6 @@ ${travelersLines}
                               </div>
                             </div>
                           </td>
-                        )}
 
                         {/* 6. المستندات والإجراء: سطر المستندات بالأعلى وسطر الإجراءات بالأسفل */}
                         <td className="py-2.5 px-2 align-middle text-center w-[185px] min-w-[175px] max-w-[210px]">
