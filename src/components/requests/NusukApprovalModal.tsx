@@ -291,7 +291,7 @@ export const NusukApprovalModal: React.FC<NusukApprovalModalProps> = ({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
-              placeholder="أي توجيهات خاصة بالباقة أو التأشيرة..."
+              placeholder="أي توجيهات خاصة بالباقة أو المعاملة..."
               className="w-full px-3 py-2 text-xs rounded-xl border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
             />
           </div>

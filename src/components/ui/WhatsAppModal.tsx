@@ -189,7 +189,7 @@ export function WhatsAppModal({ isOpen, onClose, request }: WhatsAppModalProps) 
               type="text"
               value={customNote}
               onChange={(e) => setCustomNote(e.target.value)}
-              placeholder="مثال: يرجى إحضار أصل الجوازات والتأشيرات..."
+              placeholder="مثال: يرجى إحضار أصل الجوازات وتذاكر الطيران..."
               className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-xl text-xs focus:outline-hidden focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all"
             />
           </div>

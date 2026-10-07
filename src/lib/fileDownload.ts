@@ -42,3 +42,40 @@ export async function downloadFile(url: string, fileName: string): Promise<void>
     document.body.removeChild(fallbackLink);
   }
 }
+
+/**
+ * Print an existing document URL via isolated hidden iframe
+ */
+export function printPdfDocumentUrl(pdfUrl: string): void {
+  if (typeof window === "undefined" || !pdfUrl) return;
+
+  const iframe = document.createElement("iframe");
+  iframe.style.position = "fixed";
+  iframe.style.right = "0";
+  iframe.style.bottom = "0";
+  iframe.style.width = "0";
+  iframe.style.height = "0";
+  iframe.style.border = "none";
+  iframe.style.visibility = "hidden";
+  iframe.src = pdfUrl;
+
+  document.body.appendChild(iframe);
+
+  iframe.onload = () => {
+    setTimeout(() => {
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      } catch (err) {
+        console.warn("Could not print iframe directly, opening in new tab:", err);
+        window.open(pdfUrl, "_blank");
+      } finally {
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+        }, 60000);
+      }
+    }, 400);
+  };
+}

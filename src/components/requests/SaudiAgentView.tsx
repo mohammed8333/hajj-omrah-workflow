@@ -152,7 +152,7 @@ export const SaudiAgentView: React.FC<SaudiAgentViewProps> = ({
               <div>
                 <h3 className="text-sm font-black text-emerald-950">سداد الفاتورة واكتمال المعاملة</h3>
                 <p className="text-xs text-emerald-800 mt-0.5">
-                  تم قبول الاستضافة وجاهزية التأشيرات. اضغط على الزر لتأكيد دفع الفاتورة واكتمال المعاملة نهائياً.
+                  تم قبول الاستضافة وجاهزية الخدمات. اضغط على الزر لتأكيد دفع الفاتورة واكتمال المعاملة نهائياً.
                 </p>
               </div>
             </div>

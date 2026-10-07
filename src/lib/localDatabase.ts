@@ -460,7 +460,7 @@ export const DEFAULT_REQUESTS: GroupRequestDetail[] = [
         toStatus: "Completed",
         changedById: "usr-agent-1",
         changedByName: "شركة الهدى المعتمدة",
-        note: "تم إصدار التأشيرات والباركودات لجميع أعضاء الفوج بنجاح.",
+        note: "تم إنجاز كافة الخدمات لجميع أعضاء الفوج بنجاح.",
         createdAt: "2026-08-28T18:00:00.000Z",
       },
     ],
@@ -1656,7 +1656,7 @@ class LocalDatabaseEngine {
       toStatus: "Completed",
       changedById: currentUser?.id || "agent",
       changedByName: currentUser?.fullName || "الوكيل السعودي",
-      note: note || "تم إصدار التأشيرات والباركودات وإتمام المعاملة نهائياً بنجاح",
+      note: note || "تم إنجاز كافة الخدمات وإتمام المعاملة نهائياً بنجاح",
       createdAt: new Date().toISOString(),
     });
 

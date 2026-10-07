@@ -44,10 +44,8 @@ import { RequestLifecycleTimer } from "@/components/ui/RequestLifecycleTimer";
 import { useDialog } from "@/lib/dialog-context";
 import { getWhatsAppUrl } from "@/lib/phoneUtils";
 import { WhatsAppModal } from "@/components/ui/WhatsAppModal";
-import { printHtmlViaIframe, printPdfDocumentUrl } from "@/lib/visaPrintHelper";
+import { downloadFile, printPdfDocumentUrl } from "@/lib/fileDownload";
 import { NusukApprovalModal } from "@/components/requests/NusukApprovalModal";
-import { notificationsService } from "@/lib/notificationsService";
-import { downloadFile } from "@/lib/fileDownload";
 import { matchesRequestSearch, getMatchingTravelers, isTravelerMatch } from "@/lib/searchUtils";
 import {
   HeaderColumnFilter,
@@ -63,7 +61,6 @@ import {
   compareRequestsByDeparture,
   getDefaultActiveWorkflowTab,
 } from "@/lib/travelArchiveUtils";
-import { RequestVisaActionButtons } from "@/components/requests/RequestVisaActionButtons";
 import { resolveSenderCode } from "@/lib/groupNaming";
 import { useRealtimeSync } from "@/lib/realtimeSync";
 
@@ -562,7 +559,7 @@ ${travelersLines}
     try {
       const targetReq = requests.find((x) => x.id === id);
       if (targetReq && targetReq.status !== "Completed" && targetReq.status !== "Archived") {
-        await api.requests.agentComplete(id, "تم إنجاز كافة التأشيرات والخدمات بنجاح");
+        await api.requests.agentComplete(id, "تم إنجاز كافة الخدمات والمعاملة بنجاح");
       }
       await api.requests.archive(id, "تم إنجاز المعاملة وأرشفتها بواسطة الوكيل السعودي (تم)");
       const reqsRes = await api.requests.getAll();
@@ -692,7 +689,7 @@ ${travelersLines}
     try {
       await api.requests.agentComplete(
         r.id,
-        "تم دفع الفاتورة وإصدار كافة التأشيرات والخدمات بنجاح"
+        "تم دفع الفاتورة وإنجاز كافة الخدمات والمعاملة بنجاح"
       );
 
       const reqsRes = await api.requests.getAll();
@@ -2013,17 +2010,6 @@ ${travelersLines}
                       </button>
                     </div>
 
-                    {/* التأشيرات: جلب كافة التأشيرات + طباعة الكل في ملف واحد (للمعاملات المكتملة فقط) */}
-                    {(r.status === "Completed" || r.status === "Archived") && (
-                      <RequestVisaActionButtons
-                        requestId={r.id}
-                        requestNumber={r.requestNumber}
-                        groupName={r.groupName}
-                        status={r.status}
-                        onRefresh={loadData}
-                      />
-                    )}
-
                     {/* أزرار الإجراءات */}
                     <div className="flex items-center gap-1.5 flex-wrap">
                       {role === "Sender" && isWaitingHosting(r) && (
@@ -2732,7 +2718,7 @@ ${travelersLines}
                         {/* 6. المستندات والإجراء: سطر المستندات بالأعلى وسطر الإجراءات بالأسفل */}
                         <td className="py-2.5 px-2 align-middle text-center w-[185px] min-w-[175px] max-w-[210px]">
                           <div className="flex flex-col items-center justify-center gap-1.5 w-full">
-                            {/* السطر الأول: المستندات (التذكرة + الهوية + التأشيرات) */}
+                            {/* السطر الأول: المستندات (التذكرة + الهوية) */}
                             <div className="flex items-center justify-center gap-1 flex-wrap">
                               {/* تذكرة الطيران: شارة مقسومة (معاينة طيارة يمين / تحميل يسار) بدون كتابة */}
                               <div
@@ -2790,17 +2776,7 @@ ${travelersLines}
                                 </button>
                               </div>
 
-                              {/* التأشيرات: جلب كافة التأشيرات + طباعة الكل في ملف واحد (للمعاملات المكتملة والمؤرشفة فقط) */}
-                              {(r.status === "Completed" || r.status === "Archived") && (
-                                <RequestVisaActionButtons
-                                  requestId={r.id}
-                                  requestNumber={r.requestNumber}
-                                  groupName={r.groupName}
-                                  status={r.status}
-                                  onRefresh={loadData}
-                                />
-                              )}
-                            </div>
+                              </div>
 
                             {/* السطر الثاني: أزرار الإجراء بحسب الدور وسير العمل */}
                             <div className="flex items-center justify-center gap-1 flex-wrap pt-1 border-t border-gray-100/90 w-full">
@@ -3038,28 +3014,7 @@ ${travelersLines}
                       type="button"
                       onClick={() => {
                         if (docPreviewModal.url) {
-                          if (
-                            docPreviewModal.url.includes("text/html") ||
-                            docPreviewModal.downloadName?.endsWith(".html") ||
-                            docPreviewModal.downloadName?.endsWith(".htm") ||
-                            docPreviewModal.title.includes("تأشيرة")
-                          ) {
-                            if (docPreviewModal.url.startsWith("data:text/html;base64,")) {
-                              const base64 = docPreviewModal.url.split(",")[1];
-                              const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-                              const decoded = new TextDecoder().decode(bytes);
-                              printHtmlViaIframe(decoded);
-                            } else if (docPreviewModal.url.startsWith("data:text/html")) {
-                              printHtmlViaIframe(decodeURIComponent(docPreviewModal.url.split(",")[1] || ""));
-                            } else {
-                              fetch(docPreviewModal.url)
-                                .then((r) => r.text())
-                                .then((html) => printHtmlViaIframe(html))
-                                .catch(() => printPdfDocumentUrl(docPreviewModal.url!));
-                            }
-                          } else {
-                            printPdfDocumentUrl(docPreviewModal.url);
-                          }
+                          printPdfDocumentUrl(docPreviewModal.url);
                         }
                       }}
                       className="p-1.5 text-gray-500 hover:text-sky-600 hover:bg-white rounded-lg transition-colors cursor-pointer"
@@ -3105,11 +3060,7 @@ ${travelersLines}
                 </div>
               ) : docPreviewModal.url ? (
                 docPreviewModal.url.includes("application/pdf") ||
-                docPreviewModal.downloadName?.endsWith(".pdf") ||
-                docPreviewModal.url.includes("text/html") ||
-                docPreviewModal.downloadName?.endsWith(".html") ||
-                docPreviewModal.downloadName?.endsWith(".htm") ||
-                docPreviewModal.title.includes("تأشيرة") ? (
+                docPreviewModal.downloadName?.endsWith(".pdf") ? (
                   <iframe
                     src={docPreviewModal.url}
                     className="w-full h-[70vh] rounded-lg border border-gray-200 bg-white"

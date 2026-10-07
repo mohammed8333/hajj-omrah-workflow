@@ -69,29 +69,12 @@ import { scanPassportMRZ, translateEnglishNameToArabic } from "@/lib/mrzScanner"
 import { scanHostId } from "@/lib/hostIdScanner";
 import { scanFlightTicket, calculateAirportArrivalTime } from "@/lib/flightTicketScanner";
 import { getGeminiApiKey, setGeminiApiKey } from "@/lib/geminiVision";
-import {
-  getMofaWorkerUrl,
-  ensureMofaWorkerUrl,
-  syncMofaWorkerUrlFromDatabase,
-  setMofaWorkerUrl,
-  fetchMofaSession,
-  checkAndAttachVisaToTraveler,
-  extractFirstName,
-  convertNationalityToMofaCode,
-} from "@/lib/mofaVisaService";
-import {
-  printVisaDocument,
-  printPdfDocumentUrl,
-  printAllVisasByRequestId,
-  printHtmlViaIframe,
-} from "@/lib/visaPrintHelper";
-import { extractVisaData, renderOfficialVisaHtml } from "@/lib/officialVisaTemplate";
 import { useDialog } from "@/lib/dialog-context";
 import { FileDropArea } from "@/components/ui/FileDropArea";
 import { getWhatsAppUrl, getTelUrl, normalizePhone, validateHostPhone, validateTravelerPhone } from "@/lib/phoneUtils";
 import { WhatsAppModal } from "@/components/ui/WhatsAppModal";
 import { formatOfficialGroupName, resolveSenderCode } from "@/lib/groupNaming";
-import { downloadFile } from "@/lib/fileDownload";
+import { downloadFile, printPdfDocumentUrl } from "@/lib/fileDownload";
 import { sendWhatsAppGroupPackage } from "@/lib/whatsappGroupSend";
 import { checkPassportValidity, findDuplicatePassportOrId } from "@/lib/passportValidation";
 import { useRealtimeSync } from "@/lib/realtimeSync";
@@ -120,7 +103,6 @@ export default function RequestDetailPage({
   const [previewDoc, setPreviewDoc] = useState<DocumentItem | null>(null);
   const [previewDocUrl, setPreviewDocUrl] = useState<string | null>(null);
   const [previewDocLoading, setPreviewDocLoading] = useState(false);
-  const [previewDocHtml, setPreviewDocHtml] = useState<string | null>(null);
   const [reviewModalDoc, setReviewModalDoc] = useState<DocumentItem | null>(null);
   const [reviewStatus, setReviewStatus] = useState<DocumentReviewStatus>("Accepted");
   const [reviewNote, setReviewNote] = useState("");
@@ -235,155 +217,12 @@ export default function RequestDetailPage({
   const [newTravelerPhotoFile, setNewTravelerPhotoFile] = useState<File | null>(null);
   const [newTravelerPhotoPreview, setNewTravelerPhotoPreview] = useState<string | null>(null);
 
-  // MOFA Visa Checking state
-  const [isCheckingVisaTravelerId, setIsCheckingVisaTravelerId] = useState<string | null>(null);
-  const [isBulkCheckingVisas, setIsBulkCheckingVisas] = useState(false);
-  const [isPrintingAllVisas, setIsPrintingAllVisas] = useState(false);
-  const [visaProgressMsg, setVisaProgressMsg] = useState<string | null>(null);
-  const [cachedVisaHtmlMap, setCachedVisaHtmlMap] = useState<Record<string, string>>({});
-  const [mofaModalData, setMofaModalData] = useState<{
-    isOpen: boolean;
-    traveler: Traveler;
-    workerUrl: string;
-    token: string;
-    cookie: string;
-    captchaImage: string;
-    userCaptcha: string;
-    searchPassportNo: string;
-    searchFirstName: string;
-    searchNationality: string;
-    loading: boolean;
-    refreshingCaptcha: boolean;
-    error?: string | null;
-  } | null>(null);
-
   useEffect(() => {
     let isMounted = true;
     let createdBlobUrl: string | null = null;
-    setPreviewDocHtml(null);
 
     if (previewDoc) {
       setPreviewDocLoading(true);
-
-      const isVisaDoc =
-        previewDoc.documentType === "Visa" ||
-        previewDoc.originalFileName?.toLowerCase().endsWith(".html") ||
-        previewDoc.originalFileName?.toLowerCase().endsWith(".htm") ||
-        previewDoc.mimeType?.includes("html");
-
-      if (isVisaDoc) {
-        const trv = request?.travelers.find(
-          (t) =>
-            t.documents?.some((d) => d.id === previewDoc.id) ||
-            t.id === previewDoc.travelerId
-        );
-
-        const setupHtmlPreview = async (rawHtml: string) => {
-          if (!isMounted) return;
-          let finalRenderedHtml = rawHtml;
-          try {
-            const visaData = await extractVisaData(rawHtml, trv);
-            finalRenderedHtml = renderOfficialVisaHtml(visaData);
-          } catch (e) {
-            console.warn("Could not parse official visa template, fallback to raw HTML:", e);
-          }
-
-          if (!isMounted) return;
-          setPreviewDocHtml(finalRenderedHtml);
-          const blob = new Blob([finalRenderedHtml], { type: "text/html;charset=utf-8" });
-          createdBlobUrl = URL.createObjectURL(blob);
-          setPreviewDocUrl(createdBlobUrl);
-          setPreviewDocLoading(false);
-        };
-
-        // 1. Direct memory or local storage cache
-        let directHtml: string | null = null;
-        if (trv) {
-          directHtml = cachedVisaHtmlMap[trv.id] || null;
-          if (!directHtml && typeof window !== "undefined") {
-            try {
-              directHtml = localStorage.getItem(`mofa_visa_html_${trv.id}`) || null;
-            } catch {}
-          }
-        }
-
-        if (directHtml) {
-          setupHtmlPreview(directHtml);
-          return () => {
-            isMounted = false;
-            if (createdBlobUrl) URL.revokeObjectURL(createdBlobUrl);
-          };
-        }
-
-        // 2. Fetch from document stream
-        const fetchDocHtml = async () => {
-          try {
-            let docStream = previewDoc.storageUrl;
-            if (!docStream) {
-              docStream = await api.documents.getStreamUrl(previewDoc.id);
-            }
-            if (!isMounted) return;
-
-            if (docStream) {
-              if (
-                docStream.startsWith("data:text/html;base64,") ||
-                docStream.startsWith("data:text/html;charset=utf-8;base64,")
-              ) {
-                const base64 = docStream.split(",")[1];
-                const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-                const decodedHtml = new TextDecoder().decode(bytes);
-                await setupHtmlPreview(decodedHtml);
-                return;
-              } else if (docStream.startsWith("data:text/html")) {
-                const decodedHtml = decodeURIComponent(docStream.split(",")[1] || "");
-                await setupHtmlPreview(decodedHtml);
-                return;
-              } else if (
-                docStream.startsWith("http") ||
-                docStream.startsWith("blob:") ||
-                docStream.startsWith("/")
-              ) {
-                try {
-                  const res = await fetch(docStream);
-                  const fetchedHtml = await res.text();
-                  if (
-                    fetchedHtml &&
-                    (fetchedHtml.includes("<html") ||
-                      fetchedHtml.includes("<!DOCTYPE") ||
-                      fetchedHtml.includes("<table") ||
-                      fetchedHtml.includes("<div"))
-                  ) {
-                    await setupHtmlPreview(fetchedHtml);
-                    return;
-                  }
-                } catch {}
-              }
-            }
-
-            if (trv && (trv.visaNumber || trv.status === "Accepted")) {
-              await setupHtmlPreview("");
-              return;
-            }
-
-            applyUrl(docStream);
-          } catch {
-            if (isMounted) {
-              if (trv && (trv.visaNumber || trv.status === "Accepted")) {
-                await setupHtmlPreview("");
-              } else {
-                setPreviewDocUrl(null);
-                setPreviewDocLoading(false);
-              }
-            }
-          }
-        };
-
-        fetchDocHtml();
-        return () => {
-          isMounted = false;
-          if (createdBlobUrl) URL.revokeObjectURL(createdBlobUrl);
-        };
-      }
 
       const applyUrl = (rawUrl: string | null) => {
         if (!isMounted) return;
@@ -1218,484 +1057,13 @@ export default function RequestDetailPage({
     }
   };
 
-  const getOrPromptWorkerUrl = async (): Promise<string | null> => {
-    let workerUrl = await ensureMofaWorkerUrl();
-    if (!workerUrl) {
-      workerUrl = await syncMofaWorkerUrlFromDatabase();
-    }
-    if (!workerUrl) {
-      const enteredUrl = await prompt({
-        title: "إعداد خادم الاستعلام عن التأشيرات (Cloudflare Worker)",
-        message:
-          "يرجى إدخال رابط خادم Cloudflare Worker الخاص بك للاستعلام المباشر وتنزيل التأشيرات الصادرة من منصة وزارة الخارجية (سيتم حفظه في قاعدة البيانات لجميع المستخدمين ولن يُمسح بمسح بيانات المتصفح):",
-        placeholder: "https://mofa-visa-proxy.yourname.workers.dev",
-        confirmText: "حفظ في قاعدة البيانات ومتابعة",
-        cancelText: "إلغاء",
-        variant: "primary",
-      });
-      if (enteredUrl && enteredUrl.trim()) {
-        await setMofaWorkerUrl(enteredUrl.trim(), true);
-        workerUrl = enteredUrl.trim();
-      }
-    }
-    return workerUrl;
-  };
-
-  const handleCheckSingleVisa = async (traveler: Traveler) => {
-    if (!traveler.passportNumber) {
-      await alert({
-        title: "بيانات ناقصة",
-        message: "يجب تسجيل رقم جواز السفر للمسافر أولاً للتمكن من فحص التأشيرة.",
-        variant: "warning",
-      });
-      return;
-    }
-
-    const workerUrl = await getOrPromptWorkerUrl();
-    if (!workerUrl) return;
-
-    try {
-      setIsCheckingVisaTravelerId(traveler.id);
-      setError(null);
-
-      const res = await checkAndAttachVisaToTraveler(
-        requestId,
-        traveler,
-        workerUrl,
-        (msg) => setVisaProgressMsg(msg)
-      );
-
-      if (res.success) {
-        if (res.searchResult?.visaHtml) {
-          setCachedVisaHtmlMap((prev) => ({
-            ...prev,
-            [traveler.id]: res.searchResult!.visaHtml!,
-          }));
-          // Trigger immediate print command formatted as clean 1-page A4
-          printVisaDocument(res.searchResult.visaHtml, traveler);
-        }
-
-        setSuccess(
-          `تم بنجاح استخراج التأشيرة وتنزيلها للمسافر (${traveler.fullName}) ${
-            res.visaNumber ? `| رقم التأشيرة: ${res.visaNumber}` : ""
-          } 🇸🇦`
-        );
-        setRequest((prev) => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            travelers: prev.travelers.map((t) => {
-              if (t.id === traveler.id) {
-                const existingDocs = t.documents ? t.documents.filter((d) => d.documentType !== "Visa") : [];
-                const updatedDocs = res.attachedDoc ? [...existingDocs, res.attachedDoc] : existingDocs;
-                return {
-                  ...t,
-                  visaNumber: res.visaNumber || t.visaNumber,
-                  visaStatus: "Issued",
-                  documents: updatedDocs,
-                };
-              }
-              return t;
-            }),
-          };
-        });
-        await loadRequest(false);
-      } else if (res.errorType === "INVALID_CAPTCHA" && res.session) {
-        // Open interactive Captcha verification dialog
-        setMofaModalData({
-          isOpen: true,
-          traveler,
-          workerUrl,
-          token: res.session.token,
-          cookie: res.session.cookie,
-          captchaImage: res.session.captchaImage,
-          userCaptcha: "",
-          searchPassportNo: traveler.passportNumber?.trim() || "",
-          searchFirstName: extractFirstName(traveler.fullName),
-          searchNationality: convertNationalityToMofaCode(traveler.nationality),
-          loading: false,
-          refreshingCaptcha: false,
-          error: res.error || null,
-        });
-      } else {
-        await alert({
-          title: "نتيجة فحص التأشيرة",
-          message: res.error || "لم يتم العثور على تأشيرة صادرة لهذا الجواز.",
-          variant: "info",
-        });
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "حدث خطأ أثناء فحص التأشيرة.";
-      setError(msg);
-    } finally {
-      setIsCheckingVisaTravelerId(null);
-      setVisaProgressMsg(null);
-    }
-  };
-
-  const handleRefreshModalCaptcha = async () => {
-    if (!mofaModalData) return;
-    try {
-      setMofaModalData((prev) => (prev ? { ...prev, refreshingCaptcha: true, error: null } : null));
-      const newSession = await fetchMofaSession(mofaModalData.workerUrl);
-      setMofaModalData((prev) =>
-        prev
-          ? {
-              ...prev,
-              token: newSession.token,
-              cookie: newSession.cookie,
-              captchaImage: newSession.captchaImage,
-              userCaptcha: "",
-              refreshingCaptcha: false,
-            }
-          : null
-      );
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "تعذر تحديث رمز الصورة";
-      setMofaModalData((prev) => (prev ? { ...prev, refreshingCaptcha: false, error: msg } : null));
-    }
-  };
-
-  const handleConfirmModalCaptcha = async () => {
-    if (!mofaModalData) return;
-    if (!mofaModalData.userCaptcha || mofaModalData.userCaptcha.trim().length !== 6) {
-      setMofaModalData((prev) =>
-        prev ? { ...prev, error: "يرجى كتابة رمز التحقق المكون من 6 أرقام كاملاً." } : null
-      );
-      return;
-    }
-
-    try {
-      setMofaModalData((prev) => (prev ? { ...prev, loading: true, error: null } : null));
-
-      const res = await checkAndAttachVisaToTraveler(
-        requestId,
-        mofaModalData.traveler,
-        mofaModalData.workerUrl,
-        undefined,
-        { token: mofaModalData.token, cookie: mofaModalData.cookie },
-        mofaModalData.userCaptcha.trim(),
-        {
-          passportNo: mofaModalData.searchPassportNo.trim(),
-          firstName: mofaModalData.searchFirstName.trim(),
-          nationality: mofaModalData.searchNationality.trim(),
-        }
-      );
-
-      if (res.success) {
-        const trvName = mofaModalData.traveler.fullName;
-        const trvId = mofaModalData.traveler.id;
-        const vNum = res.visaNumber;
-
-        if (res.searchResult?.visaHtml) {
-          setCachedVisaHtmlMap((prev) => ({
-            ...prev,
-            [trvId]: res.searchResult!.visaHtml!,
-          }));
-          // Trigger immediate print command formatted as clean 1-page A4
-          printVisaDocument(res.searchResult.visaHtml, mofaModalData.traveler);
-        }
-
-        setMofaModalData(null);
-        setSuccess(
-          `تم بنجاح استخراج التأشيرة وتنزيلها للمسافر (${trvName}) ${
-            vNum ? `| رقم التأشيرة: ${vNum}` : ""
-          } 🇸🇦`
-        );
-        setRequest((prev) => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            travelers: prev.travelers.map((t) => {
-              if (t.id === trvId) {
-                const existingDocs = t.documents ? t.documents.filter((d) => d.documentType !== "Visa") : [];
-                const updatedDocs = res.attachedDoc ? [...existingDocs, res.attachedDoc] : existingDocs;
-                return {
-                  ...t,
-                  visaNumber: vNum || t.visaNumber,
-                  visaStatus: "Issued",
-                  documents: updatedDocs,
-                };
-              }
-              return t;
-            }),
-          };
-        });
-        await loadRequest(false);
-      } else if (res.errorType === "INVALID_CAPTCHA") {
-        try {
-          const newSession = await fetchMofaSession(mofaModalData.workerUrl);
-          setMofaModalData((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  token: newSession.token,
-                  cookie: newSession.cookie,
-                  captchaImage: newSession.captchaImage,
-                  userCaptcha: "",
-                  loading: false,
-                  error: "رمز الصورة غير مطابق، تم تحديث الصورة، يرجى إدخال الرمز الجديد.",
-                }
-              : null
-          );
-        } catch {
-          setMofaModalData((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  loading: false,
-                  error: "رمز الصورة غير مطابق، يرجى الضغط على زر التحديث وإعادة المحاولة.",
-                }
-              : null
-          );
-        }
-      } else if (res.errorType === "NOT_FOUND") {
-        try {
-          const newSession = await fetchMofaSession(mofaModalData.workerUrl);
-          setMofaModalData((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  token: newSession.token,
-                  cookie: newSession.cookie,
-                  captchaImage: newSession.captchaImage,
-                  userCaptcha: "",
-                  loading: false,
-                  error:
-                    "لم يتم العثور على تأشيرة مطابقة لهذه البيانات. جرب كتابة الاسم الأول بالإنجليزية (كالمسجل بالجواز) أو بهمزات مختلفة، ثم أدخل الرمز الجديد.",
-                }
-              : null
-          );
-        } catch {
-          setMofaModalData((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  loading: false,
-                  error:
-                    "لم يتم العثور على تأشيرة مطابقة. تأكد من الاسم الأول ورقم الجواز، أو اضغط زر التحديث لإعادة المحاولة.",
-                }
-              : null
-          );
-        }
-      } else {
-        const errMsg = res.error || "فشل الاستعلام عن التأشيرة.";
-        setMofaModalData((prev) =>
-          prev ? { ...prev, loading: false, error: errMsg } : null
-        );
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "حدث خطأ أثناء فحص التأشيرة.";
-      setMofaModalData((prev) => (prev ? { ...prev, loading: false, error: msg } : null));
-    }
-  };
-
-  const handlePrintVisa = async (traveler: Traveler) => {
-    // 1. Check in-memory cache or localStorage
-    let cachedHtml = cachedVisaHtmlMap[traveler.id];
-    if (!cachedHtml && typeof window !== "undefined") {
-      try {
-        cachedHtml = localStorage.getItem(`mofa_visa_html_${traveler.id}`) || "";
-      } catch {}
-    }
-
-    if (traveler.visaNumber || cachedHtml) {
-      await printVisaDocument(cachedHtml || "", traveler);
-      return;
-    }
-
-    // 2. Otherwise look for attached Visa document
-    const visaDoc = traveler.documents?.find((d) => d.documentType === "Visa");
-    if (visaDoc) {
-      try {
-        let rawUrl = visaDoc.storageUrl;
-        if (!rawUrl) {
-          rawUrl = await api.documents.getStreamUrl(visaDoc.id);
-        }
-        if (rawUrl) {
-          if (
-            rawUrl.startsWith("data:text/html;base64,") ||
-            rawUrl.startsWith("data:text/html;charset=utf-8;base64,")
-          ) {
-            const base64 = rawUrl.split(",")[1];
-            const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-            const decodedHtml = new TextDecoder().decode(bytes);
-            await printVisaDocument(decodedHtml, traveler);
-            return;
-          } else if (rawUrl.startsWith("data:text/html")) {
-            const decodedHtml = decodeURIComponent(rawUrl.split(",")[1] || "");
-            await printVisaDocument(decodedHtml, traveler);
-            return;
-          } else if (
-            visaDoc.originalFileName?.toLowerCase().endsWith(".html") ||
-            visaDoc.mimeType?.includes("html")
-          ) {
-            const res = await fetch(rawUrl);
-            const htmlContent = await res.text();
-            await printVisaDocument(htmlContent, traveler);
-            return;
-          } else {
-            printPdfDocumentUrl(rawUrl);
-            return;
-          }
-        }
-      } catch (err) {
-        console.warn("Failed to load visa document for print:", err);
-      }
-    }
-
-    await alert({
-      title: "تنبيه",
-      message: "لم يتم استخراج أو إرفاق مستند التأشيرة لهذا المسافر بعد. يرجى الضغط على زر فحص وتنزيل التأشيرة أولاً.",
-      variant: "warning",
-    });
-  };
-
-  const handlePreviewVisa = (traveler: Traveler) => {
-    const existingDoc = traveler.documents?.find((d) => d.documentType === "Visa");
-    if (existingDoc) {
-      setPreviewDoc(existingDoc);
-    } else {
-      const syntheticVisaDoc: DocumentItem = {
-        id: `visa-${traveler.id}`,
-        groupRequestId: request?.id || "",
-        travelerId: traveler.id,
-        documentType: "Visa",
-        originalFileName: `تأشيرة_${(traveler.fullName || "المسافر").replace(/[\/\\:*?"<>|]/g, "_")}_${traveler.visaNumber || traveler.passportNumber || ""}.html`,
-        mimeType: "text/html;charset=utf-8",
-        fileSize: 1024,
-        version: 1,
-        uploadedById: "system",
-        uploadedByName: "النظام",
-        uploadedAt: new Date().toISOString(),
-        reviewStatus: "Accepted",
-      };
-      setPreviewDoc(syntheticVisaDoc);
-    }
-  };
-
-  const handleBulkCheckVisas = async () => {
-    if (!request || !request.travelers || request.travelers.length === 0) {
-      await alert({
-        title: "تنبيه",
-        message: "لا يوجد مسافرين في هذه المعاملة.",
-        variant: "info",
-      });
-      return;
-    }
-
-    const eligibleTravelers = request.travelers.filter((t) => !!t.passportNumber);
-    if (eligibleTravelers.length === 0) {
-      await alert({
-        title: "تنبيه",
-        message: "لا يوجد مسافرون مسجل لهم أرقام جوازات في هذه المعاملة.",
-        variant: "warning",
-      });
-      return;
-    }
-
-    const workerUrl = await getOrPromptWorkerUrl();
-    if (!workerUrl) return;
-
-    try {
-      setIsBulkCheckingVisas(true);
-      setError(null);
-      let successCount = 0;
-      let notFoundCount = 0;
-
-      for (let i = 0; i < eligibleTravelers.length; i++) {
-        const t = eligibleTravelers[i];
-        setVisaProgressMsg(`جاري فحص وتنزيل تأشيرة المسافر (${i + 1} من ${eligibleTravelers.length}): ${t.fullName}...`);
-
-        try {
-          const res = await checkAndAttachVisaToTraveler(
-            requestId,
-            t,
-            workerUrl,
-            (step) => setVisaProgressMsg(`(${i + 1}/${eligibleTravelers.length}) ${t.fullName}: ${step}`)
-          );
-          if (res.success) {
-            successCount++;
-          } else {
-            notFoundCount++;
-          }
-        } catch (singleErr) {
-          console.warn(`Error checking visa for ${t.fullName}:`, singleErr);
-          notFoundCount++;
-        }
-      }
-
-      await loadRequest(false);
-      setSuccess(
-        `اكتمل فحص المجموعة 🇸🇦: تم العثور على (${successCount}) تأشيرة وتنزيلها وربطها بالمسافرين تلقائياً${
-          notFoundCount > 0 ? `، و(${notFoundCount}) لم تصدر لهم بعد.` : "."
-        }`
-      );
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "حدث خطأ أثناء فحص تأشيرات المجموعة.";
-      setError(msg);
-    } finally {
-      setIsBulkCheckingVisas(false);
-      setVisaProgressMsg(null);
-    }
-  };
-
-  const handlePrintAllVisas = async () => {
-    if (!request) return;
-    try {
-      setIsPrintingAllVisas(true);
-      setError(null);
-      const res = await printAllVisasByRequestId(request.id, cachedVisaHtmlMap);
-      if (res.error) {
-        await alert({
-          title: "تنبيه",
-          message: res.error,
-          variant: "info",
-        });
-      } else {
-        setSuccess(`تم فتح أمر طباعة (${res.count}) تأشيرات في ملف واحد بنجاح 🖨️`);
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "حدث خطأ أثناء تجهيز طباعة التأشيرات.";
-      setError(msg);
-    } finally {
-      setIsPrintingAllVisas(false);
-    }
-  };
-
   const handleDownloadDoc = async (doc: DocumentItem) => {
     try {
       setActionLoading(true);
-      if (doc.documentType === "Visa") {
-        const trv = request?.travelers.find(
-          (t) =>
-            t.documents?.some((d) => d.id === doc.id) ||
-            t.id === doc.travelerId
-        );
-        let html = previewDocHtml || (trv ? cachedVisaHtmlMap[trv.id] : null);
-        if (!html && trv && typeof window !== "undefined") {
-          try {
-            html = localStorage.getItem(`mofa_visa_html_${trv.id}`);
-          } catch {}
-        }
-        if (!html && trv && (trv.visaNumber || trv.status === "Accepted")) {
-          const visaData = await extractVisaData("", trv);
-          html = renderOfficialVisaHtml(visaData);
-        }
-        if (html) {
-          const safeName = (trv?.fullName || "المسافر").replace(/[\/\\:*?"<>|]/g, "_");
-          const vNum = trv?.visaNumber || doc.id;
-          const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-          const blobUrl = URL.createObjectURL(blob);
-          await downloadFile(blobUrl, `تأشيرة_${safeName}_${vNum}.html`);
-          URL.revokeObjectURL(blobUrl);
-          return;
-        }
-      }
       const url = doc.storageUrl || (await api.documents.getStreamUrl(doc.id));
       const fileName =
         doc.originalFileName ||
-        `document-${doc.documentType}.${doc.mimeType?.includes("pdf") ? "pdf" : doc.mimeType?.includes("html") ? "html" : "jpg"}`;
+        `document-${doc.documentType}.${doc.mimeType?.includes("pdf") ? "pdf" : "jpg"}`;
       await downloadFile(url, fileName);
     } catch (e) {
       console.error("Download failed", e);
@@ -1747,7 +1115,7 @@ export default function RequestDetailPage({
         });
       }
 
-      // 3. Traveler Documents (Passport, Photo & Visa)
+      // 3. Traveler Documents (Passport & Photo)
       request.travelers?.forEach((traveler, tIdx) => {
         const safeName = (traveler.fullName || `مسافر_${tIdx + 1}`).replace(
           /[\/\\:*?"<>|]/g,
@@ -1773,18 +1141,6 @@ export default function RequestDetailPage({
           docEntries.push({
             doc: photoDoc,
             customName: `مسافر_${tIdx + 1}_${safeName}_الصورة_الشخصية.${ext}`,
-          });
-        }
-        const visaDoc = traveler.documents?.find(
-          (d) => d.documentType === "Visa"
-        );
-        if (visaDoc) {
-          const ext =
-            visaDoc.originalFileName?.split(".").pop() ||
-            (visaDoc.mimeType?.includes("pdf") ? "pdf" : visaDoc.mimeType?.includes("html") ? "html" : "html");
-          docEntries.push({
-            doc: visaDoc,
-            customName: `مسافر_${tIdx + 1}_${safeName}_تأشيرة_السفر.${ext}`,
           });
         }
       });
@@ -2373,7 +1729,7 @@ export default function RequestDetailPage({
     try {
       setActionLoading(true);
       if (request.status !== "Completed" && request.status !== "Archived") {
-        await api.requests.agentComplete(requestId, "تم إنجاز كافة التأشيرات والخدمات بنجاح");
+        await api.requests.agentComplete(requestId, "تم إنجاز كافة الخدمات والمعاملة بنجاح");
       }
       await api.requests.archive(requestId, "تم إنجاز المعاملة وأرشفتها بواسطة الوكيل السعودي (تم)");
       setSuccess("تم إنجاز المعاملة بنجاح ونقلها إلى سجل المؤرشفة (تم) ✓.");
@@ -4194,38 +3550,6 @@ export default function RequestDetailPage({
 
             <button
               type="button"
-              onClick={handleBulkCheckVisas}
-              disabled={isBulkCheckingVisas || request.travelers.length === 0}
-              className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-all"
-              title="فحص وتنزيل التأشيرات الصادرة لكافة مسافري المعاملة من منصة وزارة الخارجية"
-            >
-              {isBulkCheckingVisas ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <Search className="w-3.5 h-3.5" />
-              )}
-              <span>فحص وتنزيل تأشيرات المجموعة (MOFA) 🇸🇦</span>
-            </button>
-
-            {(request.status === "Completed" || request.status === "Archived") && (
-              <button
-                type="button"
-                onClick={handlePrintAllVisas}
-                disabled={isPrintingAllVisas || request.travelers.length === 0}
-                className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-all"
-                title="طباعة كافة تأشيرات المسافرين الصادرة في هذه المعاملة في ملف واحد (صفحة لكل تأشيرة)"
-              >
-                {isPrintingAllVisas ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Printer className="w-3.5 h-3.5" />
-                )}
-                <span>طباعة كافة التأشيرات في ملف واحد 🖨️</span>
-              </button>
-            )}
-
-            <button
-              type="button"
               onClick={handleDownloadAllDocs}
               disabled={isDownloadingAll || totalDocsCount === 0}
               className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-all"
@@ -4239,13 +3563,6 @@ export default function RequestDetailPage({
             </button>
           </div>
         </div>
-
-        {visaProgressMsg && (
-          <div className="bg-emerald-50 border border-emerald-300 rounded-xl p-3 text-xs text-emerald-800 flex items-center gap-2 animate-pulse shadow-xs">
-            <Loader2 className="w-4 h-4 animate-spin text-emerald-600 shrink-0" />
-            <span className="font-semibold">{visaProgressMsg}</span>
-          </div>
-        )}
 
         {request.travelers.map((traveler, tIndex) => (
           <div
@@ -4465,15 +3782,6 @@ export default function RequestDetailPage({
                           ملاحظة: {traveler.notes}
                         </span>
                       )}
-                      {traveler.visaNumber ? (
-                        <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-900 border border-emerald-300 text-[11px] font-bold px-2 py-0.5 rounded shadow-2xs">
-                          <span>تأشيرة صادرة: {traveler.visaNumber} 🇸🇦</span>
-                        </span>
-                      ) : traveler.visaStatus === "UnderProcessing" ? (
-                        <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-900 border border-amber-300 text-[11px] font-medium px-2 py-0.5 rounded">
-                          <span>التأشيرة: قيد الإجراء ⏳</span>
-                        </span>
-                      ) : null}
                       {(() => {
                         const validity = checkPassportValidity(traveler.expiryDate, request.travelDate);
                         if (validity.warning) {
@@ -4492,53 +3800,6 @@ export default function RequestDetailPage({
               </div>
 
               <div className="flex items-center gap-2 flex-wrap">
-                {/* MOFA Visa Check Button */}
-                {traveler.passportNumber && (
-                  <button
-                    type="button"
-                    disabled={isCheckingVisaTravelerId === traveler.id}
-                    onClick={() => handleCheckSingleVisa(traveler)}
-                    className="text-xs text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-md font-semibold flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
-                    title="فحص التأشيرة الصادرة وتنزيلها تلقائياً من منصة وزارة الخارجية"
-                  >
-                    {isCheckingVisaTravelerId === traveler.id ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600" />
-                    ) : (
-                      <Search className="w-3.5 h-3.5" />
-                    )}
-                    <span>
-                      {isCheckingVisaTravelerId === traveler.id
-                        ? "جاري فحص وتنزيل التأشيرة..."
-                        : "فحص وتنزيل التأشيرة 🇸🇦"}
-                    </span>
-                  </button>
-                )}
-
-                {/* Official Visa Actions: Preview & Print */}
-                {(traveler.visaNumber || traveler.documents?.some((d) => d.documentType === "Visa")) && (
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => handlePreviewVisa(traveler)}
-                      className="text-xs text-sky-700 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-2.5 py-1 rounded-md font-semibold flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
-                      title="معاينة التأشيرة الرسمية (HTML)"
-                    >
-                      <Eye className="w-3.5 h-3.5 text-sky-600" />
-                      <span>معاينة التأشيرة 👁️</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handlePrintVisa(traveler)}
-                      className="text-xs text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2.5 py-1 rounded-md font-semibold flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
-                      title="طباعة التأشيرة الرسمية مباشرة (أمر طباعة / حفظ بتنسيق PDF)"
-                    >
-                      <Printer className="w-3.5 h-3.5 text-indigo-600" />
-                      <span>طباعة التأشيرة 🖨️</span>
-                    </button>
-                  </div>
-                )}
-
                 {/* MRZ Scan Button if passport document exists */}
                 {traveler.documents?.some((d) => d.documentType === "Passport") && (
                   <button
@@ -4594,8 +3855,8 @@ export default function RequestDetailPage({
             </div>
 
             {/* Traveler Documents Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
-              {(["Passport", "PersonalPhoto", "Visa"] as DocumentType[]).map(
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              {(["Passport", "PersonalPhoto"] as DocumentType[]).map(
                 (docType) => {
                   const doc = traveler.documents?.find(
                     (d) => d.documentType === docType
@@ -4606,9 +3867,9 @@ export default function RequestDetailPage({
                       key={docType}
                       disabled={!canEditAnyData}
                       onFileDrop={(file) => handleFileUpload(file, docType, traveler.id)}
-                      accept={docType === "PersonalPhoto" ? ".jpg,.jpeg,.png" : ".pdf,.html,.htm,.jpg,.jpeg,.png"}
+                      accept={docType === "PersonalPhoto" ? ".jpg,.jpeg,.png" : ".pdf,.jpg,.jpeg,.png"}
                       maxSizeMb={10}
-                      activeBorderColor={docType === "Passport" ? "blue" : docType === "PersonalPhoto" ? "purple" : "emerald"}
+                      activeBorderColor={docType === "Passport" ? "blue" : "purple"}
                       overlayText={`أفلت ${DOCUMENT_TYPE_LABELS[docType]} هنا للرفع`}
                       overlaySubtext="سيتم رفع وتحديث المستند للمسافر مباشرة"
                       onError={(msg) => alert({ title: "تنبيه", message: msg, variant: "warning" })}
@@ -4620,9 +3881,7 @@ export default function RequestDetailPage({
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-xs font-bold text-gray-700">
                             {DOCUMENT_TYPE_LABELS[docType]}
-                            {docType === "Passport" || docType === "PersonalPhoto" ? (
-                              <span className="text-red-500 mr-0.5">*</span>
-                            ) : null}
+                            <span className="text-red-500 mr-0.5">*</span>
                           </span>
 
                           {doc ? (
@@ -4637,7 +3896,7 @@ export default function RequestDetailPage({
                             )
                           ) : (
                             <span className="text-[10px] bg-gray-200 text-gray-600 px-2 py-0.5 rounded font-medium">
-                              {docType === "Visa" ? "لم تصدر بعد" : "غير مرفوع"}
+                              غير مرفوع
                             </span>
                           )}
                         </div>
@@ -4679,20 +3938,6 @@ export default function RequestDetailPage({
                                 <Download className="w-4 h-4" />
                               </button>
 
-                              {doc.documentType === "Visa" && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    handlePrintVisa(traveler);
-                                  }}
-                                  className="p-1.5 text-sky-600 hover:text-sky-800 hover:bg-sky-50 rounded-lg transition-colors cursor-pointer"
-                                  title="طباعة التأشيرة الرسمية (PDF)"
-                                >
-                                  <Printer className="w-4 h-4" />
-                                </button>
-                              )}
-
                               {canEditAnyData && (
                                 <label
                                   className="p-1.5 text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors cursor-pointer shadow-2xs"
@@ -4701,7 +3946,7 @@ export default function RequestDetailPage({
                                   <UploadCloud className="w-4 h-4" />
                                   <input
                                     type="file"
-                                    accept={docType === "PersonalPhoto" ? ".jpg,.jpeg,.png" : ".pdf,.html,.htm,.jpg,.jpeg,.png"}
+                                    accept={docType === "PersonalPhoto" ? ".jpg,.jpeg,.png" : ".pdf,.jpg,.jpeg,.png"}
                                     className="hidden"
                                     onChange={(e) => {
                                       const file = e.target.files?.[0];
@@ -4710,7 +3955,6 @@ export default function RequestDetailPage({
                                   />
                                 </label>
                               )}
-
 
                               {canEditAnyData && role !== "Sender" && (
                                 <button
@@ -4735,7 +3979,7 @@ export default function RequestDetailPage({
                                 <span>رفع المستند (أو اسحبه هنا)</span>
                                 <input
                                   type="file"
-                                  accept={docType === "PersonalPhoto" ? ".jpg,.jpeg,.png" : ".pdf,.html,.htm,.jpg,.jpeg,.png"}
+                                  accept={docType === "PersonalPhoto" ? ".jpg,.jpeg,.png" : ".pdf,.jpg,.jpeg,.png"}
                                   className="hidden"
                                   onChange={(e) => {
                                     const file = e.target.files?.[0];
@@ -4745,7 +3989,7 @@ export default function RequestDetailPage({
                               </label>
                             ) : (
                               <span className="text-[11px] text-gray-400">
-                                {docType === "Visa" ? "لم تصدر بعد" : "لم يُرفع"}
+                                لم يُرفع
                               </span>
                             )}
                           </div>
@@ -4825,21 +4069,6 @@ export default function RequestDetailPage({
                   <button
                     type="button"
                     onClick={() => {
-                      if (previewDocHtml) {
-                        printHtmlViaIframe(previewDocHtml);
-                        return;
-                      }
-                      if (previewDoc.documentType === "Visa") {
-                        const trv = request?.travelers.find(
-                          (t) =>
-                            t.documents?.some((d) => d.id === previewDoc.id) ||
-                            t.id === previewDoc.travelerId
-                        );
-                        if (trv) {
-                          handlePrintVisa(trv);
-                          return;
-                        }
-                      }
                       printPdfDocumentUrl(previewDocUrl);
                     }}
                     className="p-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-colors cursor-pointer shadow-xs"
@@ -4878,11 +4107,7 @@ export default function RequestDetailPage({
               ) : previewDocUrl ? (
                 previewDoc.mimeType === "application/pdf" ||
                 previewDoc.originalFileName?.toLowerCase().endsWith(".pdf") ||
-                previewDocUrl.toLowerCase().includes(".pdf") ||
-                previewDoc.documentType === "Visa" ||
-                previewDoc.mimeType?.includes("html") ||
-                previewDoc.originalFileName?.toLowerCase().endsWith(".html") ||
-                previewDoc.originalFileName?.toLowerCase().endsWith(".htm") ? (
+                previewDocUrl.toLowerCase().includes(".pdf") ? (
                   <iframe
                     src={previewDocUrl}
                     className="w-full h-full rounded-lg border-0 bg-white"
@@ -4905,227 +4130,7 @@ export default function RequestDetailPage({
         </div>
       )}
 
-      {/* --- MODAL: MOFA Visa Captcha Verification --- */}
-      {mofaModalData && mofaModalData.isOpen && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-4 border border-gray-100">
-            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-lg">
-                  🇸🇦
-                </div>
-                <div>
-                  <h3 className="font-bold text-base text-gray-900">
-                    رمز التحقق لمنصة التأشيرات
-                  </h3>
-                  <span className="text-[11px] text-gray-500">
-                    وزارة الخارجية السعودية (MOFA)
-                  </span>
-                </div>
-              </div>
-              <button
-                type="button"
-                disabled={mofaModalData.loading}
-                onClick={() => setMofaModalData(null)}
-                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
 
-            {/* Traveler info & search parameters preview */}
-            <div className="bg-emerald-50/70 border border-emerald-100 rounded-xl p-3 text-xs space-y-2.5">
-              <div className="flex justify-between items-center border-b border-emerald-200/60 pb-1.5">
-                <span className="font-bold text-gray-900 truncate">
-                  {mofaModalData.traveler.fullName}
-                </span>
-                <span className="text-[10px] text-emerald-800 bg-white px-2 py-0.5 rounded border border-emerald-200 font-semibold shrink-0">
-                  معايير البحث
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[11px] font-bold text-gray-700 mb-1">
-                    الاسم الأول (fName):
-                  </label>
-                  <input
-                    type="text"
-                    disabled={mofaModalData.loading}
-                    value={mofaModalData.searchFirstName}
-                    onChange={(e) =>
-                      setMofaModalData((prev) => (prev ? { ...prev, searchFirstName: e.target.value } : null))
-                    }
-                    className="w-full bg-white border border-gray-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 rounded-lg px-2.5 py-1.5 text-xs font-bold text-gray-900 outline-hidden transition-all"
-                    placeholder="ابراهيم أو IBRAHIM"
-                    title="الاسم الأول كما هو مسجل في التأشيرة (جرب بالإنجليزية أو بالعربية مع/بدون همزة)"
-                  />
-                  <span className="text-[10px] text-gray-500 mt-0.5 block">
-                    جرب بالإنجليزية إذا لم تظهر
-                  </span>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-gray-700 mb-1">
-                    رقم الجواز:
-                  </label>
-                  <input
-                    type="text"
-                    disabled={mofaModalData.loading}
-                    value={mofaModalData.searchPassportNo}
-                    onChange={(e) =>
-                      setMofaModalData((prev) =>
-                        prev ? { ...prev, searchPassportNo: e.target.value.toUpperCase() } : null
-                      )
-                    }
-                    className="w-full bg-white border border-gray-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-gray-900 outline-hidden transition-all"
-                  />
-                  <span className="text-[10px] text-gray-500 mt-0.5 block">
-                    كالمكتوب في الجواز
-                  </span>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-gray-700 mb-1">
-                  الجنسية:
-                </label>
-                <select
-                  disabled={mofaModalData.loading}
-                  value={mofaModalData.searchNationality}
-                  onChange={(e) =>
-                    setMofaModalData((prev) => (prev ? { ...prev, searchNationality: e.target.value } : null))
-                  }
-                  className="w-full bg-white border border-gray-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 rounded-lg px-2.5 py-1.5 text-xs font-bold text-gray-900 outline-hidden transition-all"
-                >
-                  <option value="EGY">مصر (EGY)</option>
-                  <option value="SAU">السعودية (SAU)</option>
-                  <option value="JOR">الأردن (JOR)</option>
-                  <option value="SDN">السودان (SDN)</option>
-                  <option value="YEM">اليمن (YEM)</option>
-                  <option value="SYR">سوريا (SYR)</option>
-                  <option value="IRQ">العراق (IRQ)</option>
-                  <option value="TUN">تونس (TUN)</option>
-                  <option value="MAR">المغرب (MAR)</option>
-                  <option value="DZA">الجزائر (DZA)</option>
-                  <option value="LBN">لبنان (LBN)</option>
-                  <option value="KWT">الكويت (KWT)</option>
-                  <option value="ARE">الإمارات (ARE)</option>
-                  <option value="OMN">عُمان (OMN)</option>
-                  <option value="QAT">قطر (QAT)</option>
-                  <option value="BHR">البحرين (BHR)</option>
-                  <option value="PAK">باكستان (PAK)</option>
-                  <option value="IND">الهند (IND)</option>
-                  <option value="BGD">بنغلاديش (BGD)</option>
-                  <option value="IDN">إندونيسيا (IDN)</option>
-                  <option value="TUR">تركيا (TUR)</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Captcha Image and refresh button */}
-            <div className="space-y-2">
-              <label className="block text-xs font-bold text-gray-700">
-                رمز الصورة (Captcha):
-              </label>
-              <div className="flex items-center gap-2">
-                <div className="flex-1 bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl p-2 flex items-center justify-center min-h-[58px]">
-                  {mofaModalData.refreshingCaptcha ? (
-                    <div className="flex items-center gap-2 text-xs text-gray-500">
-                      <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
-                      <span>جاري تحديث الرمز...</span>
-                    </div>
-                  ) : mofaModalData.captchaImage ? (
-                    <img
-                      src={mofaModalData.captchaImage}
-                      alt="MOFA Captcha"
-                      className="h-10 object-contain rounded select-none pointer-events-none"
-                    />
-                  ) : (
-                    <span className="text-xs text-gray-400">لا توجد صورة</span>
-                  )}
-                </div>
-
-                <button
-                  type="button"
-                  disabled={mofaModalData.refreshingCaptcha || mofaModalData.loading}
-                  onClick={handleRefreshModalCaptcha}
-                  className="p-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl transition-colors cursor-pointer flex items-center gap-1 text-xs font-semibold disabled:opacity-50"
-                  title="تحديث رمز الصورة برمز جديد"
-                >
-                  <RotateCcw className={`w-4 h-4 ${mofaModalData.refreshingCaptcha ? "animate-spin" : ""}`} />
-                  <span className="hidden sm:inline">تحديث الرمز</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Captcha Input */}
-            <div className="space-y-1.5">
-              <input
-                type="text"
-                autoFocus
-                maxLength={6}
-                disabled={mofaModalData.loading}
-                value={mofaModalData.userCaptcha}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/[^0-9]/g, "");
-                  setMofaModalData((prev) => (prev ? { ...prev, userCaptcha: val, error: null } : null));
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    handleConfirmModalCaptcha();
-                  }
-                }}
-                placeholder="123456"
-                className="w-full text-center font-mono text-2xl tracking-[0.35em] font-bold border-2 border-emerald-500 focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100 rounded-xl py-2.5 outline-hidden transition-all placeholder:text-sm placeholder:tracking-normal placeholder:font-normal placeholder:text-gray-400"
-              />
-              <span className="text-[11px] text-gray-500 block text-center">
-                أدخل الأرقام الـ 6 الظاهرة في الصورة ثم اضغط Enter أو زر البحث
-              </span>
-            </div>
-
-            {/* Error banner if any */}
-            {mofaModalData.error && (
-              <div className="p-2.5 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-medium flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 shrink-0 text-red-500" />
-                <span>{mofaModalData.error}</span>
-              </div>
-            )}
-
-            {/* Modal Actions */}
-            <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
-              <button
-                type="button"
-                disabled={mofaModalData.loading}
-                onClick={() => setMofaModalData(null)}
-                className="flex-1 py-2.5 px-3 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-colors cursor-pointer"
-              >
-                إلغاء
-              </button>
-
-              <button
-                type="button"
-                disabled={mofaModalData.loading || mofaModalData.userCaptcha.trim().length !== 6}
-                onClick={handleConfirmModalCaptcha}
-                className="flex-2 py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-md shadow-emerald-600/20"
-              >
-                {mofaModalData.loading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>جاري الاستعلام وتنزيل التأشيرة...</span>
-                  </>
-                ) : (
-                  <>
-                    <Search className="w-4 h-4" />
-                    <span>استعلام وتنزيل التأشيرة 🇸🇦</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* --- MODAL 2: Document Review by Safa/Agent --- */}
       {reviewModalDoc && (
@@ -5301,7 +4306,7 @@ export default function RequestDetailPage({
                 value={nusukNote}
                 onChange={(e) => setNusukNote(e.target.value)}
                 rows={2}
-                placeholder="أي توجيهات خاصة بالباقة أو التأشيرة..."
+                placeholder="أي توجيهات خاصة بالباقة أو المعاملة..."
                 className="w-full px-3 py-2 text-xs rounded-xl border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-teal-500"
               />
             </div>
