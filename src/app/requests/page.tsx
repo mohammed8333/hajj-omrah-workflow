@@ -2290,7 +2290,7 @@ ${travelersLines}
                     )}
 
                     {/* 8. المستندات والإجراء */}
-                    <th className="py-2.5 px-2 text-center w-[120px] min-w-[110px]">
+                    <th className="py-2.5 px-2 text-center min-w-[280px]">
                       <div className="flex items-center justify-center gap-1">
                         <span>المستندات والإجراء</span>
                         {activeColFiltersCount > 0 && (
@@ -2645,71 +2645,75 @@ ${travelersLines}
                           </td>
                         )}
 
-                        {/* 6. المستندات والإجراء: تذكرة جنبها الهوية جنبها الأزرار */}
-                        <td className="py-2.5 px-3 align-middle text-center">
-                          <div className="inline-flex items-center justify-center gap-2 flex-wrap">
-                            {/* تذكرة الطيران */}
-                            <div className="flex items-center gap-1 bg-sky-50 border border-sky-200 px-2 py-1 rounded-lg shadow-2xs">
-                              <button
-                                type="button"
-                                onClick={(e) => handleViewDoc(r.flightTicketDocumentId, r.flightTicketDocumentUrl, `تذكرة طيران - ${r.groupName}`, e)}
-                                className={`p-1 text-sky-700 hover:bg-sky-100 rounded-md transition-colors cursor-pointer flex items-center gap-1 ${
-                                  !r.flightTicketDocumentId && !r.flightTicketDocumentUrl ? "opacity-40" : ""
-                                }`}
-                                title="معاينة تذكرة الطيران"
-                              >
-                                <Plane className="w-3.5 h-3.5 text-sky-600" />
-                                <span className="text-[11px] font-bold">التذكرة</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => handleDownloadDoc(r.flightTicketDocumentId, r.flightTicketDocumentUrl, `ticket-${r.requestNumber}.pdf`, e)}
-                                className={`p-1 text-sky-700 hover:bg-sky-100 rounded-md transition-colors cursor-pointer ${
-                                  !r.flightTicketDocumentId && !r.flightTicketDocumentUrl ? "opacity-40" : ""
-                                }`}
-                                title="تحميل تذكرة الطيران"
-                              >
-                                <Download className="w-3.5 h-3.5" />
-                              </button>
+                        {/* 6. المستندات والإجراء: سطر المستندات بالأعلى وسطر الإجراءات بالأسفل */}
+                        <td className="py-2.5 px-3 align-middle text-center min-w-[280px]">
+                          <div className="flex flex-col items-center justify-center gap-2 w-full">
+                            {/* السطر الأول: المستندات (التذكرة + الهوية + التأشيرات) */}
+                            <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                              {/* تذكرة الطيران */}
+                              <div className="flex items-center gap-1 bg-sky-50 border border-sky-200 px-2 py-1 rounded-lg shadow-2xs shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleViewDoc(r.flightTicketDocumentId, r.flightTicketDocumentUrl, `تذكرة طيران - ${r.groupName}`, e)}
+                                  className={`p-1 text-sky-700 hover:bg-sky-100 rounded-md transition-colors cursor-pointer flex items-center gap-1 shrink-0 ${
+                                    !r.flightTicketDocumentId && !r.flightTicketDocumentUrl ? "opacity-40" : ""
+                                  }`}
+                                  title="معاينة تذكرة الطيران"
+                                >
+                                  <Plane className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                                  <span className="text-[11px] font-bold whitespace-nowrap">التذكرة</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleDownloadDoc(r.flightTicketDocumentId, r.flightTicketDocumentUrl, `ticket-${r.requestNumber}.pdf`, e)}
+                                  className={`p-1 text-sky-700 hover:bg-sky-100 rounded-md transition-colors cursor-pointer shrink-0 ${
+                                    !r.flightTicketDocumentId && !r.flightTicketDocumentUrl ? "opacity-40" : ""
+                                  }`}
+                                  title="تحميل تذكرة الطيران"
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+
+                              {/* هوية المستضيف */}
+                              <div className="flex items-center gap-1 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg shadow-2xs shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleViewDoc(r.hostIdDocumentId, r.hostIdDocumentUrl, `هوية المستضيف - ${r.hostName || r.groupName}`, e)}
+                                  className={`p-1 text-amber-800 hover:bg-amber-100 rounded-md transition-colors cursor-pointer flex items-center gap-1 shrink-0 ${
+                                    !r.hostIdDocumentId && !r.hostIdDocumentUrl ? "opacity-40" : ""
+                                  }`}
+                                  title="معاينة هوية المستضيف"
+                                >
+                                  <IdCard className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                                  <span className="text-[11px] font-bold whitespace-nowrap">الهوية</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleDownloadDoc(r.hostIdDocumentId, r.hostIdDocumentUrl, `host-id-${r.requestNumber}.jpg`, e)}
+                                  className={`p-1 text-amber-800 hover:bg-amber-100 rounded-md transition-colors cursor-pointer shrink-0 ${
+                                    !r.hostIdDocumentId && !r.hostIdDocumentUrl ? "opacity-40" : ""
+                                  }`}
+                                  title="تحميل هوية المستضيف"
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+
+                              {/* التأشيرات: جلب كافة التأشيرات + طباعة الكل في ملف واحد (للمعاملات المكتملة فقط) */}
+                              {(r.status === "Completed" || r.status === "Archived") && (
+                                <RequestVisaActionButtons
+                                  requestId={r.id}
+                                  requestNumber={r.requestNumber}
+                                  groupName={r.groupName}
+                                  status={r.status}
+                                  onRefresh={loadRequests}
+                                />
+                              )}
                             </div>
 
-                            {/* هوية المستضيف */}
-                            <div className="flex items-center gap-1 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg shadow-2xs">
-                              <button
-                                type="button"
-                                onClick={(e) => handleViewDoc(r.hostIdDocumentId, r.hostIdDocumentUrl, `هوية المستضيف - ${r.hostName || r.groupName}`, e)}
-                                className={`p-1 text-amber-800 hover:bg-amber-100 rounded-md transition-colors cursor-pointer flex items-center gap-1 ${
-                                  !r.hostIdDocumentId && !r.hostIdDocumentUrl ? "opacity-40" : ""
-                                }`}
-                                title="معاينة هوية المستضيف"
-                              >
-                                <IdCard className="w-3.5 h-3.5 text-amber-700" />
-                                <span className="text-[11px] font-bold">الهوية</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => handleDownloadDoc(r.hostIdDocumentId, r.hostIdDocumentUrl, `host-id-${r.requestNumber}.jpg`, e)}
-                                className={`p-1 text-amber-800 hover:bg-amber-100 rounded-md transition-colors cursor-pointer ${
-                                  !r.hostIdDocumentId && !r.hostIdDocumentUrl ? "opacity-40" : ""
-                                }`}
-                                title="تحميل هوية المستضيف"
-                              >
-                                <Download className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-
-                            {/* التأشيرات: جلب كافة التأشيرات + طباعة الكل في ملف واحد (للمعاملات المكتملة فقط) */}
-                            {(r.status === "Completed" || r.status === "Archived") && (
-                              <RequestVisaActionButtons
-                                requestId={r.id}
-                                requestNumber={r.requestNumber}
-                                groupName={r.groupName}
-                                status={r.status}
-                                onRefresh={loadRequests}
-                              />
-                            )}
-
-                            {/* أزرار الإجراء بحسب الدور */}
+                            {/* السطر الثاني: أزرار الإجراء بحسب الدور وسير العمل */}
+                            <div className="flex items-center justify-center gap-1.5 flex-wrap pt-1 border-t border-gray-100/90 w-full">
                             {role === "Sender" && isWaitingHosting(r) && (
                               <button
                                 type="button"
@@ -2902,14 +2906,15 @@ ${travelersLines}
                             {/* زر فتح/عرض المعاملة */}
                             <Link
                               href={`/requests/${r.id}`}
-                              className="inline-flex items-center gap-1 text-xs font-bold text-gray-700 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 border border-gray-300 px-2.5 py-1.5 rounded-lg transition-colors shadow-2xs cursor-pointer"
+                              className="inline-flex items-center gap-1 text-xs font-bold text-gray-700 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 border border-gray-300 px-2.5 py-1.5 rounded-lg transition-colors shadow-2xs cursor-pointer shrink-0"
                               title="عرض تفاصيل المعاملة"
                             >
                               <span>عرض</span>
                               <ArrowRight className="w-3 h-3 rotate-180" />
                             </Link>
                           </div>
-                        </td>
+                        </div>
+                      </td>
                       </tr>
                     );
                   })}
