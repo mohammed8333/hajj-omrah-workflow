@@ -199,7 +199,7 @@ export async function attachVisaDocumentToTraveler(
   requestId: string,
   traveler: Traveler,
   result: MofaVisaResult
-): Promise<void> {
+): Promise<DocumentItem | undefined> {
   // 1. Update Traveler record with visa details
   await api.travelers.update(traveler.id, {
     visaNumber: result.visaNumber || traveler.visaNumber,
@@ -217,15 +217,22 @@ export async function attachVisaDocumentToTraveler(
         } catch {}
       }
 
-      const fileName = `visa-${traveler.passportNumber || traveler.id}.html`;
+      const fileName = `visa-${result.visaNumber || traveler.passportNumber || traveler.id}.html`;
       const blob = new Blob([result.visaHtml], { type: "text/html;charset=utf-8" });
-      const visaFile = new File([blob], fileName, { type: "text/html" });
+      const visaFile = new File([blob], fileName, { type: "text/html", lastModified: Date.now() });
 
-      await api.documents.upload(requestId, visaFile, "Visa", traveler.id);
+      const uploaded = await api.documents.upload(requestId, visaFile, "Visa", traveler.id);
+      return uploaded;
     } catch (uploadErr) {
-      console.warn("Failed to attach visa document file:", uploadErr);
+      console.error("Failed to attach visa document file:", uploadErr);
+      throw new Error(
+        uploadErr instanceof Error
+          ? `تم جلب التأشيرة لكن تعذر حفظ الملف: ${uploadErr.message}`
+          : "تعذر حفظ مستند التأشيرة"
+      );
     }
   }
+  return undefined;
 }
 
 /**
@@ -247,6 +254,8 @@ export async function checkAndAttachVisaToTraveler(
 ): Promise<{
   success: boolean;
   visaNumber?: string;
+  attachedDoc?: DocumentItem;
+  searchResult?: MofaVisaResult;
   error?: string;
   errorType?: "INVALID_CAPTCHA" | "NOT_FOUND" | "NETWORK_ERROR";
   session?: MofaSession;
@@ -312,11 +321,13 @@ export async function checkAndAttachVisaToTraveler(
 
     // 4. Attach document to traveler
     onProgress?.("تم العثور على التأشيرة! جاري ربطها وتنزيل المستند...");
-    await attachVisaDocumentToTraveler(requestId, traveler, searchResult);
+    const attachedDoc = await attachVisaDocumentToTraveler(requestId, traveler, searchResult);
 
     return {
       success: true,
       visaNumber: searchResult.visaNumber,
+      attachedDoc,
+      searchResult,
     };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "فشل فحص التأشيرة";

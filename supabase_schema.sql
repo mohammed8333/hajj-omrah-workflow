@@ -74,6 +74,9 @@ create table if not exists public.travelers (
     date_of_birth text,
     status text not null default 'Pending',
     notes text,
+    visa_number text,
+    visa_status text,
+    visa_issue_date text,
     created_at timestamptz not null default now()
 );
 
@@ -82,7 +85,7 @@ create table if not exists public.documents (
     id text primary key,
     group_request_id text references public.group_requests(id) on delete cascade,
     traveler_id text references public.travelers(id) on delete cascade,
-    document_type text not null check (document_type in ('Passport', 'PersonalPhoto', 'FlightTicket', 'HostId', 'Other')),
+    document_type text not null check (document_type in ('Passport', 'PersonalPhoto', 'FlightTicket', 'HostId', 'Visa', 'Other')),
     original_file_name text not null,
     file_size bigint not null default 0,
     mime_type text,

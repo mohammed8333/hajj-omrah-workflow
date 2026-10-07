@@ -17,7 +17,7 @@ import {
   UserRole,
 } from "@/types";
 
-import { getFileFromIndexedDB } from "./localDatabase";
+import { getFileFromIndexedDB, saveFileToIndexedDB, deleteFileFromIndexedDB } from "./localDatabase";
 import { resolveSenderCode } from "./groupNaming";
 
 const BUCKET_NAME = "hajj-documents";
@@ -99,11 +99,21 @@ function mapDoc(row: any): DocumentItem {
     } catch {}
   }
 
+  let docType = row.document_type as DocumentType;
+  if (
+    docType === "Other" &&
+    (row.original_file_name?.toLowerCase().includes("visa") ||
+      row.original_file_name?.includes("تأشيرة") ||
+      row.mime_type === "text/html")
+  ) {
+    docType = "Visa";
+  }
+
   return {
     id: row.id,
     groupRequestId: row.group_request_id || undefined,
     travelerId: row.traveler_id || undefined,
-    documentType: row.document_type as DocumentType,
+    documentType: docType,
     originalFileName: row.original_file_name,
     fileSize: Number(row.file_size || 0),
     mimeType: row.mime_type || "application/octet-stream",
@@ -132,16 +142,75 @@ function extractAffiliation(row: any): string | undefined {
   return undefined;
 }
 
-// Helper to remove embedded affiliation tag from notes
+// Helper to extract visa number from direct column or embedded note tag
+function extractVisaNumber(row: any): string | undefined {
+  if (row?.visa_number && typeof row.visa_number === "string" && row.visa_number.trim()) {
+    return row.visa_number.trim();
+  }
+  if (row?.visaNumber && typeof row.visaNumber === "string" && row.visaNumber.trim()) {
+    return row.visaNumber.trim();
+  }
+  const notes = typeof row === "string" ? row : row?.notes;
+  if (notes && typeof notes === "string") {
+    const match = notes.match(/\[رقم التأشيرة:\s*([^\]]+)\]/);
+    if (match) return match[1].trim();
+    const lineMatch = notes.match(/^رقم التأشيرة:\s*([0-9]+)/m);
+    if (lineMatch) return lineMatch[1].trim();
+  }
+  return undefined;
+}
+
+// Helper to extract visa status from direct column or embedded note tag
+function extractVisaStatus(row: any): "Issued" | "UnderProcessing" | "NotApplied" | "Rejected" | undefined {
+  if (row?.visa_status && typeof row.visa_status === "string" && row.visa_status.trim()) {
+    return row.visa_status.trim() as any;
+  }
+  if (row?.visaStatus && typeof row.visaStatus === "string" && row.visaStatus.trim()) {
+    return row.visaStatus.trim() as any;
+  }
+  const notes = typeof row === "string" ? row : row?.notes;
+  if (notes && typeof notes === "string") {
+    const match = notes.match(/\[حالة التأشيرة:\s*([^\]]+)\]/);
+    if (match) return match[1].trim() as any;
+  }
+  return undefined;
+}
+
+// Helper to extract visa issue date from direct column or embedded note tag
+function extractVisaIssueDate(row: any): string | undefined {
+  if (row?.visa_issue_date && typeof row.visa_issue_date === "string" && row.visa_issue_date.trim()) {
+    return row.visa_issue_date.trim();
+  }
+  if (row?.visaIssueDate && typeof row.visaIssueDate === "string" && row.visaIssueDate.trim()) {
+    return row.visaIssueDate.trim();
+  }
+  const notes = typeof row === "string" ? row : row?.notes;
+  if (notes && typeof notes === "string") {
+    const match = notes.match(/\[تاريخ إصدار التأشيرة:\s*([^\]]+)\]/);
+    if (match) return match[1].trim();
+  }
+  return undefined;
+}
+
+// Helper to remove embedded tags from notes
 function cleanNotes(notes?: string | null): string | undefined {
   if (!notes) return undefined;
-  const cleaned = notes.replace(/\[التبعية:\s*([^\]]+)\]\s*/g, "").trim();
+  const cleaned = notes
+    .replace(/\[التبعية:\s*([^\]]+)\]\s*/g, "")
+    .replace(/\[رقم التأشيرة:\s*([^\]]+)\]\s*/g, "")
+    .replace(/\[حالة التأشيرة:\s*([^\]]+)\]\s*/g, "")
+    .replace(/\[تاريخ إصدار التأشيرة:\s*([^\]]+)\]\s*/g, "")
+    .trim();
   return cleaned || undefined;
 }
 
 // Map snake_case DB row to TypeScript Traveler
 function mapTraveler(row: any, docs: DocumentItem[] = []): Traveler {
   const aff = extractAffiliation(row);
+  const vNum = extractVisaNumber(row);
+  const vStat = extractVisaStatus(row) || (vNum ? "Issued" : undefined);
+  const vDate = extractVisaIssueDate(row);
+
   return {
     id: row.id,
     groupRequestId: row.group_request_id,
@@ -153,6 +222,9 @@ function mapTraveler(row: any, docs: DocumentItem[] = []): Traveler {
     status: row.status,
     affiliation: aff,
     notes: cleanNotes(row.notes),
+    visaNumber: vNum,
+    visaStatus: vStat,
+    visaIssueDate: vDate,
     createdAt: row.created_at,
     documents: docs.filter((d) => d.travelerId === row.id),
   };
@@ -1149,34 +1221,64 @@ export const supabaseService = {
 
       const affProvided = data.affiliation !== undefined;
       const notesProvided = data.notes !== undefined;
+      const visaNoProvided = data.visaNumber !== undefined;
+      const visaStatProvided = data.visaStatus !== undefined;
+      const visaDateProvided = data.visaIssueDate !== undefined;
 
-      if (affProvided || notesProvided) {
-        let currentAff = affProvided ? data.affiliation?.trim() : undefined;
-        let currentNotes = notesProvided ? data.notes?.trim() : undefined;
+      if (affProvided || notesProvided || visaNoProvided || visaStatProvided || visaDateProvided) {
+        let existingTrv: any = null;
+        try {
+          const { data: ex } = await client
+            .from("travelers")
+            .select("*")
+            .eq("id", id)
+            .single();
+          existingTrv = ex;
+        } catch (_) {}
 
-        if (currentAff === undefined || currentNotes === undefined) {
-          try {
-            const { data: existingTrv } = await client
-              .from("travelers")
-              .select("affiliation, notes")
-              .eq("id", id)
-              .single();
-            if (currentAff === undefined) currentAff = extractAffiliation(existingTrv);
-            if (currentNotes === undefined) currentNotes = cleanNotes(existingTrv?.notes);
-          } catch (_) {}
-        }
+        let currentAff = affProvided ? data.affiliation?.trim() : extractAffiliation(existingTrv);
+        let currentNotes = notesProvided ? data.notes?.trim() : cleanNotes(existingTrv?.notes);
+        let currentVisaNo = visaNoProvided ? data.visaNumber?.trim() : (existingTrv?.visa_number || extractVisaNumber(existingTrv?.notes));
+        let currentVisaStat = visaStatProvided ? data.visaStatus : (existingTrv?.visa_status || extractVisaStatus(existingTrv?.notes) || (currentVisaNo ? "Issued" : undefined));
+        let currentVisaDate = visaDateProvided ? data.visaIssueDate?.trim() : (existingTrv?.visa_issue_date || extractVisaIssueDate(existingTrv?.notes));
 
         let combinedNotes = (currentNotes || "").trim();
         if (currentAff) {
           combinedNotes = `[التبعية: ${currentAff}] ${combinedNotes}`.trim();
         }
+        if (currentVisaNo) {
+          combinedNotes = `[رقم التأشيرة: ${currentVisaNo}] ${combinedNotes}`.trim();
+        }
+        if (currentVisaStat) {
+          combinedNotes = `[حالة التأشيرة: ${currentVisaStat}] ${combinedNotes}`.trim();
+        }
+        if (currentVisaDate) {
+          combinedNotes = `[تاريخ إصدار التأشيرة: ${currentVisaDate}] ${combinedNotes}`.trim();
+        }
+
         payload.notes = combinedNotes || null;
         if (affProvided) {
           payload.affiliation = currentAff || null;
         }
+        if (currentVisaNo) {
+          payload.visa_number = currentVisaNo;
+        }
+        if (currentVisaStat) {
+          payload.visa_status = currentVisaStat;
+        }
+        if (currentVisaDate) {
+          payload.visa_issue_date = currentVisaDate;
+        }
       }
 
       let { error } = await client.from("travelers").update(payload).eq("id", id);
+      if (error && (error.message?.includes("visa_") || error.code === "PGRST204" || error.code === "42703")) {
+        delete payload.visa_number;
+        delete payload.visa_status;
+        delete payload.visa_issue_date;
+        const retry = await client.from("travelers").update(payload).eq("id", id);
+        error = retry.error;
+      }
       if (error && (error.message?.includes("affiliation") || error.code === "PGRST204")) {
         delete payload.affiliation;
         const retry = await client.from("travelers").update(payload).eq("id", id);
@@ -1205,25 +1307,39 @@ export const supabaseService = {
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
       const storagePath = `${requestId}/${Date.now()}_${safeName}`;
 
-      // Upload file to Supabase Storage
-      const { error: uploadErr } = await client.storage
-        .from(BUCKET_NAME)
-        .upload(storagePath, file, { upsert: true });
-
-      if (uploadErr) {
-        console.warn("Supabase storage upload error:", uploadErr);
-        // If storage bucket is missing, provide a friendly error
-        if (uploadErr.message.includes("Bucket not found")) {
-          throw new Error("حاوية تخزين الملفات (hajj-documents) غير موجودة في Supabase. يرجى إنشاء Bucket باسم hajj-documents وضبطه كـ Public.");
-        }
-        throw new Error(`فشل رفع الملف إلى السحابة: ${uploadErr.message}`);
+      // 1. Always cache in IndexedDB for instant local availability and preview
+      try {
+        const reader = new FileReader();
+        const base64Promise = new Promise<string>((resolve, reject) => {
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+        });
+        reader.readAsDataURL(file);
+        const dataUrl = await base64Promise;
+        await saveFileToIndexedDB(docId, dataUrl);
+      } catch (idbErr) {
+        console.warn("Could not cache file to IndexedDB:", idbErr);
       }
 
-      const { data: pubData } = client.storage.from(BUCKET_NAME).getPublicUrl(storagePath);
-      const storageUrl = pubData.publicUrl;
+      // 2. Upload file to Supabase Storage if configured
+      let storageUrl: string | undefined = undefined;
+      try {
+        const { error: uploadErr } = await client.storage
+          .from(BUCKET_NAME)
+          .upload(storagePath, file, { upsert: true });
 
-      // Insert document record in DB
-      const row = {
+        if (uploadErr) {
+          console.warn("Supabase storage upload error:", uploadErr);
+        } else {
+          const { data: pubData } = client.storage.from(BUCKET_NAME).getPublicUrl(storagePath);
+          storageUrl = pubData?.publicUrl || undefined;
+        }
+      } catch (stEx) {
+        console.warn("Supabase storage exception:", stEx);
+      }
+
+      // 3. Insert document record in DB (with fallback to 'Other' if DB constraint hasn't been updated yet)
+      let row: any = {
         id: docId,
         group_request_id: requestId,
         traveler_id: travelerId || null,
@@ -1240,11 +1356,19 @@ export const supabaseService = {
         storage_url: storageUrl,
       };
 
-      const { data: inserted, error: insertErr } = await client
+      let { data: inserted, error: insertErr } = await client
         .from("documents")
         .insert(row)
         .select()
         .single();
+
+      if (insertErr && (insertErr.message?.includes("document_type") || insertErr.code === "23514")) {
+        // Fallback for Supabase databases where CHECK constraint does not yet include 'Visa'
+        row.document_type = "Other";
+        const retry = await client.from("documents").insert(row).select().single();
+        inserted = retry.data;
+        insertErr = retry.error;
+      }
 
       if (insertErr) throw new Error(insertErr.message);
 
@@ -1268,6 +1392,9 @@ export const supabaseService = {
           if (oldPaths.length > 0) {
             try { await client.storage.from(BUCKET_NAME).remove(oldPaths); } catch {}
           }
+          oldTicketDocs.forEach((d) => {
+            deleteFileFromIndexedDB(d.id).catch(() => {});
+          });
           await client
             .from("documents")
             .delete()
@@ -1310,6 +1437,9 @@ export const supabaseService = {
           if (oldPaths.length > 0) {
             try { await client.storage.from(BUCKET_NAME).remove(oldPaths); } catch {}
           }
+          oldHostDocs.forEach((d) => {
+            deleteFileFromIndexedDB(d.id).catch(() => {});
+          });
           await client
             .from("documents")
             .delete()
@@ -1319,20 +1449,37 @@ export const supabaseService = {
         // Remove previous documents of same type for this traveler from storage and DB
         const { data: oldTrvDocs } = await client
           .from("documents")
-          .select("id, storage_path")
+          .select("id, storage_path, document_type, original_file_name")
           .eq("traveler_id", travelerId)
-          .eq("document_type", documentType)
           .neq("id", docId);
 
         if (oldTrvDocs && oldTrvDocs.length > 0) {
-          const oldPaths = oldTrvDocs.map((d) => d.storage_path).filter(Boolean);
-          if (oldPaths.length > 0) {
-            try { await client.storage.from(BUCKET_NAME).remove(oldPaths); } catch {}
+          const toDelete = oldTrvDocs.filter((d) => {
+            if (d.document_type === documentType) return true;
+            if (
+              documentType === "Visa" &&
+              d.document_type === "Other" &&
+              (d.original_file_name?.toLowerCase().includes("visa") ||
+                d.original_file_name?.includes("تأشيرة"))
+            ) {
+              return true;
+            }
+            return false;
+          });
+
+          if (toDelete.length > 0) {
+            const oldPaths = toDelete.map((d) => d.storage_path).filter(Boolean);
+            if (oldPaths.length > 0) {
+              try { await client.storage.from(BUCKET_NAME).remove(oldPaths); } catch {}
+            }
+            toDelete.forEach((d) => {
+              deleteFileFromIndexedDB(d.id).catch(() => {});
+            });
+            await client
+              .from("documents")
+              .delete()
+              .in("id", toDelete.map((d) => d.id));
           }
-          await client
-            .from("documents")
-            .delete()
-            .in("id", oldTrvDocs.map((d) => d.id));
         }
       }
 
@@ -1353,16 +1500,26 @@ export const supabaseService = {
     },
 
     delete: async (documentId: string) => {
+      try {
+        await deleteFileFromIndexedDB(documentId);
+      } catch {}
+
       const client = getClient();
       const { data: doc } = await client.from("documents").select("storage_path").eq("id", documentId).single();
       if (doc?.storage_path) {
-        await client.storage.from(BUCKET_NAME).remove([doc.storage_path]);
+        try { await client.storage.from(BUCKET_NAME).remove([doc.storage_path]); } catch {}
       }
       const { error } = await client.from("documents").delete().eq("id", documentId);
       if (error) throw new Error(error.message);
     },
 
     getStreamUrl: async (documentId: string): Promise<string> => {
+      // 1. Check local IndexedDB first for instant access without network latency or CORS
+      try {
+        const fromIdb = await getFileFromIndexedDB(documentId);
+        if (fromIdb) return fromIdb;
+      } catch {}
+
       const client = getClient();
       const { data: doc, error } = await client
         .from("documents")
@@ -1376,7 +1533,7 @@ export const supabaseService = {
 
       if (doc.storage_path) {
         const { data } = client.storage.from(BUCKET_NAME).getPublicUrl(doc.storage_path);
-        return data.publicUrl;
+        if (data?.publicUrl) return data.publicUrl;
       }
 
       throw new Error("رابط المستند غير متوفر");

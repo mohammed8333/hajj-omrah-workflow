@@ -1100,6 +1100,25 @@ export default function RequestDetailPage({
             res.visaNumber ? `| رقم التأشيرة: ${res.visaNumber}` : ""
           } 🇸🇦`
         );
+        setRequest((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            travelers: prev.travelers.map((t) => {
+              if (t.id === traveler.id) {
+                const existingDocs = t.documents ? t.documents.filter((d) => d.documentType !== "Visa") : [];
+                const updatedDocs = res.attachedDoc ? [...existingDocs, res.attachedDoc] : existingDocs;
+                return {
+                  ...t,
+                  visaNumber: res.visaNumber || t.visaNumber,
+                  visaStatus: "Issued",
+                  documents: updatedDocs,
+                };
+              }
+              return t;
+            }),
+          };
+        });
         await loadRequest(false);
       } else if (res.errorType === "INVALID_CAPTCHA" && res.session) {
         // Open interactive Captcha verification dialog
@@ -1185,6 +1204,7 @@ export default function RequestDetailPage({
 
       if (res.success) {
         const trvName = mofaModalData.traveler.fullName;
+        const trvId = mofaModalData.traveler.id;
         const vNum = res.visaNumber;
         setMofaModalData(null);
         setSuccess(
@@ -1192,6 +1212,25 @@ export default function RequestDetailPage({
             vNum ? `| رقم التأشيرة: ${vNum}` : ""
           } 🇸🇦`
         );
+        setRequest((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            travelers: prev.travelers.map((t) => {
+              if (t.id === trvId) {
+                const existingDocs = t.documents ? t.documents.filter((d) => d.documentType !== "Visa") : [];
+                const updatedDocs = res.attachedDoc ? [...existingDocs, res.attachedDoc] : existingDocs;
+                return {
+                  ...t,
+                  visaNumber: vNum || t.visaNumber,
+                  visaStatus: "Issued",
+                  documents: updatedDocs,
+                };
+              }
+              return t;
+            }),
+          };
+        });
         await loadRequest(false);
       } else if (res.errorType === "INVALID_CAPTCHA") {
         try {
@@ -4183,7 +4222,7 @@ export default function RequestDetailPage({
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
               {(["Passport", "PersonalPhoto", "Visa"] as DocumentType[]).map(
                 (docType) => {
-                  const doc = traveler.documents.find(
+                  const doc = traveler.documents?.find(
                     (d) => d.documentType === docType
                   );
 
