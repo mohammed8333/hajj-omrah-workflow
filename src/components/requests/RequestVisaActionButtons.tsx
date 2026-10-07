@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { DownloadCloud, Printer, Loader2 } from "lucide-react";
+import { Printer, Loader2 } from "lucide-react";
 import { useDialog } from "@/lib/dialog-context";
 import {
   bulkFetchVisasForRequest,
@@ -129,50 +129,55 @@ export const RequestVisaActionButtons: React.FC<RequestVisaActionButtonsProps> =
 
   return (
     <div className="inline-flex flex-col items-center gap-0.5 shrink-0">
-      <div className="inline-flex items-center gap-1 bg-emerald-50 border border-emerald-300 px-2 py-0.5 rounded-lg shadow-2xs whitespace-nowrap shrink-0">
-        {/* زر جلب التأشيرات */}
+      <div className="inline-flex items-center bg-white border border-emerald-300 rounded-lg shadow-2xs overflow-hidden shrink-0">
+        {/* نصف جلب التأشيرات: أيقونة على شكل حرف V */}
         <button
           type="button"
           onClick={handleFetchAllVisas}
           disabled={isFetching || isPrinting}
-          className="p-1 text-emerald-800 hover:bg-emerald-100 rounded-md transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-50 whitespace-nowrap shrink-0"
-          title="جلب وفحص كافة تأشيرات المسافرين في هذه المعاملة آلياً من منصة وزارة الخارجية"
+          className="p-1 px-1.5 text-emerald-700 hover:text-emerald-900 hover:bg-emerald-50 active:bg-emerald-100 transition-colors cursor-pointer flex items-center justify-center disabled:opacity-50 shrink-0"
+          title="جلب وفحص تأشيرات كافة مسافري المعاملة آلياً (منصة وزارة الخارجية MOFA)"
         >
           {isFetching ? (
             <Loader2 className="w-3.5 h-3.5 text-emerald-600 animate-spin shrink-0" />
           ) : (
-            <DownloadCloud className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+            <svg
+              className="w-3.5 h-3.5 text-emerald-600 shrink-0"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M5 6L12 18.5L19 6" />
+            </svg>
           )}
-          <span className="text-[11px] font-bold whitespace-nowrap">
-            {isFetching ? "جاري الجلب..." : "جلب التأشيرات"}
-          </span>
         </button>
 
-        <span className="text-emerald-300 select-none font-bold shrink-0">|</span>
+        {/* فاصل رفيع بين النصفين */}
+        <span className="w-px h-3.5 bg-emerald-200 select-none shrink-0" />
 
-        {/* زر طباعة كافة التأشيرات في ملف واحد */}
+        {/* نصف طباعة التأشيرات: علامة طباعة فقط بدون كتابة */}
         <button
           type="button"
           onClick={handlePrintAllVisas}
           disabled={isFetching || isPrinting}
-          className="p-1 text-purple-800 hover:bg-purple-100 rounded-md transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-50 whitespace-nowrap shrink-0"
-          title="طباعة كافة تأشيرات المسافرين في هذه المعاملة في ملف واحد (صفحة رسمية لكل تأشيرة)"
+          className="p-1 px-1.5 text-purple-700 hover:text-purple-900 hover:bg-purple-50 active:bg-purple-100 transition-colors cursor-pointer flex items-center justify-center disabled:opacity-50 shrink-0"
+          title="طباعة كافة تأشيرات المسافرين في ملف واحد (صفحة رسمية لكل تأشيرة)"
         >
           {isPrinting ? (
             <Loader2 className="w-3.5 h-3.5 text-purple-600 animate-spin shrink-0" />
           ) : (
             <Printer className="w-3.5 h-3.5 text-purple-600 shrink-0" />
           )}
-          <span className="text-[11px] font-bold whitespace-nowrap">
-            {isPrinting ? "جاري التجهيز..." : "طباعة التأشيرات"}
-          </span>
         </button>
       </div>
 
       {/* مؤشر التقدم أثناء فحص التأشيرات */}
       {isFetching && progressMsg && (
         <span
-          className="text-[9.5px] font-semibold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-md animate-pulse truncate max-w-[200px] whitespace-nowrap"
+          className="text-[9.5px] font-semibold text-emerald-700 bg-emerald-100/90 px-1.5 py-0.5 rounded-md animate-pulse truncate max-w-[180px] whitespace-nowrap"
           title={progressMsg}
         >
           {progressMsg}
