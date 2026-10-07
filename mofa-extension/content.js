@@ -1,5 +1,5 @@
 /**
- * مساعد تأشيرات وزارة الخارجية السعودية (MOFA Visa Helper)
+ * مساعد تأشيرات وزارة الخارجية السعودية (MOFA & KSA VISA Helper)
  * يقوم بتعبئة بيانات المسافر تلقائياً، والتقاط التأشيرة عند صدورها وربطها بنظام إدارة العمرة
  */
 
@@ -24,7 +24,7 @@
             reqId: params.get("reqId") || "",
             autoCapture: params.get("auto") !== "0",
           };
-          // حفظها في الجلسة حتى لو أعادت الصفحة التحميل بعد الضغط على بحث
+          // حفظها في الجلسة حتى لو أعادت الصفحة التحميل أو تم الانتقال بين الصفحات
           sessionStorage.setItem("safa_mofa_context", JSON.stringify(ctx));
         }
       } catch (err) {
@@ -47,10 +47,27 @@
 
   // 2. فحص هل الصفحة الحالية هي صفحة نتيجة تأشيرة صادرة
   function detectVisaResult() {
+    const href = window.location.href.toLowerCase();
     const bodyText = document.body ? document.body.innerText || "" : "";
+
+    // استثناء صفحات الخطأ
+    if (href.includes("handleexception") || href.includes("error")) {
+      return null;
+    }
+
+    const isPrintedUmrahVisa =
+      href.includes("printedumrahvisa") ||
+      href.includes("printvisa") ||
+      href.includes("umrahvisa");
+
     const hasVisaKeywords =
+      isPrintedUmrahVisa ||
       bodyText.includes("رقم التأشيرة") ||
-      bodyText.includes("تأشيرة") && bodyText.includes("تاريخ انتهاء التأشيرة") ||
+      (bodyText.includes("تأشيرة") &&
+        (bodyText.includes("تاريخ انتهاء") ||
+          bodyText.includes("صالحة لغاية") ||
+          bodyText.includes("مدة الإقامة") ||
+          bodyText.includes("صادرة اعتباراً من"))) ||
       bodyText.includes("Visa No");
 
     if (!hasVisaKeywords) return null;
@@ -80,10 +97,9 @@
 
     // أ) تحديد خيار البحث (البحث برقم الجواز)
     const searchOptionSelect = document.querySelector(
-      'select[name*="SearchOption"], select[id*="SearchOption"], select[id*="SearchType"], #SearchOption'
+      'select[name*="SearchOption"], select[id*="SearchOption"], select[id*="SearchType"], #SearchOption, #SearchingType'
     );
     if (searchOptionSelect) {
-      // البحث عن خيار "جواز السفر" أو "رقم الجواز"
       for (const opt of searchOptionSelect.options) {
         if (
           opt.text.includes("جواز") ||
@@ -135,7 +151,6 @@
       );
       for (const sel of natSelects) {
         const natCode = context.nationality;
-        let matched = false;
         for (const opt of sel.options) {
           if (
             opt.value.toUpperCase() === natCode ||
@@ -148,7 +163,6 @@
           ) {
             sel.value = opt.value;
             sel.dispatchEvent(new Event("change", { bubbles: true }));
-            matched = true;
             filledCount++;
             break;
           }
@@ -175,13 +189,15 @@
     let existing = document.getElementById("mofa-helper-widget");
     if (existing) existing.remove();
 
+    const isExceptionPage = window.location.href.toLowerCase().includes("handleexception");
+
     const widget = document.createElement("div");
     widget.id = "mofa-helper-widget";
 
     if (visaInfo && visaInfo.isVisa) {
       // --- حالة: تم العثور على التأشيرة ---
       widget.innerHTML = `
-        <div class="mofa-helper-header" style="background: linear-gradient(135deg, #1e40af 0%, #1d4ed8 100%);">
+        <div class="mofa-helper-header" style="background: linear-gradient(135deg, #059669 0%, #10b981 100%);">
           <div class="mofa-helper-title">
             <span>🇸🇦 تم العثور على التأشيرة</span>
             <span class="mofa-helper-badge">جاهز للحفظ</span>
@@ -189,9 +205,9 @@
           <button id="mofa-close-btn" style="background:none;border:none;color:#fff;cursor:pointer;font-size:16px;">✕</button>
         </div>
         <div class="mofa-helper-body">
-          <div class="mofa-helper-info-row" style="background: #eff6ff; border-color: #bfdbfe;">
-            <span class="mofa-helper-info-label" style="color: #1e40af;">رقم التأشيرة:</span>
-            <span class="mofa-helper-info-value" style="color: #1e3a8a; font-size: 15px;">${visaInfo.visaNumber || "مستخرجة من الصفحة"}</span>
+          <div class="mofa-helper-info-row" style="background: #ecfdf5; border-color: #a7f3d0;">
+            <span class="mofa-helper-info-label" style="color: #065f46;">رقم التأشيرة:</span>
+            <span class="mofa-helper-info-value" style="color: #064e3b; font-size: 15px; font-weight: bold;">${visaInfo.visaNumber || "مستخرجة من الصفحة"}</span>
           </div>
           ${
             context && context.name
@@ -212,12 +228,12 @@
         </div>
       `;
     } else if (context) {
-      // --- حالة: صفحة إدخال البيانات ---
+      // --- حالة: صفحة إدخال البيانات أو صفحة أخرى ---
       widget.innerHTML = `
         <div class="mofa-helper-header">
           <div class="mofa-helper-title">
             <span>🕋 نظام العمرة: مساعد التأشيرات</span>
-            <span class="mofa-helper-badge">تعبئة آلية</span>
+            <span class="mofa-helper-badge">${isExceptionPage ? "تنبيه" : "تعبئة آلية"}</span>
           </div>
           <button id="mofa-close-btn" style="background:none;border:none;color:#fff;cursor:pointer;font-size:16px;">✕</button>
         </div>
@@ -230,24 +246,40 @@
             <span class="mofa-helper-info-label">رقم الجواز:</span>
             <span class="mofa-helper-info-value">${context.passport}</span>
           </div>
-          <div class="mofa-helper-alert mofa-helper-alert-info">
-            <span>⚡ تم تعبئة البيانات آلياً! يرجى إدخال رمز الصورة (الكابتشا) ثم الضغط على بحث.</span>
-          </div>
+
+          ${
+            isExceptionPage
+              ? `<div class="mofa-helper-alert" style="background:#fffbeb;border-color:#fde68a;color:#92400e;">
+                  <span>⚠️ الرابط السابق قديم بالوزارة. اضغط على الزر أدناه للانتقال لصفحة الاستعلام الرئيسية:</span>
+                </div>`
+              : `<div class="mofa-helper-alert mofa-helper-alert-info">
+                  <span>⚡ تم تعبئة البيانات آلياً! إذا كنت في صفحة التأشيرة اضغط "حفظ الصفحة كتأشيرة".</span>
+                </div>`
+          }
+
           <div class="mofa-helper-actions">
-            <button id="mofa-re-fill-btn" class="mofa-helper-btn mofa-helper-btn-secondary" title="إعادة تعبئة البيانات">
-              <span>🔄 إعادة تعبئة الحقول</span>
+            ${
+              isExceptionPage
+                ? `<a href="https://visa.mofa.gov.sa" class="mofa-helper-btn" style="background:#0284c7;color:#fff;text-decoration:none;display:flex;align-items:center;justify-content:center;margin-bottom:6px;">
+                    <span>🌐 الانتقال لصفحة الاستعلام الرئيسية</span>
+                  </a>`
+                : `<button id="mofa-re-fill-btn" class="mofa-helper-btn mofa-helper-btn-secondary" style="margin-bottom:6px;" title="إعادة تعبئة البيانات">
+                    <span>🔄 تعبئة الحقول تلقائياً</span>
+                  </button>`
+            }
+            <button id="mofa-manual-capture-btn" class="mofa-helper-btn mofa-helper-btn-capture" title="حفظ هذه الصفحة الحالية كتأشيرة للمسافر">
+              <span>💾 حفظ وربط هذه الصفحة كتأشيرة</span>
             </button>
           </div>
         </div>
       `;
     } else {
-      // لا توجد بيانات مسافر
       return;
     }
 
     document.body.appendChild(widget);
 
-    // إضافة الأحداث (Events)
+    // إضافة الأحداث
     const closeBtn = document.getElementById("mofa-close-btn");
     if (closeBtn) closeBtn.onclick = () => widget.remove();
 
@@ -255,7 +287,28 @@
     if (reFillBtn) {
       reFillBtn.onclick = () => {
         tryAutoFillForm(context);
-        alert("تمت إعادة تعبئة الحقول بنجاح!");
+        alert("تمت محاولة تعبئة الحقول بنجاح!");
+      };
+    }
+
+    const manualCaptureBtn = document.getElementById("mofa-manual-capture-btn");
+    if (manualCaptureBtn) {
+      manualCaptureBtn.onclick = () => {
+        let detected = detectVisaResult();
+        if (!detected) {
+          // استخراج أي رقم 10 أرقام في الصفحة أو سؤال المستخدم
+          const match = document.body.innerText.match(/(\d{10})/);
+          let promptNum = match ? match[1] : "";
+          if (!promptNum) {
+            promptNum = prompt("يرجى تأكيد رقم التأشيرة (أو اتركه فارغاً للحفظ كصفحة):", "") || "";
+          }
+          detected = {
+            isVisa: true,
+            visaNumber: promptNum,
+            html: document.documentElement.outerHTML,
+          };
+        }
+        sendVisaToSystem(context, detected);
       };
     }
 
@@ -275,8 +328,8 @@
       travelerId: context ? context.travelerId : "",
       reqId: context ? context.reqId : "",
       passportNumber: context ? context.passport : "",
-      visaNumber: visaInfo.visaNumber,
-      visaHtml: visaInfo.html,
+      visaNumber: visaInfo ? visaInfo.visaNumber : "",
+      visaHtml: visaInfo ? visaInfo.html : document.documentElement.outerHTML,
       timestamp: Date.now(),
     };
 
@@ -297,13 +350,16 @@
       localStorage.setItem("mofa_last_captured_visa", JSON.stringify(payload));
     } catch (e) {}
 
-    const linkBtn = document.getElementById("mofa-link-visa-btn");
+    const linkBtn =
+      document.getElementById("mofa-link-visa-btn") ||
+      document.getElementById("mofa-manual-capture-btn");
+
     if (linkBtn) {
       linkBtn.innerHTML = "<span>✓ تم ربط التأشيرة بنجاح! جاري الإغلاق...</span>";
       linkBtn.style.background = "#059669";
     }
 
-    // إغلاق النافذة المنبثقة تلقائياً بعد ثانيتين
+    // إغلاق النافذة المنبثقة بعد ثانيتين
     setTimeout(() => {
       try {
         window.close();
@@ -318,7 +374,7 @@
       console.log("🇸🇦 [MOFA Helper] Visa result detected:", visaResult.visaNumber);
       renderWidget(ctx, visaResult);
     } else if (ctx) {
-      const filled = tryAutoFillForm(ctx);
+      tryAutoFillForm(ctx);
       renderWidget(ctx, null);
     }
   }, 700);
