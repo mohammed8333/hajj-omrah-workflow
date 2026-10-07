@@ -509,6 +509,49 @@
     }
   }
 
+  // دوال جلب ومزامنة الكابتشا بمرونة
+  function getPageCaptchaImg() {
+    return document.querySelector("#imgCaptcha, img[src*='Captcha'], img[src*='captcha'], #CaptchaImage");
+  }
+
+  function getPageCaptchaInput() {
+    return document.querySelector("#Captcha, input[name='Captcha'], input[name*='captcha' i]");
+  }
+
+  function syncCaptchaImage() {
+    const pageCaptchaImg = getPageCaptchaImg();
+    const widgetCaptchaImg = document.getElementById("mofa-widget-captcha-img");
+    const captchaInputWidget = document.getElementById("mofa-widget-captcha-input");
+    const pageCaptchaInput = getPageCaptchaInput();
+
+    if (pageCaptchaImg && widgetCaptchaImg) {
+      const src = pageCaptchaImg.getAttribute("src") || pageCaptchaImg.src;
+      if (src && widgetCaptchaImg.src !== src) {
+        widgetCaptchaImg.src = src;
+      }
+
+      const runOcr = () => {
+        ocrMofaCaptcha(pageCaptchaImg, (text) => {
+          if (text && text.length >= 4) {
+            console.log("🇸🇦 [MOFA Helper] OCR recognized captcha:", text);
+            if (captchaInputWidget && !captchaInputWidget.value) captchaInputWidget.value = text;
+            if (pageCaptchaInput && !pageCaptchaInput.value) {
+              pageCaptchaInput.value = text;
+              pageCaptchaInput.dispatchEvent(new Event("input", { bubbles: true }));
+              pageCaptchaInput.dispatchEvent(new Event("change", { bubbles: true }));
+            }
+          }
+        });
+      };
+
+      if (pageCaptchaImg.complete && pageCaptchaImg.naturalWidth > 0) {
+        runOcr();
+      } else {
+        pageCaptchaImg.addEventListener("load", runOcr, { once: true });
+      }
+    }
+  }
+
   // دالة متقدمة لحذف وإخفاء أي أثر لتنبيه "حقل إجباري" للجنسية
   function purgeNationalityError() {
     try {
@@ -628,102 +671,6 @@
 
     purgeNationalityError();
 
-    // ب) حقن كود لتطبيق الإعداد على jQuery و Select2 بدون استدعاء MRZCode_set (لتجنب الضغط المبكر على زر الاستعلام)
-    try {
-      const scriptCode = `
-        (function() {
-          try {
-            var pass = ${JSON.stringify(passport)};
-            var fn = ${JSON.stringify(firstName)};
-            var nat = ${JSON.stringify(targetNat)};
-            var jq = window.jQuery || window.$;
-
-            if (jq) {
-              // 1. رقم الجواز
-              var $d1 = jq('#ddlFirstValue');
-              if ($d1.length) $d1.val('PassPortNo').trigger('change');
-              var $t1 = jq('#tbFirstValue');
-              if ($t1.length && pass) {
-                $t1.val(pass).removeClass('error').addClass('valid').attr('aria-invalid', 'false').trigger('input').trigger('change');
-              }
-
-              // 2. الاسم الأول
-              var $d2 = jq('#ddlSecondValue');
-              if ($d2.length) $d2.val('fName').trigger('change');
-              var $t2 = jq('#tbSecondValue');
-              if ($t2.length && fn) {
-                $t2.val(fn).removeClass('error').addClass('valid').attr('aria-invalid', 'false').trigger('input').trigger('change');
-              }
-
-              // 3. الجنسية - مصر
-              var $nat = jq('#NationalityId');
-              if ($nat.length) {
-                $nat.val(nat);
-                $nat.find('option').prop('selected', false).removeAttr('selected');
-                $nat.find('option[value="' + nat + '"]').prop('selected', true).attr('selected', 'selected');
-                $nat.removeClass('error').addClass('valid').attr('aria-invalid', 'false');
-                $nat.trigger('change');
-                $nat.trigger('change.select2');
-
-                try {
-                  $nat.trigger({
-                    type: 'select2:select',
-                    params: {
-                      data: { id: nat, text: 'مصر' }
-                    }
-                  });
-                } catch(e) {}
-
-                // التحقق رسمياً عبر jQuery Validate لإلغاء حالة الخطأ
-                try {
-                  if (jq('#myform').length && typeof jq('#myform').validate === 'function') {
-                    var val = jq('#myform').validate();
-                    if (val) {
-                      if (typeof val.element === 'function') {
-                        val.element($nat);
-                      }
-                      if (val.errorMap) delete val.errorMap['NationalityId'];
-                      if (val.errorList && val.errorList.length) {
-                        val.errorList = val.errorList.filter(function(x) {
-                          return x.element && x.element.id !== 'NationalityId';
-                        });
-                      }
-                    }
-                  }
-                } catch(e) {}
-              }
-
-              // 4. تحديث حاوية Select2 v4
-              var $cont = jq('#select2-NationalityId-container');
-              if ($cont.length) {
-                $cont.attr('title', 'مصر').attr('aria-readonly', 'true');
-                $cont.html('<span class="select2-selection__clear" title="قم بإزالة كل العناصر">×</span>مصر');
-              }
-
-              // 5. إزالة رسائل الخطأ من DOM
-              jq('label[for="NationalityId"], #NationalityId-error, .col-md-3 label.error, span[data-valmsg-for="NationalityId"]').each(function() {
-                jq(this).hide().css('display', 'none').text('').remove();
-              });
-
-              // إزالة أي عنصر يحمل نص "حقل إجباري" داخل عمود الجنسية
-              if ($cont.length) {
-                var $parent = $cont.closest('.col-md-3');
-                if ($parent.length) {
-                  $parent.find('*').filter(function() {
-                    return jq(this).text().indexOf('حقل إجباري') !== -1 && !jq(this).hasClass('select2-selection__rendered');
-                  }).hide().css('display', 'none').text('').remove();
-                }
-              }
-            }
-          } catch(e) {}
-        })();
-      `;
-      const scriptEl = document.createElement("script");
-      scriptEl.textContent = scriptCode;
-      (document.head || document.documentElement).appendChild(scriptEl);
-      scriptEl.remove();
-    } catch (e) {}
-
     purgeNationalityError();
     return true;
   }
@@ -748,6 +695,7 @@
     }
 
     purgeNationalityError();
+    syncCaptchaImage();
 
     if (natCont && !natCont.textContent.includes("مصر")) {
       natCont.setAttribute("title", "مصر");
@@ -894,31 +842,12 @@
     }
 
     // 2. مزامنة صورة الكابتشا
-    const pageCaptchaImg = document.getElementById("imgCaptcha");
-    const widgetCaptchaImg = document.getElementById("mofa-widget-captcha-img");
-    const captchaInputWidget = document.getElementById("mofa-widget-captcha-input");
-    const pageCaptchaInput = document.getElementById("Captcha");
+    syncCaptchaImage();
+    setTimeout(syncCaptchaImage, 500);
+    setTimeout(syncCaptchaImage, 1200);
 
-    function syncCaptchaImage() {
-      if (pageCaptchaImg && widgetCaptchaImg) {
-        widgetCaptchaImg.src = pageCaptchaImg.src;
-        // قراءة الرمز تلقائياً عبر OCR فور جاهزية الصورة
-        ocrMofaCaptcha(pageCaptchaImg, (text) => {
-          if (text && text.length >= 4) {
-            console.log("🇸🇦 [MOFA Helper] OCR recognized captcha:", text);
-            if (captchaInputWidget) captchaInputWidget.value = text;
-            if (pageCaptchaInput) {
-              pageCaptchaInput.value = text;
-              pageCaptchaInput.dispatchEvent(new Event("input", { bubbles: true }));
-              pageCaptchaInput.dispatchEvent(new Event("change", { bubbles: true }));
-            }
-          }
-        });
-      }
-    }
-
+    const pageCaptchaImg = getPageCaptchaImg();
     if (pageCaptchaImg) {
-      syncCaptchaImage();
       pageCaptchaImg.addEventListener("load", syncCaptchaImage);
     }
 
@@ -926,27 +855,30 @@
     const refreshBtn = document.getElementById("mofa-refresh-captcha-btn");
     const imgWrapper = document.getElementById("mofa-captcha-img-wrapper");
     const doRefresh = () => {
-      const pageRefreshBtn = document.getElementById("btnRefreshCaptcha");
+      const pageRefreshBtn = document.querySelector("#btnRefreshCaptcha, [id*='RefreshCaptcha' i], .btn-refresh-captcha");
+      const pImg = getPageCaptchaImg();
       if (pageRefreshBtn) {
         pageRefreshBtn.click();
-      } else if (pageCaptchaImg) {
-        pageCaptchaImg.src = "/Base/GetRandomCaptchaImage/" + Math.floor(Math.random() * 1000000000);
+      } else if (pImg) {
+        pImg.src = "/Base/GetRandomCaptchaImage/" + Math.floor(Math.random() * 1000000000);
       }
       setTimeout(syncCaptchaImage, 350);
+      setTimeout(syncCaptchaImage, 1000);
     };
 
     if (refreshBtn) refreshBtn.onclick = doRefresh;
     if (imgWrapper) imgWrapper.onclick = doRefresh;
 
     // 4. مزامنة الكتابة في الكابتشا إلى حقل الوزارة
-    if (captchaInputWidget && pageCaptchaInput) {
+    const captchaInputWidget = document.getElementById("mofa-widget-captcha-input");
+    if (captchaInputWidget) {
       captchaInputWidget.oninput = () => {
-        pageCaptchaInput.value = captchaInputWidget.value;
-        pageCaptchaInput.dispatchEvent(new Event("input", { bubbles: true }));
-        pageCaptchaInput.dispatchEvent(new Event("change", { bubbles: true }));
-        try {
-          if (window.jQuery) window.jQuery("#Captcha").attr("title", "on");
-        } catch (e) {}
+        const pageCaptchaInput = getPageCaptchaInput();
+        if (pageCaptchaInput) {
+          pageCaptchaInput.value = captchaInputWidget.value;
+          pageCaptchaInput.dispatchEvent(new Event("input", { bubbles: true }));
+          pageCaptchaInput.dispatchEvent(new Event("change", { bubbles: true }));
+        }
       };
 
       // الضغط على Enter في الكابتشا يقوم بالإرسال
@@ -963,14 +895,17 @@
     const ocrBtn = document.getElementById("mofa-ocr-btn");
     if (ocrBtn) {
       ocrBtn.onclick = () => {
-        if (pageCaptchaImg) {
-          ocrMofaCaptcha(pageCaptchaImg, (text) => {
+        const pImg = getPageCaptchaImg();
+        if (pImg) {
+          ocrMofaCaptcha(pImg, (text) => {
             if (text) {
-              if (captchaInputWidget) captchaInputWidget.value = text;
-              if (pageCaptchaInput) {
-                pageCaptchaInput.value = text;
-                pageCaptchaInput.dispatchEvent(new Event("input", { bubbles: true }));
-                pageCaptchaInput.dispatchEvent(new Event("change", { bubbles: true }));
+              const capInputW = document.getElementById("mofa-widget-captcha-input");
+              const pInput = getPageCaptchaInput();
+              if (capInputW) capInputW.value = text;
+              if (pInput) {
+                pInput.value = text;
+                pInput.dispatchEvent(new Event("input", { bubbles: true }));
+                pInput.dispatchEvent(new Event("change", { bubbles: true }));
               }
               alert("تمت قراءة الرمز: " + text);
             } else {
@@ -1081,10 +1016,11 @@
     }
   }, 1200);
 
-  // مراقبة تحديث الصفحة (ظهور التأشيرة بعد الضغط على استعلام وإزالة أخطاء الجنسية فورياً)
+  // مراقبة تحديث الصفحة (ظهور التأشيرة بعد الضغط على استعلام وإزالة أخطاء الجنسية ومزامنة الكابتشا)
   let lastWasVisa = false;
   const observer = new MutationObserver(() => {
     purgeNationalityError();
+    syncCaptchaImage();
     const vResult = detectVisaResult();
     if (vResult && vResult.isVisa && !lastWasVisa) {
       lastWasVisa = true;
