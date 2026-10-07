@@ -63,6 +63,7 @@ import {
   IdCard,
   User,
   Search,
+  Printer,
 } from "lucide-react";
 import { scanPassportMRZ, translateEnglishNameToArabic } from "@/lib/mrzScanner";
 import { scanHostId } from "@/lib/hostIdScanner";
@@ -76,6 +77,7 @@ import {
   extractFirstName,
   convertNationalityToMofaCode,
 } from "@/lib/mofaVisaService";
+import { printVisaDocument, printPdfDocumentUrl } from "@/lib/visaPrintHelper";
 import { useDialog } from "@/lib/dialog-context";
 import { FileDropArea } from "@/components/ui/FileDropArea";
 import { getWhatsAppUrl, getTelUrl, normalizePhone, validateHostPhone, validateTravelerPhone } from "@/lib/phoneUtils";
@@ -227,6 +229,7 @@ export default function RequestDetailPage({
   const [isCheckingVisaTravelerId, setIsCheckingVisaTravelerId] = useState<string | null>(null);
   const [isBulkCheckingVisas, setIsBulkCheckingVisas] = useState(false);
   const [visaProgressMsg, setVisaProgressMsg] = useState<string | null>(null);
+  const [cachedVisaHtmlMap, setCachedVisaHtmlMap] = useState<Record<string, string>>({});
   const [mofaModalData, setMofaModalData] = useState<{
     isOpen: boolean;
     traveler: Traveler;
@@ -1117,6 +1120,15 @@ export default function RequestDetailPage({
       );
 
       if (res.success) {
+        if (res.searchResult?.visaHtml) {
+          setCachedVisaHtmlMap((prev) => ({
+            ...prev,
+            [traveler.id]: res.searchResult!.visaHtml!,
+          }));
+          // Trigger immediate print command formatted as clean 1-page A4
+          printVisaDocument(res.searchResult.visaHtml, traveler.fullName);
+        }
+
         setSuccess(
           `تم بنجاح استخراج التأشيرة وتنزيلها للمسافر (${traveler.fullName}) ${
             res.visaNumber ? `| رقم التأشيرة: ${res.visaNumber}` : ""
@@ -1228,6 +1240,16 @@ export default function RequestDetailPage({
         const trvName = mofaModalData.traveler.fullName;
         const trvId = mofaModalData.traveler.id;
         const vNum = res.visaNumber;
+
+        if (res.searchResult?.visaHtml) {
+          setCachedVisaHtmlMap((prev) => ({
+            ...prev,
+            [trvId]: res.searchResult!.visaHtml!,
+          }));
+          // Trigger immediate print command formatted as clean 1-page A4
+          printVisaDocument(res.searchResult.visaHtml, trvName);
+        }
+
         setMofaModalData(null);
         setSuccess(
           `تم بنجاح استخراج التأشيرة وتنزيلها للمسافر (${trvName}) ${
@@ -1320,6 +1342,41 @@ export default function RequestDetailPage({
       const msg = err instanceof Error ? err.message : "حدث خطأ أثناء فحص التأشيرة.";
       setMofaModalData((prev) => (prev ? { ...prev, loading: false, error: msg } : null));
     }
+  };
+
+  const handlePrintVisa = async (traveler: Traveler) => {
+    // 1. If HTML is cached in memory, print directly with native print helper
+    const cachedHtml = cachedVisaHtmlMap[traveler.id];
+    if (cachedHtml) {
+      printVisaDocument(cachedHtml, traveler.fullName);
+      return;
+    }
+
+    // 2. Otherwise look for attached Visa document
+    const visaDoc = traveler.documents?.find((d) => d.documentType === "Visa");
+    if (visaDoc) {
+      if (visaDoc.storageUrl) {
+        printPdfDocumentUrl(visaDoc.storageUrl);
+      } else {
+        try {
+          const url = await api.documents.getStreamUrl(visaDoc.id);
+          if (url) {
+            printPdfDocumentUrl(url);
+          } else {
+            await alert({ title: "خطأ", message: "تعذر تحميل رابط التأشيرة للطباعة", variant: "error" });
+          }
+        } catch {
+          await alert({ title: "خطأ", message: "تعذر تحميل ملف التأشيرة للطباعة", variant: "error" });
+        }
+      }
+      return;
+    }
+
+    await alert({
+      title: "تنبيه",
+      message: "لم يتم استخراج أو إرفاق مستند التأشيرة لهذا المسافر بعد. يرجى الضغط على زر فحص وتنزيل التأشيرة أولاً.",
+      variant: "warning",
+    });
   };
 
   const handleBulkCheckVisas = async () => {
@@ -4186,6 +4243,19 @@ export default function RequestDetailPage({
                   </button>
                 )}
 
+                {/* Print Official Visa Button */}
+                {(traveler.visaNumber || traveler.documents?.some((d) => d.documentType === "Visa")) && (
+                  <button
+                    type="button"
+                    onClick={() => handlePrintVisa(traveler)}
+                    className="text-xs text-sky-700 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-2.5 py-1 rounded-md font-semibold flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
+                    title="طباعة التأشيرة الرسمية مباشرة (أمر طباعة / حفظ بتنسيق PDF)"
+                  >
+                    <Printer className="w-3.5 h-3.5 text-sky-600" />
+                    <span>طباعة التأشيرة (PDF) 🖨️</span>
+                  </button>
+                )}
+
                 {/* MRZ Scan Button if passport document exists */}
                 {traveler.documents?.some((d) => d.documentType === "Passport") && (
                   <button
@@ -4326,6 +4396,20 @@ export default function RequestDetailPage({
                                 <Download className="w-4 h-4" />
                               </button>
 
+                              {doc.documentType === "Visa" && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    handlePrintVisa(traveler);
+                                  }}
+                                  className="p-1.5 text-sky-600 hover:text-sky-800 hover:bg-sky-50 rounded-lg transition-colors cursor-pointer"
+                                  title="طباعة التأشيرة الرسمية (PDF)"
+                                >
+                                  <Printer className="w-4 h-4" />
+                                </button>
+                              )}
+
                               {canEditAnyData && (
                                 <label
                                   className="p-1.5 text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors cursor-pointer shadow-2xs"
@@ -4454,6 +4538,27 @@ export default function RequestDetailPage({
                 >
                   <Download className="w-4 h-4" />
                 </button>
+                {previewDocUrl && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (previewDoc.documentType === "Visa") {
+                        const trv = request?.travelers.find((t) =>
+                          t.documents?.some((d) => d.id === previewDoc.id)
+                        );
+                        if (trv && cachedVisaHtmlMap[trv.id]) {
+                          printVisaDocument(cachedVisaHtmlMap[trv.id], trv.fullName);
+                          return;
+                        }
+                      }
+                      printPdfDocumentUrl(previewDocUrl);
+                    }}
+                    className="p-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-colors cursor-pointer shadow-xs"
+                    title="أمر طباعة المستند (Print / Save as PDF)"
+                  >
+                    <Printer className="w-4 h-4" />
+                  </button>
+                )}
                 {previewDocUrl && (
                   <a
                     href={previewDocUrl}

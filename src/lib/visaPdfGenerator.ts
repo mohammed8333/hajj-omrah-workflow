@@ -2,9 +2,11 @@ import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import { MofaVisaResult } from "./mofaVisaService";
 import { Traveler } from "@/types";
+import { extractCleanVisaHtml } from "./visaPrintHelper";
 
 /**
  * Generate a high-resolution, printable A4 PDF Blob from MOFA Visa HTML
+ * Guaranteed to fit strictly on 1 single page without website headers, modals, or footers.
  */
 export async function generateVisaPdfBlob(
   visaHtml: string,
@@ -14,33 +16,18 @@ export async function generateVisaPdfBlob(
     throw new Error("PDF generation requires browser environment");
   }
 
-  // 1. Parse incoming HTML and extract relevant printable visa container
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(visaHtml, "text/html");
+  // 1. Sanitize incoming HTML to extract ONLY the pure visa slip
+  const contentToRender = extractCleanVisaHtml(visaHtml);
 
-  // MOFA e-visa is housed in .evis-content or #PrintDiv or .evisa or main body
-  const evisContent =
-    doc.querySelector(".evis-content") ||
-    doc.querySelector("#PrintDiv") ||
-    doc.querySelector(".evisa") ||
-    doc.querySelector(".print-area");
-
-  let contentToRender = "";
-  if (evisContent) {
-    contentToRender = evisContent.outerHTML;
-  } else {
-    // If specific container not found, strip navigation/search and use body
-    const bodyClone = doc.body.cloneNode(true) as HTMLElement;
-    bodyClone
-      .querySelectorAll("header, footer, nav, .navbar, .header, form:not(.evisa-form), .search-container, #searchForm, button, script")
-      .forEach((el) => el.remove());
-    contentToRender = bodyClone.innerHTML;
-  }
-
-  // Collect any style tags from original document
-  const originalStyles = Array.from(doc.querySelectorAll("style, link[rel='stylesheet']"))
-    .map((el) => el.outerHTML)
-    .join("\n");
+  // Parse original styles from visaHtml (if any)
+  let originalStyles = "";
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(visaHtml, "text/html");
+    originalStyles = Array.from(doc.querySelectorAll("style, link[rel='stylesheet']"))
+      .map((el) => el.outerHTML)
+      .join("\n");
+  } catch {}
 
   // 2. Create offscreen container styled specifically for A4 proportions (794px width)
   const container = document.createElement("div");
@@ -71,20 +58,23 @@ export async function generateVisaPdfBlob(
         color: #000000 !important;
         direction: rtl !important;
         width: 794px !important;
-        padding: 24px !important;
+        padding: 20px 24px !important;
         margin: 0 auto !important;
       }
-      .evis-content, .evisa, #PrintDiv {
+      .evis-content, .evisa, #PrintDiv, #dvToPrint, .page-print, .portlet-body {
         display: block !important;
         width: 100% !important;
         margin: 0 auto !important;
         border: none !important;
+        background: transparent !important;
       }
-      header, footer, nav, .navbar, .header, form:not(.evisa-form), .search-container, #searchForm, button, .btn {
+      header, footer, nav, .navbar, .page-header, .page-footer, .pre-footer, 
+      .banner-beta, .modal, #dlgMessage, #msg, form, button, .btn {
         display: none !important;
       }
       img {
         max-width: 100% !important;
+        height: auto !important;
       }
     </style>
     <div class="visa-pdf-canvas-root">
@@ -96,7 +86,7 @@ export async function generateVisaPdfBlob(
 
   try {
     // Wait for DOM & images to settle
-    await new Promise((resolve) => setTimeout(resolve, 350));
+    await new Promise((resolve) => setTimeout(resolve, 400));
 
     const canvas = await html2canvas(container, {
       scale: 2, // 2x resolution for ultra-sharp text, emblem, and barcodes
@@ -114,25 +104,28 @@ export async function generateVisaPdfBlob(
       compress: true,
     });
 
-    const pdfWidth = 210;
-    const pdfPageHeight = 297;
-    const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+    const pageWidth = 210;
+    const pageHeight = 297;
+    const margin = 6; // 6mm margin
+    const targetWidth = pageWidth - margin * 2; // 198mm
+    const targetHeight = pageHeight - margin * 2; // 285mm
 
-    if (imgHeight <= pdfPageHeight) {
-      pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, imgHeight, undefined, "FAST");
-    } else {
-      let heightLeft = imgHeight;
-      let position = 0;
-      pdf.addImage(imgData, "JPEG", 0, position, pdfWidth, imgHeight, undefined, "FAST");
-      heightLeft -= pdfPageHeight;
+    // Calculate proportional height
+    let renderWidth = targetWidth;
+    let renderHeight = (canvas.height * targetWidth) / canvas.width;
 
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, "JPEG", 0, position, pdfWidth, imgHeight, undefined, "FAST");
-        heightLeft -= pdfPageHeight;
-      }
+    // Scale down proportionally if it exceeds A4 height to GUARANTEE 1 SINGLE PAGE
+    if (renderHeight > targetHeight) {
+      const scale = targetHeight / renderHeight;
+      renderWidth = renderWidth * scale;
+      renderHeight = targetHeight;
     }
+
+    const xOffset = margin + (targetWidth - renderWidth) / 2;
+    const yOffset = margin;
+
+    // Draw single-page PDF
+    pdf.addImage(imgData, "JPEG", xOffset, yOffset, renderWidth, renderHeight, undefined, "FAST");
 
     return pdf.output("blob");
   } finally {
