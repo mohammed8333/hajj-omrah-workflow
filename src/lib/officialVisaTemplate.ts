@@ -253,25 +253,15 @@ function escapeHtml(str: string): string {
 /**
  * Render the Official, Pixel-Perfect Single-Page A4 Saudi eVisa HTML
  */
-export function renderOfficialVisaHtml(data: OfficialVisaData): string {
-  const visaBarcodeSvg = generateCode39Svg(data.visaNumber, 36);
-  const appBarcodeSvg = generateCode39Svg(data.applicationNumber, 36);
-  const safeMrzLine1 = escapeHtml(data.mrzLine1 || "");
-  const safeMrzLine2 = escapeHtml(data.mrzLine2 || "");
-
-  // Photo placeholder if traveler has no photo uploaded
-  const photoContent = data.photoUrl
-    ? `<img src="${data.photoUrl}" alt="Traveler Photo" style="width: 100%; height: 100%; object-fit: cover; border-radius: 4px;" />`
-    : `<div style="width: 100%; height: 100%; background: #f1f5f9; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #94a3b8; font-size: 11px; text-align: center; border-radius: 4px;">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>
-        <span style="margin-top: 6px; font-weight: 600;">صورة شخصية</span>
-       </div>`;
-
+/**
+ * Wraps one or more rendered .page-container HTML pages into an official printable document shell
+ */
+export function wrapWithOfficialDocumentShell(pagesHtml: string, title: string): string {
   return `<!DOCTYPE html>
 <html dir="rtl" lang="ar">
 <head>
   <meta charset="utf-8">
-  <title>تأشيرة_${data.fullName.replace(/\s+/g, "_")}_${data.visaNumber}</title>
+  <title>${escapeHtml(title)}</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Tajawal:wght@400;500;700;800&display=swap">
   <style>
     @page {
@@ -289,8 +279,13 @@ export function renderOfficialVisaHtml(data: OfficialVisaData): string {
         print-color-adjust: exact !important;
       }
       .page-container {
+      page-break-after: always;
+      break-after: page;
         padding: 10mm 15mm 8mm 15mm !important;
         box-shadow: none !important;
+        page-break-after: always !important;
+        break-after: page !important;
+        margin: 0 !important;
       }
     }
     * {
@@ -499,7 +494,29 @@ export function renderOfficialVisaHtml(data: OfficialVisaData): string {
   </style>
 </head>
 <body>
-  <div class="page-container">
+  ${pagesHtml}
+</body>
+</html>`;
+}
+
+/**
+ * Render a single .page-container for a traveler's eVisa
+ */
+export function renderOfficialVisaPageContainer(data: OfficialVisaData): string {
+  const visaBarcodeSvg = generateCode39Svg(data.visaNumber, 36);
+  const appBarcodeSvg = generateCode39Svg(data.applicationNumber, 36);
+  const safeMrzLine1 = escapeHtml(data.mrzLine1 || "");
+  const safeMrzLine2 = escapeHtml(data.mrzLine2 || "");
+
+  // Photo placeholder if traveler has no photo uploaded
+  const photoContent = data.photoUrl
+    ? `<img src="${data.photoUrl}" alt="Traveler Photo" style="width: 100%; height: 100%; object-fit: cover; border-radius: 4px;" />`
+    : `<div style="width: 100%; height: 100%; background: #f1f5f9; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #94a3b8; font-size: 11px; text-align: center; border-radius: 4px;">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>
+        <span style="margin-top: 6px; font-weight: 600;">صورة شخصية</span>
+       </div>`;
+
+  return `  <div class="page-container">
     <!-- 1. Header Logos -->
     <table class="header-table" style="margin-bottom: 4px;">
       <tr>
@@ -682,7 +699,22 @@ export function renderOfficialVisaHtml(data: OfficialVisaData): string {
         </td>
       </tr>
     </table>
-  </div>
-</body>
-</html>`;
+  </div>`;
+}
+
+/**
+ * Render the Official, Pixel-Perfect Single-Page A4 Saudi eVisa HTML
+ */
+export function renderOfficialVisaHtml(data: OfficialVisaData): string {
+  const pageHtml = renderOfficialVisaPageContainer(data);
+  return wrapWithOfficialDocumentShell(pageHtml, `تأشيرة_${data.fullName.replace(/\s+/g, "_")}_${data.visaNumber}`);
+}
+
+/**
+ * Render ALL Official Saudi eVisas for a request into a single multi-page A4 HTML document
+ */
+export function renderAllOfficialVisasHtml(dataList: OfficialVisaData[], title?: string): string {
+  const pagesHtml = dataList.map((data) => renderOfficialVisaPageContainer(data)).join("\n");
+  const docTitle = title || `كافة_تأشيرات_المعاملة_(${dataList.length})`;
+  return wrapWithOfficialDocumentShell(pagesHtml, docTitle);
 }

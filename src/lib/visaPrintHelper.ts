@@ -127,7 +127,14 @@ export function extractCleanVisaHtml(fullHtml: string): string {
 }
 
 /**
-import { extractVisaData, renderOfficialVisaHtml } from "./officialVisaTemplate";
+import {
+  extractVisaData,
+  renderOfficialVisaHtml,
+  renderAllOfficialVisasHtml,
+  OfficialVisaData,
+} from "./officialVisaTemplate";
+import { preloadVisaAssets } from "./visaTemplateAssets";
+import { api } from "./api";
 import { Traveler } from "@/types";
 
 /**
@@ -243,3 +250,132 @@ export function printPdfDocumentUrl(pdfUrl: string): void {
     }, 400);
   };
 }
+
+/**
+ * Print arbitrary HTML via isolated hidden iframe
+ */
+export function printHtmlViaIframe(htmlContent: string): void {
+  if (typeof window === "undefined") return;
+
+  const iframe = document.createElement("iframe");
+  iframe.style.position = "fixed";
+  iframe.style.right = "0";
+  iframe.style.bottom = "0";
+  iframe.style.width = "0";
+  iframe.style.height = "0";
+  iframe.style.border = "none";
+  iframe.style.visibility = "hidden";
+
+  document.body.appendChild(iframe);
+
+  const frameDoc = iframe.contentWindow?.document || iframe.contentDocument;
+  if (!frameDoc) {
+    console.error("Could not access print iframe document");
+    return;
+  }
+
+  frameDoc.open();
+  frameDoc.write(htmlContent);
+  frameDoc.close();
+
+  const triggerPrint = () => {
+    try {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+    } catch (e) {
+      console.warn("Direct iframe print failed, trying window fallback:", e);
+      const win = window.open("", "_blank");
+      if (win) {
+        win.document.write(frameDoc.documentElement.outerHTML);
+        win.document.close();
+        win.focus();
+        win.print();
+      }
+    } finally {
+      setTimeout(() => {
+        if (document.body.contains(iframe)) {
+          document.body.removeChild(iframe);
+        }
+      }, 60000);
+    }
+  };
+
+  const images = Array.from(frameDoc.images);
+  if (images.length === 0) {
+    setTimeout(triggerPrint, 400);
+  } else {
+    Promise.all(
+      images.map((img) => {
+        if (img.complete) return Promise.resolve();
+        return new Promise<void>((res) => {
+          img.onload = () => res();
+          img.onerror = () => res();
+          setTimeout(res, 2000);
+        });
+      })
+    ).then(() => {
+      setTimeout(triggerPrint, 350);
+    });
+  }
+}
+
+/**
+ * Print all visas for a given request in a single multi-page A4 document
+ * (1 official eVisa per page)
+ */
+export async function printAllVisasByRequestId(
+  requestId: string,
+  cachedHtmlMap?: Record<string, string>
+): Promise<{ count: number; error?: string }> {
+  if (typeof window === "undefined") {
+    return { count: 0, error: "بيئة المتصفح مطلوبة للطباعة" };
+  }
+
+  const req = await api.requests.getById(requestId);
+  if (!req || !req.travelers || req.travelers.length === 0) {
+    return { count: 0, error: "لا يوجد مسافرون في هذه المعاملة." };
+  }
+
+  // Preload assets for 100% sharp rendering
+  await preloadVisaAssets();
+
+  // Find travelers with visas
+  const eligible = req.travelers.filter(
+    (t) =>
+      t.visaNumber ||
+      (cachedHtmlMap && cachedHtmlMap[t.id]) ||
+      t.documents?.some((d) => d.documentType === "Visa")
+  );
+
+  if (eligible.length === 0) {
+    return {
+      count: 0,
+      error: "لا توجد تأشيرات صادرة لأي مسافر في هذه المعاملة بعد. يرجى الضغط على زر (جلب التأشيرات) أولاً.",
+    };
+  }
+
+  const visaDataList: OfficialVisaData[] = [];
+  for (const traveler of eligible) {
+    const cachedHtml = cachedHtmlMap?.[traveler.id] || "";
+    try {
+      const data = await extractVisaData(cachedHtml, traveler);
+      visaDataList.push(data);
+    } catch (e) {
+      console.warn(`Could not extract visa data for ${traveler.fullName}:`, e);
+    }
+  }
+
+  if (visaDataList.length === 0) {
+    return {
+      count: 0,
+      error: "تعذر استخراج بيانات التأشيرات للطباعة.",
+    };
+  }
+
+  const title = `تأشيرات_${req.groupName || req.requestNumber}_(${visaDataList.length})`;
+  const fullHtml = renderAllOfficialVisasHtml(visaDataList, title);
+  printHtmlViaIframe(fullHtml);
+
+  return { count: visaDataList.length };
+}
+

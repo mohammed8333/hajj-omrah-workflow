@@ -353,3 +353,55 @@ export async function checkAndAttachVisaToTraveler(
     };
   }
 }
+
+/**
+ * Bulk check and attach visas for all travelers in a request
+ */
+export async function bulkFetchVisasForRequest(
+  requestId: string,
+  workerUrl: string,
+  onProgress?: (step: string) => void
+): Promise<{
+  successCount: number;
+  notFoundCount: number;
+  total: number;
+  error?: string;
+}> {
+  const req = await api.requests.getById(requestId);
+  if (!req || !req.travelers || req.travelers.length === 0) {
+    return { successCount: 0, notFoundCount: 0, total: 0, error: "لا يوجد مسافرون في هذه المعاملة." };
+  }
+
+  const eligibleTravelers = req.travelers.filter((t) => !!t.passportNumber);
+  if (eligibleTravelers.length === 0) {
+    return { successCount: 0, notFoundCount: 0, total: 0, error: "لا يوجد مسافرون مسجل لهم أرقام جوازات في هذه المعاملة." };
+  }
+
+  let successCount = 0;
+  let notFoundCount = 0;
+
+  for (let i = 0; i < eligibleTravelers.length; i++) {
+    const t = eligibleTravelers[i];
+    onProgress?.(`(${i + 1}/${eligibleTravelers.length}) ${t.fullName}: جاري فحص التأشيرة...`);
+
+    try {
+      const res = await checkAndAttachVisaToTraveler(
+        requestId,
+        t,
+        workerUrl,
+        (step) => onProgress?.(`(${i + 1}/${eligibleTravelers.length}) ${t.fullName}: ${step}`)
+      );
+      if (res.success) {
+        successCount++;
+      } else {
+        notFoundCount++;
+      }
+    } catch (singleErr) {
+      console.warn(`Error checking visa for ${t.fullName}:`, singleErr);
+      notFoundCount++;
+    }
+  }
+
+  return { successCount, notFoundCount, total: eligibleTravelers.length };
+}
+

@@ -77,7 +77,7 @@ import {
   extractFirstName,
   convertNationalityToMofaCode,
 } from "@/lib/mofaVisaService";
-import { printVisaDocument, printPdfDocumentUrl } from "@/lib/visaPrintHelper";
+import { printVisaDocument, printPdfDocumentUrl, printAllVisasByRequestId } from "@/lib/visaPrintHelper";
 import { generateVisaPdfBlob } from "@/lib/visaPdfGenerator";
 import { useDialog } from "@/lib/dialog-context";
 import { FileDropArea } from "@/components/ui/FileDropArea";
@@ -229,6 +229,7 @@ export default function RequestDetailPage({
   // MOFA Visa Checking state
   const [isCheckingVisaTravelerId, setIsCheckingVisaTravelerId] = useState<string | null>(null);
   const [isBulkCheckingVisas, setIsBulkCheckingVisas] = useState(false);
+  const [isPrintingAllVisas, setIsPrintingAllVisas] = useState(false);
   const [visaProgressMsg, setVisaProgressMsg] = useState<string | null>(null);
   const [cachedVisaHtmlMap, setCachedVisaHtmlMap] = useState<Record<string, string>>({});
   const [mofaModalData, setMofaModalData] = useState<{
@@ -1481,6 +1482,29 @@ export default function RequestDetailPage({
     } finally {
       setIsBulkCheckingVisas(false);
       setVisaProgressMsg(null);
+    }
+  };
+
+  const handlePrintAllVisas = async () => {
+    if (!request) return;
+    try {
+      setIsPrintingAllVisas(true);
+      setError(null);
+      const res = await printAllVisasByRequestId(request.id, cachedVisaHtmlMap);
+      if (res.error) {
+        await alert({
+          title: "تنبيه",
+          message: res.error,
+          variant: "info",
+        });
+      } else {
+        setSuccess(`تم فتح أمر طباعة (${res.count}) تأشيرات في ملف واحد بنجاح 🖨️`);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "حدث خطأ أثناء تجهيز طباعة التأشيرات.";
+      setError(msg);
+    } finally {
+      setIsPrintingAllVisas(false);
     }
   };
 
@@ -4004,6 +4028,21 @@ export default function RequestDetailPage({
                 <Search className="w-3.5 h-3.5" />
               )}
               <span>فحص وتنزيل تأشيرات المجموعة (MOFA) 🇸🇦</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handlePrintAllVisas}
+              disabled={isPrintingAllVisas || request.travelers.length === 0}
+              className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-all"
+              title="طباعة كافة تأشيرات المسافرين الصادرة في هذه المعاملة في ملف واحد (صفحة لكل تأشيرة)"
+            >
+              {isPrintingAllVisas ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Printer className="w-3.5 h-3.5" />
+              )}
+              <span>طباعة كافة التأشيرات في ملف واحد 🖨️</span>
             </button>
 
             <button

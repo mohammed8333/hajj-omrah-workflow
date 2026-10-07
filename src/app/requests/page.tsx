@@ -57,6 +57,7 @@ import {
   compareRequestsByDeparture,
   getDefaultActiveWorkflowTab,
 } from "@/lib/travelArchiveUtils";
+import { RequestVisaActionButtons } from "@/components/requests/RequestVisaActionButtons";
 
 // اقتطاع الاسم الثلاثي فقط (3 مقاطع كحد أقصى)
 function getThreePartName(fullName?: string): string {
@@ -1940,6 +1941,14 @@ ${travelersLines}
                       </button>
                     </div>
 
+                    {/* التأشيرات: جلب كافة التأشيرات + طباعة الكل في ملف واحد */}
+                    <RequestVisaActionButtons
+                      requestId={r.id}
+                      requestNumber={r.requestNumber}
+                      groupName={r.groupName}
+                      onRefresh={loadRequests}
+                    />
+
                     {/* أزرار الإجراءات */}
                     <div className="flex items-center gap-1.5 flex-wrap">
                       {role === "Sender" && isWaitingHosting(r) && (
@@ -2685,6 +2694,14 @@ ${travelersLines}
                                 <Download className="w-3.5 h-3.5" />
                               </button>
                             </div>
+
+                            {/* التأشيرات: جلب كافة التأشيرات + طباعة الكل في ملف واحد */}
+                            <RequestVisaActionButtons
+                              requestId={r.id}
+                              requestNumber={r.requestNumber}
+                              groupName={r.groupName}
+                              onRefresh={loadRequests}
+                            />
 
                             {/* أزرار الإجراء بحسب الدور */}
                             {role === "Sender" && isWaitingHosting(r) && (
