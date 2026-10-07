@@ -73,14 +73,6 @@ function getThreePartName(fullName?: string): string {
   return parts.slice(0, 3).join(" ");
 }
 
-// استخراج الاسم الرباعي للمسافر (أو الاسم كاملاً إن كان 4 مقاطع أو أقل)
-function getFourPartName(fullName?: string): string {
-  if (!fullName) return "بدون اسم";
-  const parts = fullName.trim().split(/\s+/).filter(Boolean);
-  if (parts.length <= 4) return fullName.trim();
-  return parts.slice(0, 4).join(" ");
-}
-
 // اقتطاع الاسم الأول والثاني فقط (مقطعين كحد أقصى)
 function getTwoPartName(fullName?: string): string {
   if (!fullName) return "";
@@ -356,18 +348,13 @@ export default function DashboardPage() {
 
     try {
       const fullReq = await api.requests.getById(requestId);
-      let passportDoc =
+      const passportDoc =
         fullReq.groupDocuments?.find(
           (d) => d.travelerId === traveler.id && d.documentType === "Passport"
         ) ||
         fullReq.travelers
           ?.find((tr) => tr.id === traveler.id)
           ?.documents?.find((d) => d.documentType === "Passport");
-
-      // Fallback: if single traveler or unlinked passport document
-      if (!passportDoc && (!fullReq.travelers || fullReq.travelers.length <= 1)) {
-        passportDoc = fullReq.groupDocuments?.find((d) => d.documentType === "Passport");
-      }
 
       if (passportDoc) {
         handleViewDoc(
@@ -1711,25 +1698,12 @@ ${travelersLines}
                                 )}
                                 <div className="min-w-0 flex-1">
                                   <span
-                                    onClick={(e) => {
-                                      if (t.passportNumber || t.passportDocumentUrl || t.passportDocumentId) {
-                                        handleViewTravelerPassport(r.id, t, e);
-                                      }
-                                    }}
                                     className={`text-xs block truncate leading-tight ${
-                                      t.passportNumber || t.passportDocumentUrl || t.passportDocumentId
-                                        ? "cursor-pointer hover:text-purple-700"
-                                        : ""
-                                    } ${
                                       isThisMatched ? "font-black text-purple-950" : "font-bold text-gray-900"
                                     }`}
-                                    title={
-                                      t.passportNumber
-                                        ? `${t.fullName} (اضغط لمعاينة الجواز: ${t.passportNumber})`
-                                        : t.fullName
-                                    }
+                                    title={t.fullName}
                                   >
-                                    {getFourPartName(t.fullName)}
+                                    {t.fullName}
                                   </span>
                                   {t.passportNumber && (
                                     <button
@@ -1911,25 +1885,12 @@ ${travelersLines}
                                   )}
                                   <div className="min-w-0 flex-1">
                                     <span
-                                      onClick={(e) => {
-                                        if (t.passportNumber || t.passportDocumentUrl || t.passportDocumentId) {
-                                          handleViewTravelerPassport(r.id, t, e);
-                                        }
-                                      }}
                                       className={`text-[11px] block truncate leading-tight ${
-                                        t.passportNumber || t.passportDocumentUrl || t.passportDocumentId
-                                          ? "cursor-pointer hover:text-purple-700"
-                                          : ""
-                                      } ${
                                         isThisMatched ? "font-black text-purple-950" : "font-bold text-gray-900"
                                       }`}
-                                      title={
-                                        t.passportNumber
-                                          ? `${t.fullName} (اضغط لمعاينة الجواز: ${t.passportNumber})`
-                                          : t.fullName
-                                      }
+                                      title={t.fullName}
                                     >
-                                      {getFourPartName(t.fullName)}
+                                      {t.fullName}
                                     </span>
                                     {t.passportNumber && (
                                       <button
@@ -2643,14 +2604,14 @@ ${travelersLines}
                         {/* 5. عمود بيانات المسافرين (للمرسل ولموظف صفا وللأدمن) */}
                         {(role === "Sender" || role === "SafaEmployee" || role === "Admin") && (
                           <td className="py-2.5 px-3 align-middle border-l border-gray-100">
-                            <div className="bg-purple-50/40 border border-purple-200/80 rounded-xl p-2 min-w-[175px] max-w-xs space-y-2 max-h-48 overflow-y-auto">
+                            <div className="bg-purple-50/40 border border-purple-200/80 rounded-xl p-2 min-w-[170px] max-w-xs space-y-1.5 max-h-44 overflow-y-auto">
                               {reqTravelers.map((t, idx) => {
                                 const isThisMatched = isTravelerMatch(t, searchTerm);
                                 return (
                                   <div
                                     key={t.id || idx}
-                                    className={`flex items-start gap-2 min-w-0 p-1.5 rounded-lg transition-colors ${
-                                      isThisMatched ? "bg-purple-100 ring-2 ring-purple-400" : "hover:bg-purple-100/50"
+                                    className={`flex items-center gap-2.5 min-w-0 p-1 rounded-lg transition-colors ${
+                                      isThisMatched ? "bg-purple-100 ring-2 ring-purple-400" : ""
                                     }`}
                                   >
                                     {t.photoUrl ? (
@@ -2658,11 +2619,11 @@ ${travelersLines}
                                         src={t.photoUrl}
                                         alt={t.fullName}
                                         onClick={(e) => handleViewDoc(undefined, t.photoUrl, `صورة المسافر - ${t.fullName}`, e)}
-                                        className="w-8 h-8 rounded-full object-cover border border-purple-300 shrink-0 shadow-2xs cursor-pointer hover:opacity-80 transition-opacity mt-0.5"
+                                        className="w-9 h-9 rounded-full object-cover border border-purple-300 shrink-0 shadow-2xs cursor-pointer hover:opacity-80 transition-opacity"
                                         title="معاينة الصورة"
                                       />
                                     ) : (
-                                      <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-700 border border-purple-200 flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs mt-0.5">
+                                      <div className="w-9 h-9 rounded-full bg-purple-100 text-purple-700 border border-purple-200 flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
                                         {t.fullName && t.fullName.trim() ? (
                                           t.fullName.trim().charAt(0)
                                         ) : (
@@ -2670,42 +2631,24 @@ ${travelersLines}
                                         )}
                                       </div>
                                     )}
-                                    <div className="min-w-0 flex-1 flex flex-col items-start gap-0.5">
+                                    <div className="min-w-0 flex-1 flex items-center gap-1.5">
                                       <span
-                                        onClick={(e) => {
-                                          if (t.passportNumber || t.passportDocumentUrl || t.passportDocumentId) {
-                                            handleViewTravelerPassport(r.id, t, e);
-                                          }
-                                        }}
-                                        className={`text-xs leading-snug line-clamp-2 ${
-                                          t.passportNumber || t.passportDocumentUrl || t.passportDocumentId
-                                            ? "cursor-pointer hover:text-purple-700"
-                                            : ""
-                                        } ${
+                                        className={`text-xs truncate leading-tight ${
                                           isThisMatched ? "font-black text-purple-950" : "font-bold text-gray-900"
                                         }`}
-                                        title={
-                                          t.passportNumber
-                                            ? `${t.fullName} (اضغط لمعاينة الجواز: ${t.passportNumber})`
-                                            : t.fullName
-                                        }
+                                        title={t.fullName}
                                       >
-                                        {getFourPartName(t.fullName)}
+                                        {getTwoPartName(t.fullName)}
                                       </span>
-                                      {t.passportNumber ? (
+                                      {t.passportNumber && (
                                         <button
                                           type="button"
                                           onClick={(e) => handleViewTravelerPassport(r.id, t, e)}
-                                          className="inline-flex items-center gap-1 font-mono text-[11px] font-bold text-sky-700 hover:text-sky-950 hover:bg-sky-100/90 px-1.5 py-0.5 rounded transition-colors cursor-pointer group/pass bg-sky-50 border border-sky-200/80 shadow-2xs mt-0.5"
-                                          title={`اضغط لمعاينة جواز السفر (${t.passportNumber})`}
+                                          className="text-sky-600 hover:text-sky-800 hover:bg-sky-50 p-0.5 rounded cursor-pointer transition-colors shrink-0"
+                                          title={`معاينة جواز السفر (${t.passportNumber})`}
                                         >
-                                          <FileText className="w-3 h-3 text-sky-600 group-hover/pass:text-sky-800 shrink-0" />
-                                          <span dir="ltr" className="group-hover/pass:underline">
-                                            {t.passportNumber}
-                                          </span>
+                                          <FileText className="w-3.5 h-3.5" />
                                         </button>
-                                      ) : (
-                                        <span className="text-[10px] text-gray-400 italic">بدون جواز</span>
                                       )}
                                     </div>
                                   </div>
