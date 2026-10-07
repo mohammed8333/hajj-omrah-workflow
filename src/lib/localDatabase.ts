@@ -1827,6 +1827,9 @@ class LocalDatabaseEngine {
       expiryDate?: string;
       affiliation?: string;
       notes?: string;
+      visaNumber?: string;
+      visaStatus?: "Issued" | "UnderProcessing" | "NotApplied" | "Rejected";
+      visaIssueDate?: string;
     },
     currentUser?: User
   ): Traveler | undefined {
@@ -1841,6 +1844,9 @@ class LocalDatabaseEngine {
         if (data.expiryDate !== undefined) trv.expiryDate = data.expiryDate;
         if (data.affiliation !== undefined) trv.affiliation = data.affiliation?.trim() || undefined;
         if (data.notes !== undefined) trv.notes = data.notes;
+        if (data.visaNumber !== undefined) trv.visaNumber = data.visaNumber;
+        if (data.visaStatus !== undefined) trv.visaStatus = data.visaStatus;
+        if (data.visaIssueDate !== undefined) trv.visaIssueDate = data.visaIssueDate;
         req.updatedAt = new Date().toISOString();
         this.persistRequests();
         this.logAction(

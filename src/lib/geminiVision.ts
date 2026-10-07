@@ -360,7 +360,7 @@ function blobToBase64(blob: Blob | File): Promise<{ base64: string; mimeType: st
 }
 
 // 4. Core Gemini Multimodal Caller
-async function callGeminiVision(
+export async function callGeminiVision(
   prompt: string,
   fileOrUrl: File | Blob | string,
   explicitApiKey?: string

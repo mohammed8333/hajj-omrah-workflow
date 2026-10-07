@@ -25,6 +25,7 @@ export type DocumentType =
   | "PersonalPhoto"
   | "FlightTicket"
   | "HostId"
+  | "Visa"
   | "Other";
 
 export type DocumentReviewStatus =
@@ -92,6 +93,9 @@ export interface Traveler {
   notes?: string;
   createdAt: string;
   documents: DocumentItem[];
+  visaNumber?: string;
+  visaStatus?: "Issued" | "UnderProcessing" | "NotApplied" | "Rejected";
+  visaIssueDate?: string;
 }
 
 export interface HostingInfo {

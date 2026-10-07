@@ -1134,6 +1134,9 @@ export const supabaseService = {
         expiryDate?: string;
         affiliation?: string;
         notes?: string;
+        visaNumber?: string;
+        visaStatus?: any;
+        visaIssueDate?: string;
       }
     ) => {
       const client = getClient();

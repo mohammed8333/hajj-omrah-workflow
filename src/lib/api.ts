@@ -429,6 +429,9 @@ export const api = {
         expiryDate?: string;
         affiliation?: string;
         notes?: string;
+        visaNumber?: string;
+        visaStatus?: any;
+        visaIssueDate?: string;
       }
     ): Promise<Traveler> => {
       if (isSupabaseConfigured()) {

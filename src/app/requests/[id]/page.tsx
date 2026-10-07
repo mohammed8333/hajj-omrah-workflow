@@ -62,11 +62,17 @@ import {
   UserMinus,
   IdCard,
   User,
+  Search,
 } from "lucide-react";
 import { scanPassportMRZ, translateEnglishNameToArabic } from "@/lib/mrzScanner";
 import { scanHostId } from "@/lib/hostIdScanner";
 import { scanFlightTicket, calculateAirportArrivalTime } from "@/lib/flightTicketScanner";
 import { getGeminiApiKey, setGeminiApiKey } from "@/lib/geminiVision";
+import {
+  getMofaWorkerUrl,
+  setMofaWorkerUrl,
+  checkAndAttachVisaToTraveler,
+} from "@/lib/mofaVisaService";
 import { useDialog } from "@/lib/dialog-context";
 import { FileDropArea } from "@/components/ui/FileDropArea";
 import { getWhatsAppUrl, getTelUrl, normalizePhone, validateHostPhone, validateTravelerPhone } from "@/lib/phoneUtils";
@@ -213,6 +219,11 @@ export default function RequestDetailPage({
   const [newTravelerDuplicateWarning, setNewTravelerDuplicateWarning] = useState<string | null>(null);
   const [newTravelerPhotoFile, setNewTravelerPhotoFile] = useState<File | null>(null);
   const [newTravelerPhotoPreview, setNewTravelerPhotoPreview] = useState<string | null>(null);
+
+  // MOFA Visa Checking state
+  const [isCheckingVisaTravelerId, setIsCheckingVisaTravelerId] = useState<string | null>(null);
+  const [isBulkCheckingVisas, setIsBulkCheckingVisas] = useState(false);
+  const [visaProgressMsg, setVisaProgressMsg] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -1021,13 +1032,146 @@ export default function RequestDetailPage({
     }
   };
 
+  const getOrPromptWorkerUrl = async (): Promise<string | null> => {
+    let workerUrl = getMofaWorkerUrl();
+    if (!workerUrl) {
+      const enteredUrl = await prompt({
+        title: "إعداد خادم الاستعلام عن التأشيرات (Cloudflare Worker)",
+        message:
+          "يرجى إدخال رابط خادم Cloudflare Worker الخاص بك للاستعلام المباشر وتنزيل التأشيرات الصادرة من منصة وزارة الخارجية (مثال: https://mofa-visa-proxy.yourname.workers.dev):",
+        placeholder: "https://mofa-visa-proxy.yourname.workers.dev",
+        confirmText: "حفظ ومتابعة",
+        cancelText: "إلغاء",
+        variant: "primary",
+      });
+      if (enteredUrl && enteredUrl.trim()) {
+        setMofaWorkerUrl(enteredUrl.trim());
+        workerUrl = enteredUrl.trim();
+      }
+    }
+    return workerUrl;
+  };
+
+  const handleCheckSingleVisa = async (traveler: Traveler) => {
+    if (!traveler.passportNumber) {
+      await alert({
+        title: "بيانات ناقصة",
+        message: "يجب تسجيل رقم جواز السفر للمسافر أولاً للتمكن من فحص التأشيرة.",
+        variant: "warning",
+      });
+      return;
+    }
+
+    const workerUrl = await getOrPromptWorkerUrl();
+    if (!workerUrl) return;
+
+    try {
+      setIsCheckingVisaTravelerId(traveler.id);
+      setError(null);
+
+      const res = await checkAndAttachVisaToTraveler(
+        requestId,
+        traveler,
+        workerUrl,
+        (msg) => setVisaProgressMsg(msg)
+      );
+
+      if (res.success) {
+        setSuccess(
+          `تم بنجاح استخراج التأشيرة وتنزيلها للمسافر (${traveler.fullName}) ${
+            res.visaNumber ? `| رقم التأشيرة: ${res.visaNumber}` : ""
+          } 🇸🇦`
+        );
+        await loadRequest(false);
+      } else {
+        await alert({
+          title: "نتيجة فحص التأشيرة",
+          message: res.error || "لم يتم العثور على تأشيرة صادرة لهذا الجواز.",
+          variant: "info",
+        });
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "حدث خطأ أثناء فحص التأشيرة.";
+      setError(msg);
+    } finally {
+      setIsCheckingVisaTravelerId(null);
+      setVisaProgressMsg(null);
+    }
+  };
+
+  const handleBulkCheckVisas = async () => {
+    if (!request || !request.travelers || request.travelers.length === 0) {
+      await alert({
+        title: "تنبيه",
+        message: "لا يوجد مسافرين في هذه المعاملة.",
+        variant: "info",
+      });
+      return;
+    }
+
+    const eligibleTravelers = request.travelers.filter((t) => !!t.passportNumber);
+    if (eligibleTravelers.length === 0) {
+      await alert({
+        title: "تنبيه",
+        message: "لا يوجد مسافرون مسجل لهم أرقام جوازات في هذه المعاملة.",
+        variant: "warning",
+      });
+      return;
+    }
+
+    const workerUrl = await getOrPromptWorkerUrl();
+    if (!workerUrl) return;
+
+    try {
+      setIsBulkCheckingVisas(true);
+      setError(null);
+      let successCount = 0;
+      let notFoundCount = 0;
+
+      for (let i = 0; i < eligibleTravelers.length; i++) {
+        const t = eligibleTravelers[i];
+        setVisaProgressMsg(`جاري فحص وتنزيل تأشيرة المسافر (${i + 1} من ${eligibleTravelers.length}): ${t.fullName}...`);
+
+        try {
+          const res = await checkAndAttachVisaToTraveler(
+            requestId,
+            t,
+            workerUrl,
+            (step) => setVisaProgressMsg(`(${i + 1}/${eligibleTravelers.length}) ${t.fullName}: ${step}`)
+          );
+          if (res.success) {
+            successCount++;
+          } else {
+            notFoundCount++;
+          }
+        } catch (singleErr) {
+          console.warn(`Error checking visa for ${t.fullName}:`, singleErr);
+          notFoundCount++;
+        }
+      }
+
+      await loadRequest(false);
+      setSuccess(
+        `اكتمل فحص المجموعة 🇸🇦: تم العثور على (${successCount}) تأشيرة وتنزيلها وربطها بالمسافرين تلقائياً${
+          notFoundCount > 0 ? `، و(${notFoundCount}) لم تصدر لهم بعد.` : "."
+        }`
+      );
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "حدث خطأ أثناء فحص تأشيرات المجموعة.";
+      setError(msg);
+    } finally {
+      setIsBulkCheckingVisas(false);
+      setVisaProgressMsg(null);
+    }
+  };
+
   const handleDownloadDoc = async (doc: DocumentItem) => {
     try {
       setActionLoading(true);
       const url = doc.storageUrl || (await api.documents.getStreamUrl(doc.id));
       const fileName =
         doc.originalFileName ||
-        `document-${doc.documentType}.${doc.mimeType?.includes("pdf") ? "pdf" : "jpg"}`;
+        `document-${doc.documentType}.${doc.mimeType?.includes("pdf") ? "pdf" : doc.mimeType?.includes("html") ? "html" : "jpg"}`;
       await downloadFile(url, fileName);
     } catch (e) {
       console.error("Download failed", e);
@@ -1079,7 +1223,7 @@ export default function RequestDetailPage({
         });
       }
 
-      // 3. Traveler Documents (Passport & Photo)
+      // 3. Traveler Documents (Passport, Photo & Visa)
       request.travelers?.forEach((traveler, tIdx) => {
         const safeName = (traveler.fullName || `مسافر_${tIdx + 1}`).replace(
           /[\/\\:*?"<>|]/g,
@@ -1105,6 +1249,18 @@ export default function RequestDetailPage({
           docEntries.push({
             doc: photoDoc,
             customName: `مسافر_${tIdx + 1}_${safeName}_الصورة_الشخصية.${ext}`,
+          });
+        }
+        const visaDoc = traveler.documents?.find(
+          (d) => d.documentType === "Visa"
+        );
+        if (visaDoc) {
+          const ext =
+            visaDoc.originalFileName?.split(".").pop() ||
+            (visaDoc.mimeType?.includes("pdf") ? "pdf" : visaDoc.mimeType?.includes("html") ? "html" : "html");
+          docEntries.push({
+            doc: visaDoc,
+            customName: `مسافر_${tIdx + 1}_${safeName}_تأشيرة_السفر.${ext}`,
           });
         }
       });
@@ -3504,6 +3660,21 @@ export default function RequestDetailPage({
 
             <button
               type="button"
+              onClick={handleBulkCheckVisas}
+              disabled={isBulkCheckingVisas || request.travelers.length === 0}
+              className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-all"
+              title="فحص وتنزيل التأشيرات الصادرة لكافة مسافري المعاملة من منصة وزارة الخارجية"
+            >
+              {isBulkCheckingVisas ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Search className="w-3.5 h-3.5" />
+              )}
+              <span>فحص وتنزيل تأشيرات المجموعة (MOFA) 🇸🇦</span>
+            </button>
+
+            <button
+              type="button"
               onClick={handleDownloadAllDocs}
               disabled={isDownloadingAll || totalDocsCount === 0}
               className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-all"
@@ -3517,6 +3688,13 @@ export default function RequestDetailPage({
             </button>
           </div>
         </div>
+
+        {visaProgressMsg && (
+          <div className="bg-emerald-50 border border-emerald-300 rounded-xl p-3 text-xs text-emerald-800 flex items-center gap-2 animate-pulse shadow-xs">
+            <Loader2 className="w-4 h-4 animate-spin text-emerald-600 shrink-0" />
+            <span className="font-semibold">{visaProgressMsg}</span>
+          </div>
+        )}
 
         {request.travelers.map((traveler, tIndex) => (
           <div
@@ -3736,6 +3914,15 @@ export default function RequestDetailPage({
                           ملاحظة: {traveler.notes}
                         </span>
                       )}
+                      {traveler.visaNumber ? (
+                        <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-900 border border-emerald-300 text-[11px] font-bold px-2 py-0.5 rounded shadow-2xs">
+                          <span>تأشيرة صادرة: {traveler.visaNumber} 🇸🇦</span>
+                        </span>
+                      ) : traveler.visaStatus === "UnderProcessing" ? (
+                        <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-900 border border-amber-300 text-[11px] font-medium px-2 py-0.5 rounded">
+                          <span>التأشيرة: قيد الإجراء ⏳</span>
+                        </span>
+                      ) : null}
                       {(() => {
                         const validity = checkPassportValidity(traveler.expiryDate, request.travelDate);
                         if (validity.warning) {
@@ -3753,7 +3940,29 @@ export default function RequestDetailPage({
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* MOFA Visa Check Button */}
+                {traveler.passportNumber && (
+                  <button
+                    type="button"
+                    disabled={isCheckingVisaTravelerId === traveler.id}
+                    onClick={() => handleCheckSingleVisa(traveler)}
+                    className="text-xs text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-md font-semibold flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
+                    title="فحص التأشيرة الصادرة وتنزيلها تلقائياً من منصة وزارة الخارجية"
+                  >
+                    {isCheckingVisaTravelerId === traveler.id ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600" />
+                    ) : (
+                      <Search className="w-3.5 h-3.5" />
+                    )}
+                    <span>
+                      {isCheckingVisaTravelerId === traveler.id
+                        ? "جاري فحص وتنزيل التأشيرة..."
+                        : "فحص وتنزيل التأشيرة 🇸🇦"}
+                    </span>
+                  </button>
+                )}
+
                 {/* MRZ Scan Button if passport document exists */}
                 {traveler.documents?.some((d) => d.documentType === "Passport") && (
                   <button
@@ -3809,8 +4018,8 @@ export default function RequestDetailPage({
             </div>
 
             {/* Traveler Documents Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-              {(["Passport", "PersonalPhoto"] as DocumentType[]).map(
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
+              {(["Passport", "PersonalPhoto", "Visa"] as DocumentType[]).map(
                 (docType) => {
                   const doc = traveler.documents.find(
                     (d) => d.documentType === docType
@@ -3821,9 +4030,9 @@ export default function RequestDetailPage({
                       key={docType}
                       disabled={!canEditAnyData}
                       onFileDrop={(file) => handleFileUpload(file, docType, traveler.id)}
-                      accept={docType === "Passport" ? ".pdf,.jpg,.jpeg,.png" : ".jpg,.jpeg,.png"}
+                      accept={docType === "PersonalPhoto" ? ".jpg,.jpeg,.png" : ".pdf,.html,.htm,.jpg,.jpeg,.png"}
                       maxSizeMb={10}
-                      activeBorderColor={docType === "Passport" ? "blue" : "purple"}
+                      activeBorderColor={docType === "Passport" ? "blue" : docType === "PersonalPhoto" ? "purple" : "emerald"}
                       overlayText={`أفلت ${DOCUMENT_TYPE_LABELS[docType]} هنا للرفع`}
                       overlaySubtext="سيتم رفع وتحديث المستند للمسافر مباشرة"
                       onError={(msg) => alert({ title: "تنبيه", message: msg, variant: "warning" })}
@@ -3852,7 +4061,7 @@ export default function RequestDetailPage({
                             )
                           ) : (
                             <span className="text-[10px] bg-gray-200 text-gray-600 px-2 py-0.5 rounded font-medium">
-                              غير مرفوع
+                              {docType === "Visa" ? "لم تصدر بعد" : "غير مرفوع"}
                             </span>
                           )}
                         </div>
@@ -3902,7 +4111,7 @@ export default function RequestDetailPage({
                                   <UploadCloud className="w-4 h-4" />
                                   <input
                                     type="file"
-                                    accept=".pdf,.jpg,.jpeg,.png"
+                                    accept={docType === "PersonalPhoto" ? ".jpg,.jpeg,.png" : ".pdf,.html,.htm,.jpg,.jpeg,.png"}
                                     className="hidden"
                                     onChange={(e) => {
                                       const file = e.target.files?.[0];
@@ -3936,7 +4145,7 @@ export default function RequestDetailPage({
                                 <span>رفع المستند (أو اسحبه هنا)</span>
                                 <input
                                   type="file"
-                                  accept=".pdf,.jpg,.jpeg,.png"
+                                  accept={docType === "PersonalPhoto" ? ".jpg,.jpeg,.png" : ".pdf,.html,.htm,.jpg,.jpeg,.png"}
                                   className="hidden"
                                   onChange={(e) => {
                                     const file = e.target.files?.[0];
@@ -3945,7 +4154,9 @@ export default function RequestDetailPage({
                                 />
                               </label>
                             ) : (
-                              <span className="text-[11px] text-gray-400">لم يُرفع</span>
+                              <span className="text-[11px] text-gray-400">
+                                {docType === "Visa" ? "لم تصدر بعد" : "لم يُرفع"}
+                              </span>
                             )}
                           </div>
                         )}
@@ -4050,11 +4261,15 @@ export default function RequestDetailPage({
               ) : previewDocUrl ? (
                 previewDoc.mimeType === "application/pdf" ||
                 previewDoc.originalFileName?.toLowerCase().endsWith(".pdf") ||
-                previewDocUrl.toLowerCase().includes(".pdf") ? (
+                previewDocUrl.toLowerCase().includes(".pdf") ||
+                previewDoc.documentType === "Visa" ||
+                previewDoc.mimeType?.includes("html") ||
+                previewDoc.originalFileName?.toLowerCase().endsWith(".html") ||
+                previewDoc.originalFileName?.toLowerCase().endsWith(".htm") ? (
                   <iframe
                     src={previewDocUrl}
                     className="w-full h-full rounded-lg border-0 bg-white"
-                    title="PDF Preview"
+                    title="Document Preview"
                   />
                 ) : (
                   <img

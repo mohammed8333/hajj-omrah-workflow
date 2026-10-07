@@ -41,6 +41,7 @@ export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   PersonalPhoto: "الصورة الشخصية",
   FlightTicket: "تذكرة الطيران",
   HostId: "هوية المستضيف",
+  Visa: "تأشيرة السفر",
   Other: "مستند إضافي",
 };
 
