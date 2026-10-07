@@ -400,7 +400,7 @@ export default function RequestDetailPage({
     params.set("travelerId", traveler.id);
     params.set("reqId", requestId);
 
-    const mofaUrl = `https://visa.mofa.gov.sa/#${params.toString()}`;
+    const mofaUrl = `https://visa.mofa.gov.sa/visaservices/searchvisa#${params.toString()}`;
 
     const width = 1150;
     const height = 820;

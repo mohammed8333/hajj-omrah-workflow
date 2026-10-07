@@ -95,6 +95,61 @@
 
     let filledCount = 0;
 
+    // 0) معالجة نموذج صفحة طباعة واستعلام التأشيرة (/visaservices/searchvisa)
+    const ddl1 = document.getElementById("ddlFirstValue");
+    const tb1 = document.getElementById("tbFirstValue");
+    const ddl2 = document.getElementById("ddlSecondValue");
+    const tb2 = document.getElementById("tbSecondValue");
+    const natIdSelect = document.getElementById("NationalityId");
+
+    if (ddl1 && tb1 && context.passport) {
+      ddl1.value = "PassPortNo";
+      ddl1.dispatchEvent(new Event("change", { bubbles: true }));
+      tb1.value = context.passport;
+      tb1.dispatchEvent(new Event("input", { bubbles: true }));
+      tb1.dispatchEvent(new Event("change", { bubbles: true }));
+      filledCount++;
+    }
+
+    if (ddl2 && tb2 && context.name) {
+      const firstName = context.name.split(" ")[0].trim();
+      ddl2.value = "fName";
+      ddl2.dispatchEvent(new Event("change", { bubbles: true }));
+      tb2.value = firstName;
+      tb2.dispatchEvent(new Event("input", { bubbles: true }));
+      tb2.dispatchEvent(new Event("change", { bubbles: true }));
+      filledCount++;
+    }
+
+    if (natIdSelect) {
+      const targetNat = (context.nationality || "EGY").toUpperCase();
+      for (const opt of natIdSelect.options) {
+        if (
+          opt.value.toUpperCase() === targetNat ||
+          (targetNat === "EGY" && opt.text.includes("مصر")) ||
+          (targetNat === "YEM" && opt.text.includes("اليمن")) ||
+          (targetNat === "SDN" && opt.text.includes("السودان")) ||
+          (targetNat === "JOR" && opt.text.includes("الأردن")) ||
+          (targetNat === "SYR" && opt.text.includes("سوريا")) ||
+          (targetNat === "IRQ" && opt.text.includes("العراق"))
+        ) {
+          natIdSelect.value = opt.value;
+          natIdSelect.dispatchEvent(new Event("change", { bubbles: true }));
+
+          const select2Chosen = document.querySelector("#s2id_NationalityId .select2-chosen");
+          if (select2Chosen) {
+            select2Chosen.innerText = opt.text;
+          }
+          if (window.jQuery && window.jQuery(natIdSelect).data("select2")) {
+            window.jQuery(natIdSelect).trigger("change");
+          }
+
+          filledCount++;
+          break;
+        }
+      }
+    }
+
     // أ) تحديد خيار البحث (البحث برقم الجواز)
     const searchOptionSelect = document.querySelector(
       'select[name*="SearchOption"], select[id*="SearchOption"], select[id*="SearchType"], #SearchOption, #SearchingType'
