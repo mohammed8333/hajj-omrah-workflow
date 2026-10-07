@@ -127,13 +127,37 @@ export function extractCleanVisaHtml(fullHtml: string): string {
 }
 
 /**
- * Triggers native browser print formatted specifically for A4 Single-Page e-visa slip.
+import { extractVisaData, renderOfficialVisaHtml } from "./officialVisaTemplate";
+import { Traveler } from "@/types";
+
+/**
+ * Triggers native browser print formatted specifically for A4 Single-Page official e-visa slip.
+ * Renders the exact official Ministry of Foreign Affairs (KSA VISA) design requested by user.
  * Automatically prompts "Save as PDF" / "حفظ بتنسيق PDF".
  */
-export function printVisaDocument(visaHtml: string, title?: string): void {
+export async function printVisaDocument(
+  visaHtml: string,
+  traveler?: Traveler | string,
+  title?: string
+): Promise<void> {
   if (typeof window === "undefined") return;
 
-  const cleanContent = extractCleanVisaHtml(visaHtml);
+  const travelerObj: Traveler | undefined =
+    typeof traveler === "object" ? traveler : undefined;
+  const travelerName =
+    typeof traveler === "string" ? traveler : traveler?.fullName;
+
+  let htmlToPrint = "";
+  try {
+    const visaData = await extractVisaData(visaHtml, travelerObj);
+    if (travelerName && !visaData.fullName) {
+      visaData.fullName = travelerName;
+    }
+    htmlToPrint = renderOfficialVisaHtml(visaData);
+  } catch (err) {
+    console.warn("Could not generate official visa template, using clean HTML fallback:", err);
+    htmlToPrint = extractCleanVisaHtml(visaHtml);
+  }
 
   // Create isolated hidden iframe for printing
   const iframe = document.createElement("iframe");
@@ -154,97 +178,8 @@ export function printVisaDocument(visaHtml: string, title?: string): void {
     return;
   }
 
-  const docTitle = title
-    ? `تأشيرة_${title.replace(/[\/\\:*?"<>|]/g, "_").replace(/\s+/g, "_")}`
-    : "تأشيرة_رسمية_وزارة_الخارجية";
-
   frameDoc.open();
-  frameDoc.write(`<!DOCTYPE html>
-<html dir="rtl" lang="ar">
-<head>
-  <meta charset="utf-8">
-  <title>${docTitle}</title>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Tajawal:wght@400;500;700;800&display=swap">
-  <style>
-    @page {
-      size: A4 portrait;
-      margin: 6mm 8mm;
-    }
-    @media print {
-      html, body {
-        width: 100% !important;
-        height: auto !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        background: #ffffff !important;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-      }
-      .no-print, header, footer, .modal, .banner-beta, nav, #msg, #dlgMessage {
-        display: none !important;
-      }
-      .page-break-avoid {
-        break-inside: avoid !important;
-        page-break-inside: avoid !important;
-      }
-    }
-    * {
-      box-sizing: border-box !important;
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
-    }
-    html, body {
-      background-color: #ffffff;
-      color: #000000;
-      font-family: 'Cairo', 'Tajawal', 'Segoe UI', Tahoma, Arial, sans-serif;
-      direction: rtl;
-      margin: 0;
-      padding: 0;
-      width: 100%;
-    }
-    .visa-print-wrapper {
-      width: 100%;
-      max-width: 195mm;
-      margin: 0 auto;
-      padding: 4mm 2mm;
-      background: #ffffff;
-      page-break-inside: avoid !important;
-      break-inside: avoid !important;
-    }
-    .evis-content, #dvToPrint, .page-print, .evisa, .portlet-body {
-      width: 100% !important;
-      max-width: 100% !important;
-      margin: 0 auto !important;
-      display: block !important;
-      border: none !important;
-      background: transparent !important;
-    }
-    /* Hide all junk */
-    header, footer, nav, .navbar, .page-header, .page-footer, .pre-footer, 
-    .banner-beta, .modal, #dlgMessage, #msg, form, button, .btn {
-      display: none !important;
-    }
-    img {
-      max-width: 100% !important;
-      height: auto !important;
-      image-rendering: -webkit-optimize-contrast;
-    }
-    table {
-      width: 100% !important;
-      border-collapse: collapse !important;
-    }
-    /* Compact row styling to ensure single-page fit */
-    .row, .form-group {
-      margin-bottom: 4px !important;
-    }
-  </style>
-</head>
-<body>
-  <div class="visa-print-wrapper">
-    ${cleanContent}
-  </div>
-</body>
-</html>`);
+  frameDoc.write(htmlToPrint);
   frameDoc.close();
 
   // Give images & fonts 450ms to settle then trigger browser print

@@ -1126,7 +1126,7 @@ export default function RequestDetailPage({
             [traveler.id]: res.searchResult!.visaHtml!,
           }));
           // Trigger immediate print command formatted as clean 1-page A4
-          printVisaDocument(res.searchResult.visaHtml, traveler.fullName);
+          printVisaDocument(res.searchResult.visaHtml, traveler);
         }
 
         setSuccess(
@@ -1247,7 +1247,7 @@ export default function RequestDetailPage({
             [trvId]: res.searchResult!.visaHtml!,
           }));
           // Trigger immediate print command formatted as clean 1-page A4
-          printVisaDocument(res.searchResult.visaHtml, trvName);
+          printVisaDocument(res.searchResult.visaHtml, mofaModalData.traveler);
         }
 
         setMofaModalData(null);
@@ -1348,7 +1348,7 @@ export default function RequestDetailPage({
     // 1. If HTML is cached in memory, print directly with native print helper
     const cachedHtml = cachedVisaHtmlMap[traveler.id];
     if (cachedHtml) {
-      printVisaDocument(cachedHtml, traveler.fullName);
+      printVisaDocument(cachedHtml, traveler);
       return;
     }
 
@@ -4547,7 +4547,7 @@ export default function RequestDetailPage({
                           t.documents?.some((d) => d.id === previewDoc.id)
                         );
                         if (trv && cachedVisaHtmlMap[trv.id]) {
-                          printVisaDocument(cachedVisaHtmlMap[trv.id], trv.fullName);
+                          printVisaDocument(cachedVisaHtmlMap[trv.id], trv);
                           return;
                         }
                       }

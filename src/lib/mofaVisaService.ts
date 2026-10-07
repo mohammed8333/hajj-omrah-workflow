@@ -225,7 +225,7 @@ export async function attachVisaDocumentToTraveler(
       // Convert HTML to real PDF Blob (with fallback if canvas fails)
       let pdfBlob: Blob;
       try {
-        pdfBlob = await generateVisaPdfBlob(result.visaHtml, traveler.fullName);
+        pdfBlob = await generateVisaPdfBlob(result.visaHtml, traveler);
       } catch (pdfErr) {
         console.warn("Canvas PDF generation warning, using structured PDF fallback:", pdfErr);
         pdfBlob = await generateFallbackVisaPdf(result, traveler);

@@ -3,31 +3,37 @@ import html2canvas from "html2canvas";
 import { MofaVisaResult } from "./mofaVisaService";
 import { Traveler } from "@/types";
 import { extractCleanVisaHtml } from "./visaPrintHelper";
+import { extractVisaData, renderOfficialVisaHtml } from "./officialVisaTemplate";
 
 /**
  * Generate a high-resolution, printable A4 PDF Blob from MOFA Visa HTML
- * Guaranteed to fit strictly on 1 single page without website headers, modals, or footers.
+ * Guaranteed to fit strictly on 1 single page in the official Ministry of Foreign Affairs (KSA VISA) layout.
  */
 export async function generateVisaPdfBlob(
   visaHtml: string,
-  travelerName?: string
+  traveler?: Traveler | string
 ): Promise<Blob> {
   if (typeof window === "undefined") {
     throw new Error("PDF generation requires browser environment");
   }
 
-  // 1. Sanitize incoming HTML to extract ONLY the pure visa slip
-  const contentToRender = extractCleanVisaHtml(visaHtml);
+  const travelerObj: Traveler | undefined =
+    typeof traveler === "object" ? traveler : undefined;
+  const travelerName =
+    typeof traveler === "string" ? traveler : traveler?.fullName;
 
-  // Parse original styles from visaHtml (if any)
-  let originalStyles = "";
+  // Render the exact official eVisa template matching official design
+  let fullOfficialHtml = "";
   try {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(visaHtml, "text/html");
-    originalStyles = Array.from(doc.querySelectorAll("style, link[rel='stylesheet']"))
-      .map((el) => el.outerHTML)
-      .join("\n");
-  } catch {}
+    const visaData = await extractVisaData(visaHtml, travelerObj);
+    if (travelerName && !visaData.fullName) {
+      visaData.fullName = travelerName;
+    }
+    fullOfficialHtml = renderOfficialVisaHtml(visaData);
+  } catch (err) {
+    console.warn("Could not generate structured official visa, using clean HTML fallback:", err);
+    fullOfficialHtml = extractCleanVisaHtml(visaHtml);
+  }
 
   // 2. Create offscreen container styled specifically for A4 proportions (794px width)
   const container = document.createElement("div");
@@ -35,7 +41,6 @@ export async function generateVisaPdfBlob(
   container.style.left = "-9999px";
   container.style.top = "0";
   container.style.width = "794px"; // 210mm at 96 DPI
-  container.style.minHeight = "1123px"; // 297mm at 96 DPI
   container.style.backgroundColor = "#ffffff";
   container.style.zIndex = "-9999";
   container.style.direction = "rtl";
@@ -43,44 +48,7 @@ export async function generateVisaPdfBlob(
   container.style.padding = "0";
   container.style.margin = "0";
 
-  container.innerHTML = `
-    ${originalStyles}
-    <style>
-      @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Tajawal:wght@400;500;700;800&display=swap');
-      * {
-        box-sizing: border-box !important;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-      }
-      .visa-pdf-canvas-root {
-        font-family: 'Cairo', 'Tajawal', 'Segoe UI', Tahoma, Arial, sans-serif !important;
-        background-color: #ffffff !important;
-        color: #000000 !important;
-        direction: rtl !important;
-        width: 794px !important;
-        padding: 20px 24px !important;
-        margin: 0 auto !important;
-      }
-      .evis-content, .evisa, #PrintDiv, #dvToPrint, .page-print, .portlet-body {
-        display: block !important;
-        width: 100% !important;
-        margin: 0 auto !important;
-        border: none !important;
-        background: transparent !important;
-      }
-      header, footer, nav, .navbar, .page-header, .page-footer, .pre-footer, 
-      .banner-beta, .modal, #dlgMessage, #msg, form, button, .btn {
-        display: none !important;
-      }
-      img {
-        max-width: 100% !important;
-        height: auto !important;
-      }
-    </style>
-    <div class="visa-pdf-canvas-root">
-      ${contentToRender}
-    </div>
-  `;
+  container.innerHTML = fullOfficialHtml;
 
   document.body.appendChild(container);
 
