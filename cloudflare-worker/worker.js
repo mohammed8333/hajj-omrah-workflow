@@ -59,6 +59,43 @@ async function isAction(request, actionName) {
   }
 }
 
+function extractCleanCookieHeader(response) {
+  let rawCookies = [];
+  if (typeof response.headers.getSetCookie === "function") {
+    rawCookies = response.headers.getSetCookie();
+  } else {
+    const raw = response.headers.get("set-cookie") || "";
+    rawCookies = raw.split(/,(?=[^;]+=[^;]+)/);
+  }
+
+  const cookieMap = new Map();
+  for (const sc of rawCookies) {
+    const parts = sc.split(";");
+    const nameVal = parts[0]?.trim();
+    if (nameVal && nameVal.includes("=")) {
+      const eqIdx = nameVal.indexOf("=");
+      const key = nameVal.slice(0, eqIdx).trim();
+      const val = nameVal.slice(eqIdx + 1).trim();
+      const lower = key.toLowerCase();
+      if (
+        key &&
+        lower !== "expires" &&
+        lower !== "path" &&
+        lower !== "domain" &&
+        lower !== "samesite" &&
+        lower !== "httponly" &&
+        lower !== "secure"
+      ) {
+        cookieMap.set(key, val);
+      }
+    }
+  }
+
+  return Array.from(cookieMap.entries())
+    .map(([k, v]) => `${k}=${v}`)
+    .join("; ");
+}
+
 async function handleGetCaptcha() {
   const initRes = await fetch(MOFA_SEARCH_URL, {
     headers: {
@@ -70,14 +107,18 @@ async function handleGetCaptcha() {
   });
 
   const html = await initRes.text();
-  const setCookies = initRes.headers.get("set-cookie") || "";
+  const cleanCookie = extractCleanCookieHeader(initRes);
 
   // Extract __RequestVerificationToken
   const tokenMatch = html.match(/name="__RequestVerificationToken"\s+type="hidden"\s+value="([^"]+)"/i);
   const token = tokenMatch ? tokenMatch[1] : "";
 
   // Extract Captcha image URL
-  const captchaMatch = html.match(/id=['"]imgCaptcha['"][^>]*src=['"]([^'"]+)['"]/i);
+  const captchaMatch =
+    html.match(/id=['"]imgCaptcha['"][^>]*src=['"]([^'"]+)['"]/i) ||
+    html.match(/src=['"]([^'"]*GetRandomCaptchaImage[^'"]*)['"]/i) ||
+    html.match(/src=['"]([^'"]+)['"][^>]*id=['"]imgCaptcha['"]/i);
+
   let captchaUrl = captchaMatch ? captchaMatch[1] : "";
 
   if (captchaUrl.startsWith("/")) {
@@ -88,27 +129,30 @@ async function handleGetCaptcha() {
   if (captchaUrl) {
     const imgRes = await fetch(captchaUrl, {
       headers: {
-        Cookie: setCookies,
+        Cookie: cleanCookie,
         Referer: MOFA_SEARCH_URL,
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
       },
     });
+
     const buffer = await imgRes.arrayBuffer();
     const bytes = new Uint8Array(buffer);
     let binary = "";
-    for (let i = 0; i < bytes.byteLength; i++) {
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
       binary += String.fromCharCode(bytes[i]);
     }
     const b64 = btoa(binary);
-    captchaBase64 = `data:image/jpeg;base64,${b64}`;
+    const contentType = imgRes.headers.get("content-type") || "image/jpeg";
+    captchaBase64 = `data:${contentType};base64,${b64}`;
   }
 
   return new Response(
     JSON.stringify({
       success: true,
       token,
-      cookie: setCookies,
+      cookie: cleanCookie,
       captchaImage: captchaBase64,
     }),
     { headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
