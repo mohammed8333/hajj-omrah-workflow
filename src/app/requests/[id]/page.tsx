@@ -79,8 +79,13 @@ import {
   extractFirstName,
   convertNationalityToMofaCode,
 } from "@/lib/mofaVisaService";
-import { printVisaDocument, printPdfDocumentUrl, printAllVisasByRequestId } from "@/lib/visaPrintHelper";
-import { generateVisaPdfBlob } from "@/lib/visaPdfGenerator";
+import {
+  printVisaDocument,
+  printPdfDocumentUrl,
+  printAllVisasByRequestId,
+  printHtmlViaIframe,
+} from "@/lib/visaPrintHelper";
+import { extractVisaData, renderOfficialVisaHtml } from "@/lib/officialVisaTemplate";
 import { useDialog } from "@/lib/dialog-context";
 import { FileDropArea } from "@/components/ui/FileDropArea";
 import { getWhatsAppUrl, getTelUrl, normalizePhone, validateHostPhone, validateTravelerPhone } from "@/lib/phoneUtils";
@@ -115,6 +120,7 @@ export default function RequestDetailPage({
   const [previewDoc, setPreviewDoc] = useState<DocumentItem | null>(null);
   const [previewDocUrl, setPreviewDocUrl] = useState<string | null>(null);
   const [previewDocLoading, setPreviewDocLoading] = useState(false);
+  const [previewDocHtml, setPreviewDocHtml] = useState<string | null>(null);
   const [reviewModalDoc, setReviewModalDoc] = useState<DocumentItem | null>(null);
   const [reviewStatus, setReviewStatus] = useState<DocumentReviewStatus>("Accepted");
   const [reviewNote, setReviewNote] = useState("");
@@ -254,44 +260,129 @@ export default function RequestDetailPage({
   useEffect(() => {
     let isMounted = true;
     let createdBlobUrl: string | null = null;
+    setPreviewDocHtml(null);
 
     if (previewDoc) {
-      // If it's a Visa document, always generate the fresh, pixel-perfect official Saudi eVisa
-      if (previewDoc.documentType === "Visa") {
-        const trv = request?.travelers.find((t) =>
-          t.documents?.some((d) => d.id === previewDoc.id)
+      setPreviewDocLoading(true);
+
+      const isVisaDoc =
+        previewDoc.documentType === "Visa" ||
+        previewDoc.originalFileName?.toLowerCase().endsWith(".html") ||
+        previewDoc.originalFileName?.toLowerCase().endsWith(".htm") ||
+        previewDoc.mimeType?.includes("html");
+
+      if (isVisaDoc) {
+        const trv = request?.travelers.find(
+          (t) =>
+            t.documents?.some((d) => d.id === previewDoc.id) ||
+            t.id === previewDoc.travelerId
         );
-        if (trv && (trv.visaNumber || cachedVisaHtmlMap[trv.id])) {
-          setPreviewDocLoading(true);
-          generateVisaPdfBlob(cachedVisaHtmlMap[trv.id] || "", trv)
-            .then((freshBlob) => {
-              if (!isMounted) return;
-              createdBlobUrl = URL.createObjectURL(freshBlob);
-              setPreviewDocUrl(createdBlobUrl);
-              setPreviewDocLoading(false);
-            })
-            .catch(() => {
-              if (isMounted) {
-                if (previewDoc.storageUrl) {
-                  applyUrl(previewDoc.storageUrl);
-                } else {
-                  api.documents
-                    .getStreamUrl(previewDoc.id)
-                    .then(applyUrl)
-                    .catch(() => {
-                      setPreviewDocUrl(null);
-                      setPreviewDocLoading(false);
-                    });
-                }
-              }
-            });
+
+        const setupHtmlPreview = async (rawHtml: string) => {
+          if (!isMounted) return;
+          let finalRenderedHtml = rawHtml;
+          try {
+            const visaData = await extractVisaData(rawHtml, trv);
+            finalRenderedHtml = renderOfficialVisaHtml(visaData);
+          } catch (e) {
+            console.warn("Could not parse official visa template, fallback to raw HTML:", e);
+          }
+
+          if (!isMounted) return;
+          setPreviewDocHtml(finalRenderedHtml);
+          const blob = new Blob([finalRenderedHtml], { type: "text/html;charset=utf-8" });
+          createdBlobUrl = URL.createObjectURL(blob);
+          setPreviewDocUrl(createdBlobUrl);
+          setPreviewDocLoading(false);
+        };
+
+        // 1. Direct memory or local storage cache
+        let directHtml: string | null = null;
+        if (trv) {
+          directHtml = cachedVisaHtmlMap[trv.id] || null;
+          if (!directHtml && typeof window !== "undefined") {
+            try {
+              directHtml = localStorage.getItem(`mofa_visa_html_${trv.id}`) || null;
+            } catch {}
+          }
+        }
+
+        if (directHtml) {
+          setupHtmlPreview(directHtml);
           return () => {
             isMounted = false;
-            if (createdBlobUrl) {
-              URL.revokeObjectURL(createdBlobUrl);
-            }
+            if (createdBlobUrl) URL.revokeObjectURL(createdBlobUrl);
           };
         }
+
+        // 2. Fetch from document stream
+        const fetchDocHtml = async () => {
+          try {
+            let docStream = previewDoc.storageUrl;
+            if (!docStream) {
+              docStream = await api.documents.getStreamUrl(previewDoc.id);
+            }
+            if (!isMounted) return;
+
+            if (docStream) {
+              if (
+                docStream.startsWith("data:text/html;base64,") ||
+                docStream.startsWith("data:text/html;charset=utf-8;base64,")
+              ) {
+                const base64 = docStream.split(",")[1];
+                const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+                const decodedHtml = new TextDecoder().decode(bytes);
+                await setupHtmlPreview(decodedHtml);
+                return;
+              } else if (docStream.startsWith("data:text/html")) {
+                const decodedHtml = decodeURIComponent(docStream.split(",")[1] || "");
+                await setupHtmlPreview(decodedHtml);
+                return;
+              } else if (
+                docStream.startsWith("http") ||
+                docStream.startsWith("blob:") ||
+                docStream.startsWith("/")
+              ) {
+                try {
+                  const res = await fetch(docStream);
+                  const fetchedHtml = await res.text();
+                  if (
+                    fetchedHtml &&
+                    (fetchedHtml.includes("<html") ||
+                      fetchedHtml.includes("<!DOCTYPE") ||
+                      fetchedHtml.includes("<table") ||
+                      fetchedHtml.includes("<div"))
+                  ) {
+                    await setupHtmlPreview(fetchedHtml);
+                    return;
+                  }
+                } catch {}
+              }
+            }
+
+            if (trv && (trv.visaNumber || trv.status === "Accepted")) {
+              await setupHtmlPreview("");
+              return;
+            }
+
+            applyUrl(docStream);
+          } catch {
+            if (isMounted) {
+              if (trv && (trv.visaNumber || trv.status === "Accepted")) {
+                await setupHtmlPreview("");
+              } else {
+                setPreviewDocUrl(null);
+                setPreviewDocLoading(false);
+              }
+            }
+          }
+        };
+
+        fetchDocHtml();
+        return () => {
+          isMounted = false;
+          if (createdBlobUrl) URL.revokeObjectURL(createdBlobUrl);
+        };
       }
 
       const applyUrl = (rawUrl: string | null) => {
@@ -318,7 +409,6 @@ export default function RequestDetailPage({
       if (previewDoc.storageUrl) {
         applyUrl(previewDoc.storageUrl);
       } else {
-        setPreviewDocLoading(true);
         api.documents
           .getStreamUrl(previewDoc.id)
           .then((url) => {
@@ -1401,31 +1491,57 @@ export default function RequestDetailPage({
   };
 
   const handlePrintVisa = async (traveler: Traveler) => {
-    // 1. Always generate and print the official pixel-perfect template if traveler has visa info
-    const cachedHtml = cachedVisaHtmlMap[traveler.id];
+    // 1. Check in-memory cache or localStorage
+    let cachedHtml = cachedVisaHtmlMap[traveler.id];
+    if (!cachedHtml && typeof window !== "undefined") {
+      try {
+        cachedHtml = localStorage.getItem(`mofa_visa_html_${traveler.id}`) || "";
+      } catch {}
+    }
+
     if (traveler.visaNumber || cachedHtml) {
-      printVisaDocument(cachedHtml || "", traveler);
+      await printVisaDocument(cachedHtml || "", traveler);
       return;
     }
 
     // 2. Otherwise look for attached Visa document
     const visaDoc = traveler.documents?.find((d) => d.documentType === "Visa");
     if (visaDoc) {
-      if (visaDoc.storageUrl) {
-        printPdfDocumentUrl(visaDoc.storageUrl);
-      } else {
-        try {
-          const url = await api.documents.getStreamUrl(visaDoc.id);
-          if (url) {
-            printPdfDocumentUrl(url);
-          } else {
-            await alert({ title: "خطأ", message: "تعذر تحميل رابط التأشيرة للطباعة", variant: "error" });
-          }
-        } catch {
-          await alert({ title: "خطأ", message: "تعذر تحميل ملف التأشيرة للطباعة", variant: "error" });
+      try {
+        let rawUrl = visaDoc.storageUrl;
+        if (!rawUrl) {
+          rawUrl = await api.documents.getStreamUrl(visaDoc.id);
         }
+        if (rawUrl) {
+          if (
+            rawUrl.startsWith("data:text/html;base64,") ||
+            rawUrl.startsWith("data:text/html;charset=utf-8;base64,")
+          ) {
+            const base64 = rawUrl.split(",")[1];
+            const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+            const decodedHtml = new TextDecoder().decode(bytes);
+            await printVisaDocument(decodedHtml, traveler);
+            return;
+          } else if (rawUrl.startsWith("data:text/html")) {
+            const decodedHtml = decodeURIComponent(rawUrl.split(",")[1] || "");
+            await printVisaDocument(decodedHtml, traveler);
+            return;
+          } else if (
+            visaDoc.originalFileName?.toLowerCase().endsWith(".html") ||
+            visaDoc.mimeType?.includes("html")
+          ) {
+            const res = await fetch(rawUrl);
+            const htmlContent = await res.text();
+            await printVisaDocument(htmlContent, traveler);
+            return;
+          } else {
+            printPdfDocumentUrl(rawUrl);
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to load visa document for print:", err);
       }
-      return;
     }
 
     await alert({
@@ -1433,6 +1549,29 @@ export default function RequestDetailPage({
       message: "لم يتم استخراج أو إرفاق مستند التأشيرة لهذا المسافر بعد. يرجى الضغط على زر فحص وتنزيل التأشيرة أولاً.",
       variant: "warning",
     });
+  };
+
+  const handlePreviewVisa = (traveler: Traveler) => {
+    const existingDoc = traveler.documents?.find((d) => d.documentType === "Visa");
+    if (existingDoc) {
+      setPreviewDoc(existingDoc);
+    } else {
+      const syntheticVisaDoc: DocumentItem = {
+        id: `visa-${traveler.id}`,
+        groupRequestId: request?.id || "",
+        travelerId: traveler.id,
+        documentType: "Visa",
+        originalFileName: `تأشيرة_${(traveler.fullName || "المسافر").replace(/[\/\\:*?"<>|]/g, "_")}_${traveler.visaNumber || traveler.passportNumber || ""}.html`,
+        mimeType: "text/html;charset=utf-8",
+        fileSize: 1024,
+        version: 1,
+        uploadedById: "system",
+        uploadedByName: "النظام",
+        uploadedAt: new Date().toISOString(),
+        reviewStatus: "Accepted",
+      };
+      setPreviewDoc(syntheticVisaDoc);
+    }
   };
 
   const handleBulkCheckVisas = async () => {
@@ -1527,16 +1666,28 @@ export default function RequestDetailPage({
   const handleDownloadDoc = async (doc: DocumentItem) => {
     try {
       setActionLoading(true);
-      // If it's a Visa document, generate and download the fresh official pixel-perfect PDF
       if (doc.documentType === "Visa") {
-        const trv = request?.travelers.find((t) =>
-          t.documents?.some((d) => d.id === doc.id)
+        const trv = request?.travelers.find(
+          (t) =>
+            t.documents?.some((d) => d.id === doc.id) ||
+            t.id === doc.travelerId
         );
-        if (trv && (trv.visaNumber || cachedVisaHtmlMap[trv.id])) {
-          const freshBlob = await generateVisaPdfBlob(cachedVisaHtmlMap[trv.id] || "", trv);
-          const fileName = `تأشيرة_${trv.fullName || "المسافر"}_${trv.visaNumber || "doc"}.pdf`;
-          const blobUrl = URL.createObjectURL(freshBlob);
-          await downloadFile(blobUrl, fileName);
+        let html = previewDocHtml || (trv ? cachedVisaHtmlMap[trv.id] : null);
+        if (!html && trv && typeof window !== "undefined") {
+          try {
+            html = localStorage.getItem(`mofa_visa_html_${trv.id}`);
+          } catch {}
+        }
+        if (!html && trv && (trv.visaNumber || trv.status === "Accepted")) {
+          const visaData = await extractVisaData("", trv);
+          html = renderOfficialVisaHtml(visaData);
+        }
+        if (html) {
+          const safeName = (trv?.fullName || "المسافر").replace(/[\/\\:*?"<>|]/g, "_");
+          const vNum = trv?.visaNumber || doc.id;
+          const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+          const blobUrl = URL.createObjectURL(blob);
+          await downloadFile(blobUrl, `تأشيرة_${safeName}_${vNum}.html`);
           URL.revokeObjectURL(blobUrl);
           return;
         }
@@ -4363,17 +4514,29 @@ export default function RequestDetailPage({
                   </button>
                 )}
 
-                {/* Print Official Visa Button */}
+                {/* Official Visa Actions: Preview & Print */}
                 {(traveler.visaNumber || traveler.documents?.some((d) => d.documentType === "Visa")) && (
-                  <button
-                    type="button"
-                    onClick={() => handlePrintVisa(traveler)}
-                    className="text-xs text-sky-700 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-2.5 py-1 rounded-md font-semibold flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
-                    title="طباعة التأشيرة الرسمية مباشرة (أمر طباعة / حفظ بتنسيق PDF)"
-                  >
-                    <Printer className="w-3.5 h-3.5 text-sky-600" />
-                    <span>طباعة التأشيرة (PDF) 🖨️</span>
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handlePreviewVisa(traveler)}
+                      className="text-xs text-sky-700 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-2.5 py-1 rounded-md font-semibold flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
+                      title="معاينة التأشيرة الرسمية (HTML)"
+                    >
+                      <Eye className="w-3.5 h-3.5 text-sky-600" />
+                      <span>معاينة التأشيرة 👁️</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handlePrintVisa(traveler)}
+                      className="text-xs text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2.5 py-1 rounded-md font-semibold flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
+                      title="طباعة التأشيرة الرسمية مباشرة (أمر طباعة / حفظ بتنسيق PDF)"
+                    >
+                      <Printer className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>طباعة التأشيرة 🖨️</span>
+                    </button>
+                  </div>
                 )}
 
                 {/* MRZ Scan Button if passport document exists */}
@@ -4662,12 +4825,18 @@ export default function RequestDetailPage({
                   <button
                     type="button"
                     onClick={() => {
+                      if (previewDocHtml) {
+                        printHtmlViaIframe(previewDocHtml);
+                        return;
+                      }
                       if (previewDoc.documentType === "Visa") {
-                        const trv = request?.travelers.find((t) =>
-                          t.documents?.some((d) => d.id === previewDoc.id)
+                        const trv = request?.travelers.find(
+                          (t) =>
+                            t.documents?.some((d) => d.id === previewDoc.id) ||
+                            t.id === previewDoc.travelerId
                         );
-                        if (trv && (trv.visaNumber || cachedVisaHtmlMap[trv.id])) {
-                          printVisaDocument(cachedVisaHtmlMap[trv.id] || "", trv);
+                        if (trv) {
+                          handlePrintVisa(trv);
                           return;
                         }
                       }

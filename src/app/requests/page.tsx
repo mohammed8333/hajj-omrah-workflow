@@ -33,12 +33,14 @@ import {
   RotateCcw,
   Building,
   FileText,
+  Printer,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useDialog } from "@/lib/dialog-context";
 import { getWhatsAppUrl } from "@/lib/phoneUtils";
 import { WhatsAppModal } from "@/components/ui/WhatsAppModal";
+import { printHtmlViaIframe, printPdfDocumentUrl } from "@/lib/visaPrintHelper";
 import { NusukApprovalModal } from "@/components/requests/NusukApprovalModal";
 import { notificationsService } from "@/lib/notificationsService";
 import { downloadFile } from "@/lib/fileDownload";
@@ -2932,6 +2934,39 @@ ${travelersLines}
                     </a>
                     <button
                       type="button"
+                      onClick={() => {
+                        if (docPreviewModal.url) {
+                          if (
+                            docPreviewModal.url.includes("text/html") ||
+                            docPreviewModal.downloadName?.endsWith(".html") ||
+                            docPreviewModal.downloadName?.endsWith(".htm") ||
+                            docPreviewModal.title.includes("تأشيرة")
+                          ) {
+                            if (docPreviewModal.url.startsWith("data:text/html;base64,")) {
+                              const base64 = docPreviewModal.url.split(",")[1];
+                              const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+                              const decoded = new TextDecoder().decode(bytes);
+                              printHtmlViaIframe(decoded);
+                            } else if (docPreviewModal.url.startsWith("data:text/html")) {
+                              printHtmlViaIframe(decodeURIComponent(docPreviewModal.url.split(",")[1] || ""));
+                            } else {
+                              fetch(docPreviewModal.url)
+                                .then((r) => r.text())
+                                .then((html) => printHtmlViaIframe(html))
+                                .catch(() => printPdfDocumentUrl(docPreviewModal.url!));
+                            }
+                          } else {
+                            printPdfDocumentUrl(docPreviewModal.url);
+                          }
+                        }
+                      }}
+                      className="p-1.5 text-gray-500 hover:text-sky-600 hover:bg-white rounded-lg transition-colors cursor-pointer"
+                      title="طباعة المستند"
+                    >
+                      <Printer className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
                       onClick={() =>
                         handleDownloadDoc(
                           docPreviewModal.docId,
@@ -2968,7 +3003,11 @@ ${travelersLines}
                 </div>
               ) : docPreviewModal.url ? (
                 docPreviewModal.url.includes("application/pdf") ||
-                docPreviewModal.downloadName?.endsWith(".pdf") ? (
+                docPreviewModal.downloadName?.endsWith(".pdf") ||
+                docPreviewModal.url.includes("text/html") ||
+                docPreviewModal.downloadName?.endsWith(".html") ||
+                docPreviewModal.downloadName?.endsWith(".htm") ||
+                docPreviewModal.title.includes("تأشيرة") ? (
                   <iframe
                     src={docPreviewModal.url}
                     className="w-full h-[70vh] rounded-lg border border-gray-200 bg-white"

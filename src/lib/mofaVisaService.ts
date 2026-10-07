@@ -7,7 +7,7 @@
 import { Traveler, DocumentItem } from "@/types";
 import { api } from "./api";
 import { callGeminiVision, ensureGeminiApiKey } from "./geminiVision";
-import { generateVisaPdfBlob, generateFallbackVisaPdf } from "./visaPdfGenerator";
+import { extractVisaData, renderOfficialVisaHtml } from "./officialVisaTemplate";
 
 export const MOFA_WORKER_URL_KEY = "mofa_visa_worker_url";
 
@@ -316,7 +316,7 @@ export async function attachVisaDocumentToTraveler(
     visaIssueDate: result.issueDate,
   });
 
-  // 2. If visa HTML is returned, convert to high-resolution A4 PDF and attach to traveler
+  // 2. If visa HTML is returned, save it as an official HTML document and attach to traveler
   if (result.visaHtml) {
     try {
       const oldVisaDocs = traveler.documents?.filter((d) => d.documentType === "Visa") || [];
@@ -328,19 +328,26 @@ export async function attachVisaDocumentToTraveler(
 
       const safeName = (traveler.fullName || "traveler").replace(/[\/\\:*?"<>|]/g, "_");
       const vNum = result.visaNumber || traveler.passportNumber || traveler.id;
-      const fileName = `تأشيرة_${safeName}_${vNum}.pdf`;
+      const fileName = `تأشيرة_${safeName}_${vNum}.html`;
 
-      // Convert HTML to real PDF Blob (with fallback if canvas fails)
-      let pdfBlob: Blob;
+      // 1. Prepare standalone clean HTML for the visa
+      let finalHtml = result.visaHtml;
       try {
-        pdfBlob = await generateVisaPdfBlob(result.visaHtml, traveler);
-      } catch (pdfErr) {
-        console.warn("Canvas PDF generation warning, using structured PDF fallback:", pdfErr);
-        pdfBlob = await generateFallbackVisaPdf(result, traveler);
+        const visaData = await extractVisaData(result.visaHtml, traveler);
+        finalHtml = renderOfficialVisaHtml(visaData);
+      } catch (err) {
+        console.warn("Could not generate official visa template, using raw HTML:", err);
       }
 
-      const visaFile = new File([pdfBlob], fileName, {
-        type: "application/pdf",
+      // Cache HTML locally in localStorage for fast instant access across sessions
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem(`mofa_visa_html_${traveler.id}`, finalHtml);
+        } catch {}
+      }
+
+      const visaFile = new File([finalHtml], fileName, {
+        type: "text/html;charset=utf-8",
         lastModified: Date.now(),
       });
 
@@ -350,8 +357,8 @@ export async function attachVisaDocumentToTraveler(
       console.error("Failed to attach visa document file:", uploadErr);
       throw new Error(
         uploadErr instanceof Error
-          ? `تم جلب التأشيرة لكن تعذر إنشاء أو حفظ ملف الـ PDF: ${uploadErr.message}`
-          : "تعذر حفظ مستند التأشيرة بصيغة PDF"
+          ? `تم جلب التأشيرة لكن تعذر حفظ أو إرفاق ملف الـ HTML: ${uploadErr.message}`
+          : "تعذر حفظ مستند التأشيرة"
       );
     }
   }
