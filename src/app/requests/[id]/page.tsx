@@ -71,6 +71,7 @@ import { getGeminiApiKey, setGeminiApiKey } from "@/lib/geminiVision";
 import {
   getMofaWorkerUrl,
   setMofaWorkerUrl,
+  fetchMofaSession,
   checkAndAttachVisaToTraveler,
 } from "@/lib/mofaVisaService";
 import { useDialog } from "@/lib/dialog-context";
@@ -224,6 +225,18 @@ export default function RequestDetailPage({
   const [isCheckingVisaTravelerId, setIsCheckingVisaTravelerId] = useState<string | null>(null);
   const [isBulkCheckingVisas, setIsBulkCheckingVisas] = useState(false);
   const [visaProgressMsg, setVisaProgressMsg] = useState<string | null>(null);
+  const [mofaModalData, setMofaModalData] = useState<{
+    isOpen: boolean;
+    traveler: Traveler;
+    workerUrl: string;
+    token: string;
+    cookie: string;
+    captchaImage: string;
+    userCaptcha: string;
+    loading: boolean;
+    refreshingCaptcha: boolean;
+    error?: string | null;
+  } | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -1083,6 +1096,20 @@ export default function RequestDetailPage({
           } 🇸🇦`
         );
         await loadRequest(false);
+      } else if (res.errorType === "INVALID_CAPTCHA" && res.session) {
+        // Open interactive Captcha verification dialog
+        setMofaModalData({
+          isOpen: true,
+          traveler,
+          workerUrl,
+          token: res.session.token,
+          cookie: res.session.cookie,
+          captchaImage: res.session.captchaImage,
+          userCaptcha: "",
+          loading: false,
+          refreshingCaptcha: false,
+          error: res.error || null,
+        });
       } else {
         await alert({
           title: "نتيجة فحص التأشيرة",
@@ -1096,6 +1123,102 @@ export default function RequestDetailPage({
     } finally {
       setIsCheckingVisaTravelerId(null);
       setVisaProgressMsg(null);
+    }
+  };
+
+  const handleRefreshModalCaptcha = async () => {
+    if (!mofaModalData) return;
+    try {
+      setMofaModalData((prev) => (prev ? { ...prev, refreshingCaptcha: true, error: null } : null));
+      const newSession = await fetchMofaSession(mofaModalData.workerUrl);
+      setMofaModalData((prev) =>
+        prev
+          ? {
+              ...prev,
+              token: newSession.token,
+              cookie: newSession.cookie,
+              captchaImage: newSession.captchaImage,
+              userCaptcha: "",
+              refreshingCaptcha: false,
+            }
+          : null
+      );
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "تعذر تحديث رمز الصورة";
+      setMofaModalData((prev) => (prev ? { ...prev, refreshingCaptcha: false, error: msg } : null));
+    }
+  };
+
+  const handleConfirmModalCaptcha = async () => {
+    if (!mofaModalData) return;
+    if (!mofaModalData.userCaptcha || mofaModalData.userCaptcha.trim().length !== 6) {
+      setMofaModalData((prev) =>
+        prev ? { ...prev, error: "يرجى كتابة رمز التحقق المكون من 6 أرقام كاملاً." } : null
+      );
+      return;
+    }
+
+    try {
+      setMofaModalData((prev) => (prev ? { ...prev, loading: true, error: null } : null));
+
+      const res = await checkAndAttachVisaToTraveler(
+        requestId,
+        mofaModalData.traveler,
+        mofaModalData.workerUrl,
+        undefined,
+        { token: mofaModalData.token, cookie: mofaModalData.cookie },
+        mofaModalData.userCaptcha.trim()
+      );
+
+      if (res.success) {
+        const trvName = mofaModalData.traveler.fullName;
+        const vNum = res.visaNumber;
+        setMofaModalData(null);
+        setSuccess(
+          `تم بنجاح استخراج التأشيرة وتنزيلها للمسافر (${trvName}) ${
+            vNum ? `| رقم التأشيرة: ${vNum}` : ""
+          } 🇸🇦`
+        );
+        await loadRequest(false);
+      } else if (res.errorType === "INVALID_CAPTCHA") {
+        try {
+          const newSession = await fetchMofaSession(mofaModalData.workerUrl);
+          setMofaModalData((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  token: newSession.token,
+                  cookie: newSession.cookie,
+                  captchaImage: newSession.captchaImage,
+                  userCaptcha: "",
+                  loading: false,
+                  error: "رمز الصورة غير مطابق، تم تحديث الصورة، يرجى إدخال الرمز الجديد.",
+                }
+              : null
+          );
+        } catch {
+          setMofaModalData((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  loading: false,
+                  error: "رمز الصورة غير مطابق، يرجى الضغط على زر التحديث وإعادة المحاولة.",
+                }
+              : null
+          );
+        }
+      } else {
+        const errMsg = res.error || "لم يتم العثور على تأشيرة صادرة لهذا الجواز.";
+        setMofaModalData(null);
+        await alert({
+          title: "نتيجة فحص التأشيرة",
+          message: errMsg,
+          variant: res.errorType === "NOT_FOUND" ? "info" : "warning",
+        });
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "حدث خطأ أثناء فحص التأشيرة.";
+      setMofaModalData((prev) => (prev ? { ...prev, loading: false, error: msg } : null));
     }
   };
 
@@ -4283,6 +4406,152 @@ export default function RequestDetailPage({
                   تعذر استعراض المستند أو الملف غير متاح حالياً.
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL: MOFA Visa Captcha Verification --- */}
+      {mofaModalData && mofaModalData.isOpen && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-4 border border-gray-100">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-lg">
+                  🇸🇦
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-gray-900">
+                    رمز التحقق لمنصة التأشيرات
+                  </h3>
+                  <span className="text-[11px] text-gray-500">
+                    وزارة الخارجية السعودية (MOFA)
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={mofaModalData.loading}
+                onClick={() => setMofaModalData(null)}
+                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Traveler info preview */}
+            <div className="bg-emerald-50/70 border border-emerald-100 rounded-xl p-3 text-xs space-y-1.5">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600 font-medium">اسم المسافر:</span>
+                <span className="font-bold text-gray-900">{mofaModalData.traveler.fullName}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600 font-medium">رقم الجواز:</span>
+                <span className="font-mono font-bold text-emerald-800 bg-white px-2 py-0.5 rounded border border-emerald-200">
+                  {mofaModalData.traveler.passportNumber}
+                </span>
+              </div>
+            </div>
+
+            {/* Captcha Image and refresh button */}
+            <div className="space-y-2">
+              <label className="block text-xs font-bold text-gray-700">
+                رمز الصورة (Captcha):
+              </label>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl p-2 flex items-center justify-center min-h-[58px]">
+                  {mofaModalData.refreshingCaptcha ? (
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
+                      <span>جاري تحديث الرمز...</span>
+                    </div>
+                  ) : mofaModalData.captchaImage ? (
+                    <img
+                      src={mofaModalData.captchaImage}
+                      alt="MOFA Captcha"
+                      className="h-10 object-contain rounded select-none pointer-events-none"
+                    />
+                  ) : (
+                    <span className="text-xs text-gray-400">لا توجد صورة</span>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  disabled={mofaModalData.refreshingCaptcha || mofaModalData.loading}
+                  onClick={handleRefreshModalCaptcha}
+                  className="p-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl transition-colors cursor-pointer flex items-center gap-1 text-xs font-semibold disabled:opacity-50"
+                  title="تحديث رمز الصورة برمز جديد"
+                >
+                  <RotateCcw className={`w-4 h-4 ${mofaModalData.refreshingCaptcha ? "animate-spin" : ""}`} />
+                  <span className="hidden sm:inline">تحديث الرمز</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Captcha Input */}
+            <div className="space-y-1.5">
+              <input
+                type="text"
+                autoFocus
+                maxLength={6}
+                disabled={mofaModalData.loading}
+                value={mofaModalData.userCaptcha}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/[^0-9]/g, "");
+                  setMofaModalData((prev) => (prev ? { ...prev, userCaptcha: val, error: null } : null));
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleConfirmModalCaptcha();
+                  }
+                }}
+                placeholder="123456"
+                className="w-full text-center font-mono text-2xl tracking-[0.35em] font-bold border-2 border-emerald-500 focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100 rounded-xl py-2.5 outline-hidden transition-all placeholder:text-sm placeholder:tracking-normal placeholder:font-normal placeholder:text-gray-400"
+              />
+              <span className="text-[11px] text-gray-500 block text-center">
+                أدخل الأرقام الـ 6 الظاهرة في الصورة ثم اضغط Enter أو زر البحث
+              </span>
+            </div>
+
+            {/* Error banner if any */}
+            {mofaModalData.error && (
+              <div className="p-2.5 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-medium flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-red-500" />
+                <span>{mofaModalData.error}</span>
+              </div>
+            )}
+
+            {/* Modal Actions */}
+            <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
+              <button
+                type="button"
+                disabled={mofaModalData.loading}
+                onClick={() => setMofaModalData(null)}
+                className="flex-1 py-2.5 px-3 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+              >
+                إلغاء
+              </button>
+
+              <button
+                type="button"
+                disabled={mofaModalData.loading || mofaModalData.userCaptcha.trim().length !== 6}
+                onClick={handleConfirmModalCaptcha}
+                className="flex-2 py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-md shadow-emerald-600/20"
+              >
+                {mofaModalData.loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>جاري الاستعلام وتنزيل التأشيرة...</span>
+                  </>
+                ) : (
+                  <>
+                    <Search className="w-4 h-4" />
+                    <span>استعلام وتنزيل التأشيرة 🇸🇦</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

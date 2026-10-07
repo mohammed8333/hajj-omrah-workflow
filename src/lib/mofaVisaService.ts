@@ -69,37 +69,12 @@ export function extractFirstName(fullName: string): string {
   return parts[0] || fullName.trim();
 }
 
-/**
- * Automatically solve MOFA 6-digit Captcha using Google Gemini Vision AI
- */
-export async function solveCaptchaWithGemini(captchaBase64: string): Promise<string | null> {
-  const geminiKey = await ensureGeminiApiKey();
-  if (!geminiKey) return null;
-
-  const prompt = `
-You are an expert OCR system.
-The provided image is a 6-digit numeric captcha.
-Extract strictly the 6 digits printed in the image (digits from 0 to 9, e.g. 790059).
-Ignore background dots or colored noise.
-Return ONLY the 6 digits with no spaces, no letters, and no explanations.
-`;
-
-  try {
-    const rawRes = await callGeminiVision(prompt, captchaBase64, geminiKey);
-    const match = rawRes.match(/\b\d{6}\b/) || rawRes.match(/\d{6}/);
-    if (match) {
-      return match[0];
-    }
-    // Clean all non-digits
-    const digitsOnly = rawRes.replace(/\D/g, "");
-    if (digitsOnly.length === 6) {
-      return digitsOnly;
-    }
-    return digitsOnly.slice(0, 6) || null;
-  } catch (err) {
-    console.warn("Gemini Captcha auto-solve failed:", err);
-    return null;
-  }
+export interface MofaSession {
+  success: boolean;
+  token: string;
+  cookie: string;
+  captchaImage: string;
+  error?: string;
 }
 
 export interface MofaVisaResult {
@@ -114,26 +89,10 @@ export interface MofaVisaResult {
 }
 
 /**
- * Query MOFA for a single traveler's visa
+ * Fetch a fresh session and Captcha image from MOFA via Cloudflare proxy
  */
-export async function queryTravelerVisa(
-  traveler: Traveler,
-  workerUrl: string,
-  manualCaptcha?: string,
-  onProgress?: (step: string) => void
-): Promise<MofaVisaResult> {
+export async function fetchMofaSession(workerUrl: string): Promise<MofaSession> {
   const cleanWorkerUrl = workerUrl.trim().replace(/\/+$/, "");
-
-  if (!traveler.passportNumber) {
-    return { success: false, error: "رقم جواز السفر غير مسجل للمسافر." };
-  }
-
-  const fName = extractFirstName(traveler.fullName);
-  const nationalityCode = convertNationalityToMofaCode(traveler.nationality);
-
-  onProgress?.("جاري الاتصال بخادم الاستعلام وجلب رمز التحقق...");
-
-  // 1. Fetch Session & Captcha
   const captchaRes = await fetch(`${cleanWorkerUrl}/api/captcha`, {
     method: "GET",
     headers: { "Content-Type": "application/json" },
@@ -148,34 +107,74 @@ export async function queryTravelerVisa(
     throw new Error(sessionData.error || "فشل جلب رمز التحقق من منصة التأشيرات.");
   }
 
-  // 2. Solve Captcha (AI or manual)
-  let solvedCaptcha = manualCaptcha?.trim();
-  if (!solvedCaptcha) {
-    onProgress?.("جاري قراءة رمز التحقق بالذكاء الاصطناعي (Gemini Vision)...");
-    solvedCaptcha = (await solveCaptchaWithGemini(sessionData.captchaImage)) || "";
+  return sessionData;
+}
+
+/**
+ * Automatically solve MOFA 6-digit Captcha using Google Gemini Vision AI
+ */
+export async function solveCaptchaWithGemini(captchaBase64: string): Promise<string | null> {
+  const geminiKey = await ensureGeminiApiKey();
+  if (!geminiKey) return null;
+
+  const prompt = `
+You are an expert OCR system.
+The provided image is a 6-digit numeric captcha.
+Extract strictly the 6 digits printed in the image (0-9).
+Ignore colored background noise.
+Return strictly in valid JSON format:
+{
+  "code": "123456"
+}
+`;
+
+  try {
+    const rawRes = await callGeminiVision(prompt, captchaBase64, geminiKey);
+    try {
+      const parsed = JSON.parse(rawRes);
+      if (parsed.code && /^\d{6}$/.test(String(parsed.code).trim())) {
+        return String(parsed.code).trim();
+      }
+    } catch {}
+
+    const match = rawRes.match(/\b\d{6}\b/) || rawRes.match(/\d{6}/);
+    if (match) {
+      return match[0];
+    }
+    const digitsOnly = rawRes.replace(/\D/g, "");
+    if (digitsOnly.length === 6) {
+      return digitsOnly;
+    }
+    return null;
+  } catch (err) {
+    console.warn("Gemini Captcha auto-solve failed:", err);
+    return null;
   }
+}
 
-  if (!solvedCaptcha || solvedCaptcha.length !== 6) {
-    return {
-      success: false,
-      errorType: "INVALID_CAPTCHA",
-      error: "تعذر قراءة رمز التحقق تلقائياً بدقة، يرجى إدخال الرمز يدوياً.",
-    };
-  }
+/**
+ * Execute search on MOFA using known session & captcha
+ */
+export async function executeMofaSearch(
+  workerUrl: string,
+  traveler: Traveler,
+  session: { token: string; cookie: string },
+  captcha: string
+): Promise<MofaVisaResult> {
+  const cleanWorkerUrl = workerUrl.trim().replace(/\/+$/, "");
+  const fName = extractFirstName(traveler.fullName);
+  const nationalityCode = convertNationalityToMofaCode(traveler.nationality);
 
-  onProgress?.(`جاري فحص التأشيرة برقم الجواز (${traveler.passportNumber})...`);
-
-  // 3. Search Visa
   const searchRes = await fetch(`${cleanWorkerUrl}/api/search`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      token: sessionData.token,
-      cookie: sessionData.cookie,
-      passportNo: traveler.passportNumber.trim(),
+      token: session.token,
+      cookie: session.cookie,
+      passportNo: traveler.passportNumber?.trim() || "",
       fName,
       nationality: nationalityCode,
-      captcha: solvedCaptcha,
+      captcha: captcha.trim(),
     }),
   });
 
@@ -188,26 +187,13 @@ export async function queryTravelerVisa(
 }
 
 /**
- * Check visa and automatically download + attach visa document to traveler
+ * Attach downloaded visa document to traveler
  */
-export async function checkAndAttachVisaToTraveler(
+export async function attachVisaDocumentToTraveler(
   requestId: string,
   traveler: Traveler,
-  workerUrl: string,
-  onProgress?: (step: string) => void
-): Promise<{
-  success: boolean;
-  visaNumber?: string;
-  error?: string;
-}> {
-  const result = await queryTravelerVisa(traveler, workerUrl, undefined, onProgress);
-
-  if (!result.success) {
-    return { success: false, error: result.error };
-  }
-
-  onProgress?.("تم العثور على التأشيرة! جاري ربطها وتنزيل المستند...");
-
+  result: MofaVisaResult
+): Promise<void> {
   // 1. Update Traveler record with visa details
   await api.travelers.update(traveler.id, {
     visaNumber: result.visaNumber || traveler.visaNumber,
@@ -218,7 +204,6 @@ export async function checkAndAttachVisaToTraveler(
   // 2. If visa HTML is returned, save it as a document attached to the traveler
   if (result.visaHtml) {
     try {
-      // Remove previous Visa documents for this traveler
       const oldVisaDocs = traveler.documents?.filter((d) => d.documentType === "Visa") || [];
       for (const oldDoc of oldVisaDocs) {
         try {
@@ -226,7 +211,6 @@ export async function checkAndAttachVisaToTraveler(
         } catch {}
       }
 
-      // Create Visa Document File (HTML printable page)
       const fileName = `visa-${traveler.passportNumber || traveler.id}.html`;
       const blob = new Blob([result.visaHtml], { type: "text/html;charset=utf-8" });
       const visaFile = new File([blob], fileName, { type: "text/html" });
@@ -236,9 +220,98 @@ export async function checkAndAttachVisaToTraveler(
       console.warn("Failed to attach visa document file:", uploadErr);
     }
   }
+}
 
-  return {
-    success: true,
-    visaNumber: result.visaNumber,
-  };
+/**
+ * Check visa and automatically download + attach visa document to traveler.
+ * If Captcha fails or needs manual input, returns the session so UI can prompt user!
+ */
+export async function checkAndAttachVisaToTraveler(
+  requestId: string,
+  traveler: Traveler,
+  workerUrl: string,
+  onProgress?: (step: string) => void,
+  manualSession?: { token: string; cookie: string },
+  manualCaptcha?: string
+): Promise<{
+  success: boolean;
+  visaNumber?: string;
+  error?: string;
+  errorType?: "INVALID_CAPTCHA" | "NOT_FOUND" | "NETWORK_ERROR";
+  session?: MofaSession;
+}> {
+  if (!traveler.passportNumber) {
+    return { success: false, error: "رقم جواز السفر غير مسجل للمسافر." };
+  }
+
+  try {
+    // 1. Prepare session
+    let session: MofaSession;
+    if (manualSession) {
+      session = {
+        success: true,
+        token: manualSession.token,
+        cookie: manualSession.cookie,
+        captchaImage: "",
+      };
+    } else {
+      onProgress?.("جاري الاتصال بخادم الاستعلام وجلب رمز التحقق...");
+      session = await fetchMofaSession(workerUrl);
+    }
+
+    // 2. Solve Captcha
+    let solvedCaptcha = manualCaptcha?.trim();
+    if (!solvedCaptcha) {
+      onProgress?.("جاري قراءة رمز التحقق بالذكاء الاصطناعي (Gemini Vision)...");
+      solvedCaptcha = (await solveCaptchaWithGemini(session.captchaImage)) || "";
+    }
+
+    // If still no valid 6-digit captcha, return session for manual input modal
+    if (!solvedCaptcha || solvedCaptcha.length !== 6) {
+      return {
+        success: false,
+        errorType: "INVALID_CAPTCHA",
+        session,
+        error: "يرجى كتابة رمز التحقق الموضح في الصورة.",
+      };
+    }
+
+    onProgress?.(`جاري فحص التأشيرة برقم الجواز (${traveler.passportNumber})...`);
+
+    // 3. Search Visa
+    const searchResult = await executeMofaSearch(workerUrl, traveler, session, solvedCaptcha);
+
+    if (!searchResult.success) {
+      // If Captcha was wrong according to MOFA, return with fresh session possibility
+      if (searchResult.errorType === "INVALID_CAPTCHA") {
+        return {
+          success: false,
+          errorType: "INVALID_CAPTCHA",
+          session,
+          error: "رمز الصورة غير صحيح، يرجى إعادة المحاولة.",
+        };
+      }
+      return {
+        success: false,
+        errorType: searchResult.errorType,
+        error: searchResult.error,
+      };
+    }
+
+    // 4. Attach document to traveler
+    onProgress?.("تم العثور على التأشيرة! جاري ربطها وتنزيل المستند...");
+    await attachVisaDocumentToTraveler(requestId, traveler, searchResult);
+
+    return {
+      success: true,
+      visaNumber: searchResult.visaNumber,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "فشل فحص التأشيرة";
+    return {
+      success: false,
+      errorType: "NETWORK_ERROR",
+      error: msg,
+    };
+  }
 }
