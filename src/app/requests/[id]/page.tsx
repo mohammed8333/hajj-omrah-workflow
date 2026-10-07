@@ -178,6 +178,8 @@ export default function RequestDetailPage({
 
   // Dedicated Add / Edit Host Modal State
   const [showAddHostModal, setShowAddHostModal] = useState(false);
+  // Chrome Extension Guide Modal State
+  const [showExtensionModal, setShowExtensionModal] = useState(false);
   const [hostModalName, setHostModalName] = useState("");
   const [hostModalPhone, setHostModalPhone] = useState("");
   const [hostModalNationalId, setHostModalNationalId] = useState("");
@@ -235,6 +237,21 @@ export default function RequestDetailPage({
               u8arr[n] = bstr.charCodeAt(n);
             }
             const blob = new Blob([u8arr], { type: "application/pdf" });
+            createdBlobUrl = URL.createObjectURL(blob);
+            setPreviewDocUrl(createdBlobUrl);
+            setPreviewDocLoading(false);
+            return;
+          } catch {}
+        }
+        if (rawUrl && rawUrl.startsWith("data:text/html")) {
+          try {
+            const commaIdx = rawUrl.indexOf(",");
+            const meta = rawUrl.substring(0, commaIdx);
+            const content = rawUrl.substring(commaIdx + 1);
+            const htmlText = meta.includes(";base64")
+              ? decodeURIComponent(escape(atob(content)))
+              : decodeURIComponent(content);
+            const blob = new Blob([htmlText], { type: "text/html;charset=utf-8" });
             createdBlobUrl = URL.createObjectURL(blob);
             setPreviewDocUrl(createdBlobUrl);
             setPreviewDocLoading(false);
@@ -364,6 +381,115 @@ export default function RequestDetailPage({
       }
     }, [requestId])
   );
+
+  // Open MOFA query popup with traveler details in URL hash
+  const handleOpenMofaQuery = (traveler: Traveler) => {
+    if (!traveler.passportNumber) {
+      alert({
+        title: "تنبيه",
+        message: "يرجى إدخال رقم جواز السفر للمسافر أولاً قبل الاستعلام.",
+        variant: "warning",
+      });
+      return;
+    }
+
+    const params = new URLSearchParams();
+    params.set("passport", (traveler.passportNumber || "").trim());
+    if (traveler.fullName) params.set("name", traveler.fullName.trim());
+    if (traveler.nationality) params.set("nat", traveler.nationality.trim());
+    params.set("travelerId", traveler.id);
+    params.set("reqId", requestId);
+
+    const mofaUrl = `https://visa.mofa.gov.sa/visaServices/SearchPersons#${params.toString()}`;
+
+    const width = 1150;
+    const height = 820;
+    const left = Math.max(0, Math.round(window.screen.width / 2 - width / 2));
+    const top = Math.max(0, Math.round(window.screen.height / 2 - height / 2));
+    window.open(
+      mofaUrl,
+      `mofa_${traveler.id}`,
+      `width=${width},height=${height},top=${top},left=${left},status=yes,toolbar=no,menubar=no,location=yes,scrollbars=yes,resizable=yes`
+    );
+  };
+
+  // Listener for messages from MOFA Chrome Extension
+  useEffect(() => {
+    const handleVisaBridgeMessage = async (event: MessageEvent) => {
+      const data = event.data;
+      if (!data || data.source !== "MOFA_VISA_EXTENSION" || data.type !== "VISA_CAPTURED") {
+        return;
+      }
+
+      console.log("🇸🇦 Received captured visa from MOFA extension:", data);
+
+      const targetTravelerId = data.travelerId;
+      const targetTraveler = request?.travelers?.find(
+        (t) => t.id === targetTravelerId || (data.passportNumber && t.passportNumber === data.passportNumber)
+      );
+
+      if (!targetTraveler) {
+        console.warn("Could not find matching traveler for captured visa:", data);
+        return;
+      }
+
+      setActionLoading(true);
+      try {
+        // 1. Update traveler with visa number
+        if (data.visaNumber) {
+          await api.travelers.update(targetTraveler.id, {
+            visaNumber: data.visaNumber,
+            visaStatus: "Issued",
+          });
+        }
+
+        // 2. Upload HTML document if provided
+        if (data.visaHtml) {
+          // Delete old visa document(s) if any
+          const oldVisaDocs = targetTraveler.documents?.filter((d) => d.documentType === "Visa") || [];
+          for (const oldDoc of oldVisaDocs) {
+            try {
+              await api.documents.delete(oldDoc.id);
+            } catch (delErr) {
+              console.warn("Could not delete previous visa document:", delErr);
+            }
+          }
+
+          const htmlBlob = new Blob([data.visaHtml], { type: "text/html;charset=utf-8" });
+          const safeName = (targetTraveler.passportNumber || targetTraveler.fullName || "mofa").replace(
+            /[\/\\:*?"<>|]/g,
+            "_"
+          );
+          const fileName = `visa-${safeName}.html`;
+          const htmlFile = new File([htmlBlob], fileName, { type: "text/html" });
+
+          await api.documents.upload(requestId, htmlFile, "Visa", targetTraveler.id);
+        }
+
+        await alert({
+          title: "تم ربط التأشيرة بنجاح! 🇸🇦",
+          message: `تم حفظ التأشيرة بنجاح للمسافر (${targetTraveler.fullName}) برقم: ${data.visaNumber || "تم الحفظ"}.`,
+          variant: "success",
+        });
+
+        await loadRequest();
+      } catch (err: any) {
+        console.error("Failed to link captured visa:", err);
+        await alert({
+          title: "خطأ في حفظ التأشيرة",
+          message: `حدث خطأ أثناء حفظ التأشيرة في النظام: ${err?.message || "خطأ غير معروف"}`,
+          variant: "danger",
+        });
+      } finally {
+        setActionLoading(false);
+      }
+    };
+
+    window.addEventListener("message", handleVisaBridgeMessage);
+    return () => {
+      window.removeEventListener("message", handleVisaBridgeMessage);
+    };
+  }, [request, requestId, alert]);
 
   const handleFileUpload = async (
     file: File,
@@ -1141,6 +1267,18 @@ export default function RequestDetailPage({
           docEntries.push({
             doc: photoDoc,
             customName: `مسافر_${tIdx + 1}_${safeName}_الصورة_الشخصية.${ext}`,
+          });
+        }
+        const visaDoc = traveler.documents?.find(
+          (d) => d.documentType === "Visa"
+        );
+        if (visaDoc) {
+          const ext =
+            visaDoc.originalFileName?.split(".").pop() ||
+            (visaDoc.mimeType?.includes("html") ? "html" : "pdf");
+          docEntries.push({
+            doc: visaDoc,
+            customName: `مسافر_${tIdx + 1}_${safeName}_التأشيرة.${ext}`,
           });
         }
       });
@@ -1971,6 +2109,7 @@ export default function RequestDetailPage({
   request.travelers?.forEach((t) => {
     if (t.documents?.some((d) => d.documentType === "Passport")) totalDocsCount++;
     if (t.documents?.some((d) => d.documentType === "PersonalPhoto")) totalDocsCount++;
+    if (t.documents?.some((d) => d.documentType === "Visa")) totalDocsCount++;
   });
 
   const isAgentEligible = [
@@ -3561,6 +3700,16 @@ export default function RequestDetailPage({
               )}
               <span>تحميل كافة المستندات ({totalDocsCount}) ZIP</span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => setShowExtensionModal(true)}
+              className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold px-3 py-2 rounded-xl shadow-2xs flex items-center gap-1.5 cursor-pointer transition-all"
+              title="تحميل إضافة متصفح Chrome لجلب التأشيرات تلقائياً من وزارة الخارجية السعودية"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-indigo-600" />
+              <span>إضافة المتصفح (MOFA) 🧩</span>
+            </button>
           </div>
         </div>
 
@@ -3719,6 +3868,12 @@ export default function RequestDetailPage({
                           جواز: {traveler.passportNumber}
                         </span>
                       )}
+                      {traveler.visaNumber && (
+                        <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-900 border border-emerald-300 text-[11px] font-bold px-2 py-0.5 rounded shadow-2xs">
+                          <span>رقم التأشيرة:</span>
+                          <span className="font-mono font-black">{traveler.visaNumber}</span>
+                        </span>
+                      )}
                       {traveler.phoneNumber ? (
                         <div className="inline-flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg">
                           <a
@@ -3822,6 +3977,17 @@ export default function RequestDetailPage({
                   </button>
                 )}
 
+                {/* MOFA Visa Query Button */}
+                <button
+                  type="button"
+                  onClick={() => handleOpenMofaQuery(traveler)}
+                  className="text-xs text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-md font-semibold flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
+                  title="استعلام وتعبئة بيانات المسافر تلقائياً في موقع وزارة الخارجية السعودية وجلب التأشيرة"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>استعلام التأشيرة (MOFA) 🇸🇦</span>
+                </button>
+
                 {(isSafaReviewer || isAgent) && (
                   <button
                     type="button"
@@ -3855,8 +4021,8 @@ export default function RequestDetailPage({
             </div>
 
             {/* Traveler Documents Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-              {(["Passport", "PersonalPhoto"] as DocumentType[]).map(
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
+              {(["Passport", "PersonalPhoto", "Visa"] as DocumentType[]).map(
                 (docType) => {
                   const doc = traveler.documents?.find(
                     (d) => d.documentType === docType
@@ -3867,9 +4033,9 @@ export default function RequestDetailPage({
                       key={docType}
                       disabled={!canEditAnyData}
                       onFileDrop={(file) => handleFileUpload(file, docType, traveler.id)}
-                      accept={docType === "PersonalPhoto" ? ".jpg,.jpeg,.png" : ".pdf,.jpg,.jpeg,.png"}
+                      accept={docType === "PersonalPhoto" ? ".jpg,.jpeg,.png" : docType === "Visa" ? ".html,.htm,.pdf,.jpg,.jpeg,.png" : ".pdf,.jpg,.jpeg,.png"}
                       maxSizeMb={10}
-                      activeBorderColor={docType === "Passport" ? "blue" : "purple"}
+                      activeBorderColor={docType === "Passport" ? "blue" : docType === "Visa" ? "emerald" : "purple"}
                       overlayText={`أفلت ${DOCUMENT_TYPE_LABELS[docType]} هنا للرفع`}
                       overlaySubtext="سيتم رفع وتحديث المستند للمسافر مباشرة"
                       onError={(msg) => alert({ title: "تنبيه", message: msg, variant: "warning" })}
@@ -3881,7 +4047,7 @@ export default function RequestDetailPage({
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-xs font-bold text-gray-700">
                             {DOCUMENT_TYPE_LABELS[docType]}
-                            <span className="text-red-500 mr-0.5">*</span>
+                            {docType !== "Visa" && <span className="text-red-500 mr-0.5">*</span>}
                           </span>
 
                           {doc ? (
@@ -3946,7 +4112,7 @@ export default function RequestDetailPage({
                                   <UploadCloud className="w-4 h-4" />
                                   <input
                                     type="file"
-                                    accept={docType === "PersonalPhoto" ? ".jpg,.jpeg,.png" : ".pdf,.jpg,.jpeg,.png"}
+                                    accept={docType === "PersonalPhoto" ? ".jpg,.jpeg,.png" : docType === "Visa" ? ".html,.htm,.pdf,.jpg,.jpeg,.png" : ".pdf,.jpg,.jpeg,.png"}
                                     className="hidden"
                                     onChange={(e) => {
                                       const file = e.target.files?.[0];
@@ -3979,7 +4145,7 @@ export default function RequestDetailPage({
                                 <span>رفع المستند (أو اسحبه هنا)</span>
                                 <input
                                   type="file"
-                                  accept={docType === "PersonalPhoto" ? ".jpg,.jpeg,.png" : ".pdf,.jpg,.jpeg,.png"}
+                                  accept={docType === "PersonalPhoto" ? ".jpg,.jpeg,.png" : docType === "Visa" ? ".html,.htm,.pdf,.jpg,.jpeg,.png" : ".pdf,.jpg,.jpeg,.png"}
                                   className="hidden"
                                   onChange={(e) => {
                                     const file = e.target.files?.[0];
@@ -4107,7 +4273,12 @@ export default function RequestDetailPage({
               ) : previewDocUrl ? (
                 previewDoc.mimeType === "application/pdf" ||
                 previewDoc.originalFileName?.toLowerCase().endsWith(".pdf") ||
-                previewDocUrl.toLowerCase().includes(".pdf") ? (
+                previewDocUrl.toLowerCase().includes(".pdf") ||
+                previewDoc.mimeType === "text/html" ||
+                previewDoc.originalFileName?.toLowerCase().endsWith(".html") ||
+                previewDoc.originalFileName?.toLowerCase().endsWith(".htm") ||
+                previewDocUrl.toLowerCase().includes(".html") ||
+                previewDocUrl.toLowerCase().includes(".htm") ? (
                   <iframe
                     src={previewDocUrl}
                     className="w-full h-full rounded-lg border-0 bg-white"
@@ -5378,6 +5549,126 @@ export default function RequestDetailPage({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL: Chrome Extension Helper Modal --- */}
+      {showExtensionModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="p-4 bg-gradient-to-r from-emerald-700 to-teal-800 text-white flex justify-between items-center">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-white/10 rounded-xl">
+                  <ExternalLink className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base">
+                    إضافة متصفح Chrome: مساعد تأشيرات الخارجية (MOFA) 🇸🇦 🧩
+                  </h3>
+                  <p className="text-xs text-emerald-100">
+                    تعبئة آلية لبيانات المسافرين والتقاط التأشيرة وحفظها بنقرة واحدة
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowExtensionModal(false)}
+                className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 cursor-pointer"
+                title="إغلاق"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-5 text-gray-800 max-h-[75vh] overflow-y-auto text-sm">
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div>
+                  <h4 className="font-bold text-emerald-950 text-sm mb-1">
+                    حزمة الإضافة جاهزة للتحميل (ملف مدمج)
+                  </h4>
+                  <p className="text-xs text-emerald-800">
+                    قم بتحميل ملف ZIP وفك ضغطه لتثبيته في متصفح Google Chrome بثوانٍ معدودة.
+                  </p>
+                </div>
+                <a
+                  href="/mofa-extension.zip"
+                  download="mofa-extension.zip"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-xs flex items-center gap-2 whitespace-nowrap cursor-pointer transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>تحميل الإضافة (ZIP)</span>
+                </a>
+              </div>
+
+              <div className="space-y-3">
+                <h4 className="font-bold text-gray-900 text-sm border-b pb-2">
+                  طريقة التثبيت في متصفح Google Chrome (3 خطوات بسيطة):
+                </h4>
+
+                <div className="flex items-start gap-3 bg-gray-50 p-3.5 rounded-xl border border-gray-100">
+                  <div className="w-6 h-6 rounded-full bg-emerald-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                    1
+                  </div>
+                  <div>
+                    <strong className="block text-gray-900 mb-0.5">فك الضغط عن الملف:</strong>
+                    <span className="text-gray-600 text-xs leading-relaxed">
+                      بعد تحميل <code className="bg-gray-200 px-1 py-0.5 rounded text-gray-800">mofa-extension.zip</code>، قم بالضغط عليه بالزر الأيمن واختر &quot;استخراج الكل&quot; (Extract All) في أي مجلد تريده.
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 bg-gray-50 p-3.5 rounded-xl border border-gray-100">
+                  <div className="w-6 h-6 rounded-full bg-emerald-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                    2
+                  </div>
+                  <div>
+                    <strong className="block text-gray-900 mb-0.5">فتح صفحة إضافات Chrome:</strong>
+                    <span className="text-gray-600 text-xs leading-relaxed">
+                      افتح تبويب جديد في Chrome والصق الرابط: <code className="bg-gray-200 px-1 py-0.5 rounded text-gray-800 select-all">chrome://extensions</code> ثم قم بتفعيل مفتاح <strong>&quot;وضع مطور البرامج&quot; (Developer mode)</strong> في الزاوية العلوية.
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 bg-gray-50 p-3.5 rounded-xl border border-gray-100">
+                  <div className="w-6 h-6 rounded-full bg-emerald-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                    3
+                  </div>
+                  <div>
+                    <strong className="block text-gray-900 mb-0.5">تحميل الإضافة:</strong>
+                    <span className="text-gray-600 text-xs leading-relaxed">
+                      اضغط على زر <strong>&quot;تحميل تم فك حزمته&quot; (Load unpacked)</strong> في أعلى الصفحة، واختر المجلد المفكوك <code className="bg-gray-200 px-1 py-0.5 rounded text-gray-800">mofa-extension</code>.
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-sky-50 border border-sky-200 rounded-xl p-4 space-y-2">
+                <h4 className="font-bold text-sky-950 text-xs flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-sky-600" />
+                  <span>كيف تعمل الإضافة أثناء الاستعلام؟</span>
+                </h4>
+                <ul className="text-xs text-sky-900 space-y-1.5 list-disc list-inside">
+                  <li>اضغط على زر <strong>&quot;استعلام التأشيرة (MOFA) 🇸🇦&quot;</strong> بجوار أي مسافر.</li>
+                  <li>تفتح نافذة الاستعلام وتُملأ البيانات (رقم الجواز والاسم والجنسية) آلياً.</li>
+                  <li>ما عليك سوى كتابة الرمز المرئي (الكابتشا) والضغط على &quot;بحث&quot;.</li>
+                  <li>تكتشف الإضافة صفحة التأشيرة وتظهر لك زراً: <strong>&quot;💾 ربط وحفظ التأشيرة في النظام الآن&quot;</strong>؛ بمجرد الضغط عليه تُحفظ التأشيرة ورقمها ومستندها بالمعاملة فوراً وتُغلق النافذة!</li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-gray-50 border-t border-gray-200 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowExtensionModal(false)}
+                className="px-5 py-2 font-bold bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl transition-colors cursor-pointer"
+              >
+                إغلاق
+              </button>
+            </div>
           </div>
         </div>
       )}
