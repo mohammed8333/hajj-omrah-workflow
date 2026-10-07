@@ -11,15 +11,123 @@ import { generateVisaPdfBlob, generateFallbackVisaPdf } from "./visaPdfGenerator
 
 export const MOFA_WORKER_URL_KEY = "mofa_visa_worker_url";
 
+let memoryWorkerUrl: string | null = null;
+
+/**
+ * Synchronously retrieves the worker URL from memory or localStorage.
+ */
 export function getMofaWorkerUrl(): string | null {
+  if (memoryWorkerUrl) return memoryWorkerUrl;
   if (typeof window === "undefined") return null;
-  return localStorage.getItem(MOFA_WORKER_URL_KEY) || null;
+  const url = localStorage.getItem(MOFA_WORKER_URL_KEY);
+  if (url && url.trim()) {
+    memoryWorkerUrl = url.trim();
+    return memoryWorkerUrl;
+  }
+  return null;
 }
 
-export function setMofaWorkerUrl(url: string): void {
-  if (typeof window !== "undefined") {
-    localStorage.setItem(MOFA_WORKER_URL_KEY, url.trim());
+/**
+ * Loads the worker URL from the central database (Supabase system_settings).
+ * Updates memory cache and localStorage so it is available across all users and persists browser clears.
+ */
+export async function syncMofaWorkerUrlFromDatabase(): Promise<string | null> {
+  try {
+    const cloudUrl = await api.settings.get(MOFA_WORKER_URL_KEY);
+    if (cloudUrl && cloudUrl.trim()) {
+      const clean = cloudUrl.trim();
+      memoryWorkerUrl = clean;
+      if (typeof window !== "undefined") {
+        localStorage.setItem(MOFA_WORKER_URL_KEY, clean);
+      }
+      return clean;
+    }
+  } catch (err) {
+    console.warn("Could not sync MOFA worker URL from database:", err);
   }
+  return getMofaWorkerUrl();
+}
+
+/**
+ * Ensures a valid worker URL is available: checks memory/localStorage, then fetches from central database.
+ */
+export async function ensureMofaWorkerUrl(explicitUrl?: string): Promise<string | null> {
+  if (explicitUrl && explicitUrl.trim()) {
+    return explicitUrl.trim();
+  }
+  const current = getMofaWorkerUrl();
+  if (current) return current;
+  return await syncMofaWorkerUrlFromDatabase();
+}
+
+/**
+ * Sets the worker URL, caches it in memory and localStorage, and persists it to the central database.
+ */
+export async function setMofaWorkerUrl(url: string, syncToDatabase = true): Promise<void> {
+  const trimmed = url.trim();
+  memoryWorkerUrl = trimmed || null;
+  if (typeof window !== "undefined") {
+    if (trimmed) {
+      localStorage.setItem(MOFA_WORKER_URL_KEY, trimmed);
+    } else {
+      localStorage.removeItem(MOFA_WORKER_URL_KEY);
+    }
+  }
+  if (syncToDatabase) {
+    try {
+      await api.settings.set(MOFA_WORKER_URL_KEY, trimmed);
+    } catch (e) {
+      console.warn("Failed to persist MOFA Worker URL to database:", e);
+    }
+  }
+}
+
+/**
+ * Removes the worker URL from memory, localStorage, and central database.
+ */
+export async function removeMofaWorkerUrl(): Promise<void> {
+  memoryWorkerUrl = null;
+  if (typeof window !== "undefined") {
+    localStorage.removeItem(MOFA_WORKER_URL_KEY);
+  }
+  try {
+    await api.settings.set(MOFA_WORKER_URL_KEY, "");
+  } catch (e) {
+    console.warn("Failed to remove MOFA Worker URL from database:", e);
+  }
+}
+
+/**
+ * Tests connection with the Cloudflare Worker proxy endpoint.
+ */
+export async function testMofaWorkerUrl(workerUrl: string): Promise<{ success: boolean; message: string }> {
+  try {
+    const clean = workerUrl.trim().replace(/\/+$/, "");
+    if (!clean.startsWith("http://") && !clean.startsWith("https://")) {
+      return { success: false, message: "يجب أن يبدأ الرابط بـ https:// أو http://" };
+    }
+    const res = await fetch(`${clean}/api/captcha`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) {
+      return { success: false, message: `الخادم رد برمز خطأ (${res.status}: ${res.statusText})` };
+    }
+    const data = await res.json();
+    if (data && (data.success || data.captchaImage || data.token)) {
+      return { success: true, message: "تم الاتصال بنجاح بخادم Cloudflare Worker وجلب رمز التحقق!" };
+    }
+    return { success: false, message: data.error || "استجابة غير متوقعة من خادم الوكيل" };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "فشل الاتصال بالرابط";
+    return { success: false, message: `تعذر الاتصال بالخادم: ${msg}` };
+  }
+}
+
+// Background auto-sync on load
+if (typeof window !== "undefined") {
+  syncMofaWorkerUrlFromDatabase().catch(() => {});
 }
 
 // Convert common Arabic & English nationality names to MOFA ISO 3-letter codes
@@ -257,7 +365,7 @@ export async function attachVisaDocumentToTraveler(
 export async function checkAndAttachVisaToTraveler(
   requestId: string,
   traveler: Traveler,
-  workerUrl: string,
+  workerUrl?: string,
   onProgress?: (step: string) => void,
   manualSession?: { token: string; cookie: string },
   manualCaptcha?: string,
@@ -280,6 +388,15 @@ export async function checkAndAttachVisaToTraveler(
     return { success: false, error: "رقم جواز السفر غير مسجل للمسافر." };
   }
 
+  const effectiveWorkerUrl = (workerUrl && workerUrl.trim()) || (await ensureMofaWorkerUrl());
+  if (!effectiveWorkerUrl) {
+    return {
+      success: false,
+      errorType: "NETWORK_ERROR",
+      error: "رابط خادم الاستعلام عن التأشيرات غير متوفر في قاعدة البيانات. يرجى إدخال الرابط أولاً.",
+    };
+  }
+
   try {
     // 1. Prepare session
     let session: MofaSession;
@@ -292,7 +409,7 @@ export async function checkAndAttachVisaToTraveler(
       };
     } else {
       onProgress?.("جاري الاتصال بخادم الاستعلام وجلب رمز التحقق...");
-      session = await fetchMofaSession(workerUrl);
+      session = await fetchMofaSession(effectiveWorkerUrl);
     }
 
     // 2. Solve Captcha
@@ -315,7 +432,7 @@ export async function checkAndAttachVisaToTraveler(
     onProgress?.(`جاري فحص التأشيرة برقم الجواز (${effectivePassportNo})...`);
 
     // 3. Search Visa
-    const searchResult = await executeMofaSearch(workerUrl, traveler, session, solvedCaptcha, overrideParams);
+    const searchResult = await executeMofaSearch(effectiveWorkerUrl, traveler, session, solvedCaptcha, overrideParams);
 
     if (!searchResult.success) {
       // If Captcha was wrong according to MOFA, return with fresh session possibility
@@ -359,7 +476,7 @@ export async function checkAndAttachVisaToTraveler(
  */
 export async function bulkFetchVisasForRequest(
   requestId: string,
-  workerUrl: string,
+  workerUrl?: string,
   onProgress?: (step: string) => void
 ): Promise<{
   successCount: number;
@@ -367,6 +484,16 @@ export async function bulkFetchVisasForRequest(
   total: number;
   error?: string;
 }> {
+  const effectiveWorkerUrl = (workerUrl && workerUrl.trim()) || (await ensureMofaWorkerUrl());
+  if (!effectiveWorkerUrl) {
+    return {
+      successCount: 0,
+      notFoundCount: 0,
+      total: 0,
+      error: "رابط خادم الاستعلام عن التأشيرات غير متوفر في قاعدة البيانات. يرجى إدخال الرابط أولاً.",
+    };
+  }
+
   const req = await api.requests.getById(requestId);
   if (!req || !req.travelers || req.travelers.length === 0) {
     return { successCount: 0, notFoundCount: 0, total: 0, error: "لا يوجد مسافرون في هذه المعاملة." };
@@ -388,7 +515,7 @@ export async function bulkFetchVisasForRequest(
       const res = await checkAndAttachVisaToTraveler(
         requestId,
         t,
-        workerUrl,
+        effectiveWorkerUrl,
         (step) => onProgress?.(`(${i + 1}/${eligibleTravelers.length}) ${t.fullName}: ${step}`)
       );
       if (res.success) {

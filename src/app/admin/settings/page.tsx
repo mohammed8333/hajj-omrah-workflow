@@ -36,6 +36,8 @@ import {
   UploadCloud,
   MessageCircle,
   ShieldCheck,
+  Globe,
+  Link2,
 } from "lucide-react";
 import {
   getGeminiApiKey,
@@ -43,6 +45,13 @@ import {
   removeGeminiApiKey,
   testGeminiApiKey,
 } from "@/lib/geminiVision";
+import {
+  getMofaWorkerUrl,
+  setMofaWorkerUrl,
+  removeMofaWorkerUrl,
+  testMofaWorkerUrl,
+  MOFA_WORKER_URL_KEY,
+} from "@/lib/mofaVisaService";
 import { isSupabaseConfigured } from "@/lib/supabaseClient";
 import { CloudSettingsModal } from "@/components/ui/CloudSettingsModal";
 
@@ -69,6 +78,15 @@ export default function AdminSettingsPage() {
     message: string;
   } | null>(null);
 
+  // MOFA Visa Worker URL State
+  const [mofaWorkerUrl, setMofaWorkerUrlState] = useState("");
+  const [testingMofa, setTestingMofa] = useState(false);
+  const [mofaTestStatus, setMofaTestStatus] = useState<{
+    checked: boolean;
+    valid: boolean;
+    message: string;
+  } | null>(null);
+
   // WhatsApp Group Settings State
   const [waGroup, setWaGroup] = useState("");
   const [waLink, setWaLink] = useState("");
@@ -88,6 +106,18 @@ export default function AdminSettingsPage() {
       }
     }).catch(console.warn);
 
+    // Load MOFA Worker URL from memory/localStorage and central database
+    const savedWorker = getMofaWorkerUrl();
+    if (savedWorker) {
+      setMofaWorkerUrlState(savedWorker);
+    }
+    api.settings.get(MOFA_WORKER_URL_KEY).then((cloudUrl) => {
+      if (cloudUrl && cloudUrl.trim()) {
+        setMofaWorkerUrlState(cloudUrl.trim());
+        setMofaWorkerUrl(cloudUrl.trim(), false);
+      }
+    }).catch(console.warn);
+
     if (typeof window !== "undefined") {
       setWaGroup(localStorage.getItem("safa_whatsapp_target_group") || "");
       setWaLink(localStorage.getItem("safa_whatsapp_target_link") || "");
@@ -97,6 +127,61 @@ export default function AdminSettingsPage() {
         .catch(() => setWaBridgeConnected(false));
     }
   }, []);
+
+  const handleSaveMofaWorker = async () => {
+    const trimmed = mofaWorkerUrl.trim();
+    if (!trimmed) {
+      await removeMofaWorkerUrl();
+      setSuccess("تم مسح رابط خادم الاستعلام عن التأشيرات من قاعدة البيانات.");
+      setMofaTestStatus(null);
+      return;
+    }
+    try {
+      await setMofaWorkerUrl(trimmed, true);
+      setSuccess("تم حفظ رابط خادم التأشيرات بنجاح في قاعدة البيانات! سيعمل تلقائياً لجميع المستخدمين على كافة الأجهزة والمتصفحات ولن يتم مسحه بمسح بيانات المتصفح.");
+    } catch (e: any) {
+      setSuccess("تم حفظ الرابط محلياً! (ملاحظة: " + (e?.message || "") + ")");
+    }
+  };
+
+  const handleTestMofaWorker = async () => {
+    const trimmed = mofaWorkerUrl.trim();
+    if (!trimmed) {
+      setError("يرجى إدخال رابط الخادم أولاً قبل الاختبار.");
+      return;
+    }
+    try {
+      setTestingMofa(true);
+      setMofaTestStatus(null);
+      const res = await testMofaWorkerUrl(trimmed);
+      setMofaTestStatus({
+        checked: true,
+        valid: res.success,
+        message: res.message,
+      });
+      if (res.success) {
+        await setMofaWorkerUrl(trimmed, true);
+        setSuccess("الاتصال بالخادم سليم 100%! تم حفظ الرابط في قاعدة البيانات ليعمل على كافة الأجهزة فوراً.");
+      } else {
+        setError(`فشل الاتصال بالخادم: ${res.message}`);
+      }
+    } catch (e: any) {
+      setMofaTestStatus({
+        checked: true,
+        valid: false,
+        message: e.message || "فشل الاتصال بخادم البروكسي",
+      });
+    } finally {
+      setTestingMofa(false);
+    }
+  };
+
+  const handleRemoveMofaWorker = async () => {
+    setMofaWorkerUrlState("");
+    await removeMofaWorkerUrl();
+    setSuccess("تم مسح رابط خادم التأشيرات من قاعدة البيانات.");
+    setMofaTestStatus(null);
+  };
 
   const handleSaveWaSettings = () => {
     if (typeof window !== "undefined") {
@@ -627,6 +712,131 @@ export default function AdminSettingsPage() {
             <div className="bg-gray-50 p-2.5 rounded-xl border border-gray-100 flex items-start gap-2">
               <span className="text-emerald-600 font-black">✓</span>
               <span><strong>حصري ومجاني:</strong> يعطيك 1,500 عملية فحص مجانية يومياً من جوجل وبدون دفع أي رسوم.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Cloudflare Worker Visa Proxy Settings */}
+      <div className="bg-white rounded-2xl border border-sky-200 p-6 shadow-xs relative overflow-hidden space-y-4">
+        <div className="absolute top-0 right-0 left-0 h-1.5 bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600" />
+
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="p-3 rounded-xl bg-sky-50 text-sky-700">
+              <Globe className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-bold text-gray-900">
+                  خادم الاستعلام عن التأشيرات (Cloudflare Worker Proxy)
+                </h2>
+                <span className="text-[11px] bg-sky-100 text-sky-800 font-bold px-2 py-0.5 rounded-full border border-sky-200 shadow-2xs">
+                  مركزي في قاعدة البيانات
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 mt-0.5">
+                الرابط المعتمد لجلب تأشيرات وزارة الخارجية السعودية الصادرة تلقائياً وفك الكابتشا وطباعتها بنقرة واحدة.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <label className="block text-xs font-bold text-gray-700">
+            رابط الخادم (Worker URL):
+          </label>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            <div className="relative flex-1">
+              <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-400">
+                <Link2 className="w-4 h-4" />
+              </div>
+              <input
+                type="text"
+                value={mofaWorkerUrl}
+                onChange={(e) => {
+                  setMofaWorkerUrlState(e.target.value);
+                  setMofaTestStatus(null);
+                }}
+                placeholder="https://mofa-visa-proxy.yourname.workers.dev"
+                className="w-full pr-9 pl-3 py-2.5 text-xs font-mono border border-gray-300 rounded-xl focus:ring-2 focus:ring-sky-500 focus:outline-none bg-gray-50/50"
+                dir="ltr"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleTestMofaWorker}
+                disabled={testingMofa || !mofaWorkerUrl.trim()}
+                className="px-4 py-2.5 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                title="اختبار اتصال الرابط مع خادم Cloudflare"
+              >
+                <Zap className={`w-3.5 h-3.5 ${testingMofa ? "animate-spin" : "text-amber-500"}`} />
+                <span>{testingMofa ? "جاري الفحص..." : "اختبار الاتصال"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSaveMofaWorker}
+                className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>حفظ في قاعدة البيانات</span>
+              </button>
+
+              {mofaWorkerUrl && (
+                <button
+                  type="button"
+                  onClick={handleRemoveMofaWorker}
+                  className="px-3 py-2.5 bg-gray-100 hover:bg-rose-50 text-gray-600 hover:text-rose-600 rounded-xl text-xs font-medium transition-colors cursor-pointer border border-gray-200"
+                  title="مسح الرابط"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 text-[11px] text-gray-500 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100">
+            <Database className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+            <span>
+              يتم حفظ الرابط مركزياً في قاعدة البيانات السحابية (system_settings). يصل إليه جميع مستخدمي الموقع تلقائياً من أي جهاز، ولا يتم مسحه عند مسح بيانات أو ذاكرة المتصفح.
+            </span>
+          </div>
+
+          {/* Test Status Banner */}
+          {mofaTestStatus && (
+            <div
+              className={`p-3 rounded-xl border text-xs flex items-center gap-2 ${
+                mofaTestStatus.valid
+                  ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+                  : "bg-rose-50 border-rose-200 text-rose-800"
+              }`}
+            >
+              {mofaTestStatus.valid ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              ) : (
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              )}
+              <span>{mofaTestStatus.message}</span>
+            </div>
+          )}
+
+          {/* Features Highlights */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-[11px] text-gray-600">
+            <div className="bg-gray-50 p-2.5 rounded-xl border border-gray-100 flex items-start gap-2">
+              <span className="text-emerald-600 font-black">✓</span>
+              <span><strong>استعلام فوري وتنزيل:</strong> فحص تلقائي وتنزيل تأشيرات المعتمرين الصادرة بملف PDF فور صدورها.</span>
+            </div>
+            <div className="bg-gray-50 p-2.5 rounded-xl border border-gray-100 flex items-start gap-2">
+              <span className="text-emerald-600 font-black">✓</span>
+              <span><strong>متاح لكافة المستخدمين:</strong> بمجرد حفظ الرابط هنا، يعمل لدى كافة المستخدمين دون الحاجة لإعادة كتابته.</span>
+            </div>
+            <div className="bg-gray-50 p-2.5 rounded-xl border border-gray-100 flex items-start gap-2">
+              <span className="text-emerald-600 font-black">✓</span>
+              <span><strong>دائم وثابت:</strong> محفوظ في قاعدة البيانات ولا يتأثر بمسح الكوكيز أو الكاش أو إعادة تثبيت المتصفح.</span>
             </div>
           </div>
         </div>

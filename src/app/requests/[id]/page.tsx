@@ -71,6 +71,8 @@ import { scanFlightTicket, calculateAirportArrivalTime } from "@/lib/flightTicke
 import { getGeminiApiKey, setGeminiApiKey } from "@/lib/geminiVision";
 import {
   getMofaWorkerUrl,
+  ensureMofaWorkerUrl,
+  syncMofaWorkerUrlFromDatabase,
   setMofaWorkerUrl,
   fetchMofaSession,
   checkAndAttachVisaToTraveler,
@@ -1116,19 +1118,22 @@ export default function RequestDetailPage({
   };
 
   const getOrPromptWorkerUrl = async (): Promise<string | null> => {
-    let workerUrl = getMofaWorkerUrl();
+    let workerUrl = await ensureMofaWorkerUrl();
+    if (!workerUrl) {
+      workerUrl = await syncMofaWorkerUrlFromDatabase();
+    }
     if (!workerUrl) {
       const enteredUrl = await prompt({
         title: "إعداد خادم الاستعلام عن التأشيرات (Cloudflare Worker)",
         message:
-          "يرجى إدخال رابط خادم Cloudflare Worker الخاص بك للاستعلام المباشر وتنزيل التأشيرات الصادرة من منصة وزارة الخارجية (مثال: https://mofa-visa-proxy.yourname.workers.dev):",
+          "يرجى إدخال رابط خادم Cloudflare Worker الخاص بك للاستعلام المباشر وتنزيل التأشيرات الصادرة من منصة وزارة الخارجية (سيتم حفظه في قاعدة البيانات لجميع المستخدمين ولن يُمسح بمسح بيانات المتصفح):",
         placeholder: "https://mofa-visa-proxy.yourname.workers.dev",
-        confirmText: "حفظ ومتابعة",
+        confirmText: "حفظ في قاعدة البيانات ومتابعة",
         cancelText: "إلغاء",
         variant: "primary",
       });
       if (enteredUrl && enteredUrl.trim()) {
-        setMofaWorkerUrl(enteredUrl.trim());
+        await setMofaWorkerUrl(enteredUrl.trim(), true);
         workerUrl = enteredUrl.trim();
       }
     }
