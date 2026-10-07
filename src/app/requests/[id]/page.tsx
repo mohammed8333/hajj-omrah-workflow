@@ -73,6 +73,8 @@ import {
   setMofaWorkerUrl,
   fetchMofaSession,
   checkAndAttachVisaToTraveler,
+  extractFirstName,
+  convertNationalityToMofaCode,
 } from "@/lib/mofaVisaService";
 import { useDialog } from "@/lib/dialog-context";
 import { FileDropArea } from "@/components/ui/FileDropArea";
@@ -233,6 +235,9 @@ export default function RequestDetailPage({
     cookie: string;
     captchaImage: string;
     userCaptcha: string;
+    searchPassportNo: string;
+    searchFirstName: string;
+    searchNationality: string;
     loading: boolean;
     refreshingCaptcha: boolean;
     error?: string | null;
@@ -1106,6 +1111,9 @@ export default function RequestDetailPage({
           cookie: res.session.cookie,
           captchaImage: res.session.captchaImage,
           userCaptcha: "",
+          searchPassportNo: traveler.passportNumber?.trim() || "",
+          searchFirstName: extractFirstName(traveler.fullName),
+          searchNationality: convertNationalityToMofaCode(traveler.nationality),
           loading: false,
           refreshingCaptcha: false,
           error: res.error || null,
@@ -1167,7 +1175,12 @@ export default function RequestDetailPage({
         mofaModalData.workerUrl,
         undefined,
         { token: mofaModalData.token, cookie: mofaModalData.cookie },
-        mofaModalData.userCaptcha.trim()
+        mofaModalData.userCaptcha.trim(),
+        {
+          passportNo: mofaModalData.searchPassportNo.trim(),
+          firstName: mofaModalData.searchFirstName.trim(),
+          nationality: mofaModalData.searchNationality.trim(),
+        }
       );
 
       if (res.success) {
@@ -1207,14 +1220,40 @@ export default function RequestDetailPage({
               : null
           );
         }
+      } else if (res.errorType === "NOT_FOUND") {
+        try {
+          const newSession = await fetchMofaSession(mofaModalData.workerUrl);
+          setMofaModalData((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  token: newSession.token,
+                  cookie: newSession.cookie,
+                  captchaImage: newSession.captchaImage,
+                  userCaptcha: "",
+                  loading: false,
+                  error:
+                    "لم يتم العثور على تأشيرة مطابقة لهذه البيانات. جرب كتابة الاسم الأول بالإنجليزية (كالمسجل بالجواز) أو بهمزات مختلفة، ثم أدخل الرمز الجديد.",
+                }
+              : null
+          );
+        } catch {
+          setMofaModalData((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  loading: false,
+                  error:
+                    "لم يتم العثور على تأشيرة مطابقة. تأكد من الاسم الأول ورقم الجواز، أو اضغط زر التحديث لإعادة المحاولة.",
+                }
+              : null
+          );
+        }
       } else {
-        const errMsg = res.error || "لم يتم العثور على تأشيرة صادرة لهذا الجواز.";
-        setMofaModalData(null);
-        await alert({
-          title: "نتيجة فحص التأشيرة",
-          message: errMsg,
-          variant: res.errorType === "NOT_FOUND" ? "info" : "warning",
-        });
+        const errMsg = res.error || "فشل الاستعلام عن التأشيرة.";
+        setMofaModalData((prev) =>
+          prev ? { ...prev, loading: false, error: errMsg } : null
+        );
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "حدث خطأ أثناء فحص التأشيرة.";
@@ -4439,17 +4478,93 @@ export default function RequestDetailPage({
               </button>
             </div>
 
-            {/* Traveler info preview */}
-            <div className="bg-emerald-50/70 border border-emerald-100 rounded-xl p-3 text-xs space-y-1.5">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600 font-medium">اسم المسافر:</span>
-                <span className="font-bold text-gray-900">{mofaModalData.traveler.fullName}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600 font-medium">رقم الجواز:</span>
-                <span className="font-mono font-bold text-emerald-800 bg-white px-2 py-0.5 rounded border border-emerald-200">
-                  {mofaModalData.traveler.passportNumber}
+            {/* Traveler info & search parameters preview */}
+            <div className="bg-emerald-50/70 border border-emerald-100 rounded-xl p-3 text-xs space-y-2.5">
+              <div className="flex justify-between items-center border-b border-emerald-200/60 pb-1.5">
+                <span className="font-bold text-gray-900 truncate">
+                  {mofaModalData.traveler.fullName}
                 </span>
+                <span className="text-[10px] text-emerald-800 bg-white px-2 py-0.5 rounded border border-emerald-200 font-semibold shrink-0">
+                  معايير البحث
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                    الاسم الأول (fName):
+                  </label>
+                  <input
+                    type="text"
+                    disabled={mofaModalData.loading}
+                    value={mofaModalData.searchFirstName}
+                    onChange={(e) =>
+                      setMofaModalData((prev) => (prev ? { ...prev, searchFirstName: e.target.value } : null))
+                    }
+                    className="w-full bg-white border border-gray-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 rounded-lg px-2.5 py-1.5 text-xs font-bold text-gray-900 outline-hidden transition-all"
+                    placeholder="ابراهيم أو IBRAHIM"
+                    title="الاسم الأول كما هو مسجل في التأشيرة (جرب بالإنجليزية أو بالعربية مع/بدون همزة)"
+                  />
+                  <span className="text-[10px] text-gray-500 mt-0.5 block">
+                    جرب بالإنجليزية إذا لم تظهر
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                    رقم الجواز:
+                  </label>
+                  <input
+                    type="text"
+                    disabled={mofaModalData.loading}
+                    value={mofaModalData.searchPassportNo}
+                    onChange={(e) =>
+                      setMofaModalData((prev) =>
+                        prev ? { ...prev, searchPassportNo: e.target.value.toUpperCase() } : null
+                      )
+                    }
+                    className="w-full bg-white border border-gray-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-gray-900 outline-hidden transition-all"
+                  />
+                  <span className="text-[10px] text-gray-500 mt-0.5 block">
+                    كالمكتوب في الجواز
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                  الجنسية:
+                </label>
+                <select
+                  disabled={mofaModalData.loading}
+                  value={mofaModalData.searchNationality}
+                  onChange={(e) =>
+                    setMofaModalData((prev) => (prev ? { ...prev, searchNationality: e.target.value } : null))
+                  }
+                  className="w-full bg-white border border-gray-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 rounded-lg px-2.5 py-1.5 text-xs font-bold text-gray-900 outline-hidden transition-all"
+                >
+                  <option value="EGY">مصر (EGY)</option>
+                  <option value="SAU">السعودية (SAU)</option>
+                  <option value="JOR">الأردن (JOR)</option>
+                  <option value="SDN">السودان (SDN)</option>
+                  <option value="YEM">اليمن (YEM)</option>
+                  <option value="SYR">سوريا (SYR)</option>
+                  <option value="IRQ">العراق (IRQ)</option>
+                  <option value="TUN">تونس (TUN)</option>
+                  <option value="MAR">المغرب (MAR)</option>
+                  <option value="DZA">الجزائر (DZA)</option>
+                  <option value="LBN">لبنان (LBN)</option>
+                  <option value="KWT">الكويت (KWT)</option>
+                  <option value="ARE">الإمارات (ARE)</option>
+                  <option value="OMN">عُمان (OMN)</option>
+                  <option value="QAT">قطر (QAT)</option>
+                  <option value="BHR">البحرين (BHR)</option>
+                  <option value="PAK">باكستان (PAK)</option>
+                  <option value="IND">الهند (IND)</option>
+                  <option value="BGD">بنغلاديش (BGD)</option>
+                  <option value="IDN">إندونيسيا (IDN)</option>
+                  <option value="TUR">تركيا (TUR)</option>
+                </select>
               </div>
             </div>
 

@@ -159,11 +159,17 @@ export async function executeMofaSearch(
   workerUrl: string,
   traveler: Traveler,
   session: { token: string; cookie: string },
-  captcha: string
+  captcha: string,
+  overrideParams?: {
+    passportNo?: string;
+    firstName?: string;
+    nationality?: string;
+  }
 ): Promise<MofaVisaResult> {
   const cleanWorkerUrl = workerUrl.trim().replace(/\/+$/, "");
-  const fName = extractFirstName(traveler.fullName);
-  const nationalityCode = convertNationalityToMofaCode(traveler.nationality);
+  const fName = overrideParams?.firstName?.trim() || extractFirstName(traveler.fullName);
+  const passportNo = overrideParams?.passportNo?.trim() || traveler.passportNumber?.trim() || "";
+  const nationalityCode = overrideParams?.nationality?.trim() || convertNationalityToMofaCode(traveler.nationality);
 
   const searchRes = await fetch(`${cleanWorkerUrl}/api/search`, {
     method: "POST",
@@ -171,7 +177,7 @@ export async function executeMofaSearch(
     body: JSON.stringify({
       token: session.token,
       cookie: session.cookie,
-      passportNo: traveler.passportNumber?.trim() || "",
+      passportNo,
       fName,
       nationality: nationalityCode,
       captcha: captcha.trim(),
@@ -232,7 +238,12 @@ export async function checkAndAttachVisaToTraveler(
   workerUrl: string,
   onProgress?: (step: string) => void,
   manualSession?: { token: string; cookie: string },
-  manualCaptcha?: string
+  manualCaptcha?: string,
+  overrideParams?: {
+    passportNo?: string;
+    firstName?: string;
+    nationality?: string;
+  }
 ): Promise<{
   success: boolean;
   visaNumber?: string;
@@ -240,7 +251,8 @@ export async function checkAndAttachVisaToTraveler(
   errorType?: "INVALID_CAPTCHA" | "NOT_FOUND" | "NETWORK_ERROR";
   session?: MofaSession;
 }> {
-  if (!traveler.passportNumber) {
+  const effectivePassportNo = overrideParams?.passportNo?.trim() || traveler.passportNumber?.trim();
+  if (!effectivePassportNo) {
     return { success: false, error: "رقم جواز السفر غير مسجل للمسافر." };
   }
 
@@ -276,10 +288,10 @@ export async function checkAndAttachVisaToTraveler(
       };
     }
 
-    onProgress?.(`جاري فحص التأشيرة برقم الجواز (${traveler.passportNumber})...`);
+    onProgress?.(`جاري فحص التأشيرة برقم الجواز (${effectivePassportNo})...`);
 
     // 3. Search Visa
-    const searchResult = await executeMofaSearch(workerUrl, traveler, session, solvedCaptcha);
+    const searchResult = await executeMofaSearch(workerUrl, traveler, session, solvedCaptcha, overrideParams);
 
     if (!searchResult.success) {
       // If Captcha was wrong according to MOFA, return with fresh session possibility
