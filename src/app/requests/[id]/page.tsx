@@ -116,6 +116,8 @@ export default function RequestDetailPage({
   const [nusukSaved, setNusukSaved] = useState(false);
   const [nusukSuccessMsg, setNusukSuccessMsg] = useState<string | null>(null);
   const [nusukWaMsg, setNusukWaMsg] = useState<string | null>(null);
+  const [nusukWaLink, setNusukWaLink] = useState("");
+  const [nusukGeneratedWaUrl, setNusukGeneratedWaUrl] = useState<string | null>(null);
   const [nusukSaving, setNusukSaving] = useState(false);
   const [nusukSendingWa, setNusukSendingWa] = useState(false);
 
@@ -1611,6 +1613,20 @@ export default function RequestDetailPage({
       });
       return;
     }
+
+    // 🌟 فتح نافذة فارغة فورياً بشكل متزامن قبل أي استدعاء غير متزامن لتجاوز مانع النوافذ المنبثقة تماماً
+    let waWindow: Window | null = null;
+    try {
+      waWindow = window.open("about:blank", "_blank");
+      if (waWindow) {
+        waWindow.document.write(
+          '<html dir="rtl"><head><title>جاري فتح الواتساب...</title></head><body style="font-family:system-ui,-apple-system,sans-serif;background:#f0fdf4;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;"><div style="text-align:center;padding:24px;background:#fff;border-radius:16px;box-shadow:0 4px 16px rgba(0,0,0,0.1);max-width:360px;"><h3 style="color:#059669;margin:0 0 8px 0;font-size:18px;">جاري تجهيز حزمة الواتساب... 📲</h3><p style="color:#6b7280;font-size:13px;margin:0;">سيتم فتح الواتساب فوراً، يرجى الانتظار ثوانٍ معدودة...</p></div></body></html>'
+        );
+      }
+    } catch (popupErr) {
+      console.warn("Pre-opening window warning:", popupErr);
+    }
+
     try {
       setNusukSendingWa(true);
       setError(null);
@@ -1649,18 +1665,24 @@ export default function RequestDetailPage({
         request?.hostingInfo?.hostIdDocument ||
         request?.groupDocuments?.filter((d) => d.documentType === "HostId").slice(-1)[0];
 
-      await sendWhatsAppGroupPackage({
+      const sendRes = await sendWhatsAppGroupPackage({
         nusukNumber: nusukInput.trim(),
         hasHosting: Boolean(request?.hasHosting),
         hostPhone: request?.hostingInfo?.hostPhone || request?.contactPhone,
         contactPhone: request?.contactPhone,
         ticketDocId: ticketDoc?.id,
         hostDocId: hostDoc?.id,
+        preOpenedWindow: waWindow,
+        customGroupLink: nusukWaLink.trim() || undefined,
       });
 
-      setNusukWaMsg("تم إرسال حزمة المعاملة لمجموعة الواتساب بنجاح 📲🕋");
+      setNusukGeneratedWaUrl(sendRes.whatsappUrl);
+      setNusukWaMsg("تم نسخ رسالة المعاملة وتجهيزها وفتح الواتساب بنجاح 📲🕋");
       await loadRequest(false);
     } catch (waErr: unknown) {
+      if (waWindow && !waWindow.closed) {
+        waWindow.close();
+      }
       console.warn("WhatsApp group auto-send error:", waErr);
       await alert({
         title: "تنبيه في إرسال الواتساب",
@@ -2297,6 +2319,10 @@ export default function RequestDetailPage({
                   setNusukSaved(false);
                   setNusukSuccessMsg(null);
                   setNusukWaMsg(null);
+                  if (typeof window !== "undefined") {
+                    setNusukWaLink(localStorage.getItem("safa_whatsapp_target_link") || "");
+                  }
+                  setNusukGeneratedWaUrl(null);
                   setShowNusukModal(true);
                 }}
                 disabled={actionLoading}
@@ -2322,6 +2348,10 @@ export default function RequestDetailPage({
                 setNusukSaved(false);
                 setNusukSuccessMsg(null);
                 setNusukWaMsg(null);
+                if (typeof window !== "undefined") {
+                  setNusukWaLink(localStorage.getItem("safa_whatsapp_target_link") || "");
+                }
+                setNusukGeneratedWaUrl(null);
                 setShowNusukModal(true);
               }}
               disabled={actionLoading}
@@ -4311,6 +4341,27 @@ export default function RequestDetailPage({
               />
             </div>
 
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">
+                رابط مجموعة الواتساب (اختياري)
+              </label>
+              <input
+                type="text"
+                value={nusukWaLink}
+                onChange={(e) => {
+                  setNusukWaLink(e.target.value);
+                  if (typeof window !== "undefined") {
+                    localStorage.setItem("safa_whatsapp_target_link", e.target.value.trim());
+                  }
+                }}
+                placeholder="مثال: https://chat.whatsapp.com/..."
+                className="w-full px-3 py-2 text-xs rounded-xl border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-teal-500 font-mono"
+              />
+              <p className="text-[11px] text-gray-400 mt-1">
+                إذا لم تضع رابط مجموعة، سيتم فتح محادثة الواتساب مع تجهيز نص الرسالة وتنزيل المستندات تلقائياً.
+              </p>
+            </div>
+
             {nusukSuccessMsg && (
               <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs font-bold flex items-center gap-2">
                 <Check className="w-4 h-4 text-emerald-600 shrink-0" />
@@ -4319,9 +4370,24 @@ export default function RequestDetailPage({
             )}
 
             {nusukWaMsg && (
-              <div className="p-2.5 bg-sky-50 border border-sky-200 rounded-xl text-sky-800 text-xs font-bold flex items-center gap-2">
-                <Check className="w-4 h-4 text-sky-600 shrink-0" />
-                <span>{nusukWaMsg}</span>
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 text-xs font-bold space-y-2">
+                <div className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>{nusukWaMsg}</span>
+                </div>
+                {nusukGeneratedWaUrl && (
+                  <div className="flex items-center gap-2 pt-1">
+                    <a
+                      href={nusukGeneratedWaUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-xs cursor-pointer"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>فتح محادثة الواتساب الآن ↗</span>
+                    </a>
+                  </div>
+                )}
               </div>
             )}
 

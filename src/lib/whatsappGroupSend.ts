@@ -13,6 +13,8 @@ export interface SendWhatsAppGroupPackageParams {
   ticketDocUrl?: string;
   hostDocId?: string;
   hostDocUrl?: string;
+  preOpenedWindow?: Window | null;
+  customGroupLink?: string;
 }
 
 export function generateWhatsAppGroupMessageText(params: {
@@ -37,6 +39,30 @@ export function generateWhatsAppGroupMessageText(params: {
   }
   text += "=============================";
   return text;
+}
+
+export async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {}
+  try {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.position = "fixed";
+    textArea.style.left = "-9999px";
+    textArea.style.top = "-9999px";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    const successful = document.execCommand("copy");
+    document.body.removeChild(textArea);
+    return successful;
+  } catch {
+    return false;
+  }
 }
 
 const fetchDocBase64 = async (
@@ -95,31 +121,32 @@ const triggerDownload = async (
 
 export async function sendWhatsAppGroupPackage(
   params: SendWhatsAppGroupPackageParams
-): Promise<{ success: boolean; bridgeSent: boolean; message: string }> {
-  const groupLink =
-    (typeof window !== "undefined"
-      ? localStorage.getItem(STORAGE_KEY_LINK)
-      : "") || "";
+): Promise<{ success: boolean; bridgeSent: boolean; message: string; whatsappUrl: string }> {
+  let groupLink =
+    (params.customGroupLink !== undefined
+      ? params.customGroupLink.trim()
+      : (typeof window !== "undefined"
+          ? localStorage.getItem(STORAGE_KEY_LINK)
+          : "")) || "";
+
+  if (params.customGroupLink !== undefined && typeof window !== "undefined") {
+    localStorage.setItem(STORAGE_KEY_LINK, params.customGroupLink.trim());
+  }
+
   const targetGroup =
     (typeof window !== "undefined"
       ? localStorage.getItem(STORAGE_KEY_GROUP)
       : "") || "";
 
-  // 1. Copy formatted text to clipboard
+  // 1. Copy formatted text to clipboard (guaranteed copy)
   const messageText = generateWhatsAppGroupMessageText(params);
-  try {
-    if (navigator?.clipboard?.writeText) {
-      await navigator.clipboard.writeText(messageText);
-    }
-  } catch (err) {
-    console.warn("Clipboard copy failed:", err);
-  }
+  await copyToClipboard(messageText);
 
-  // 2. Check if local Bridge is online
+  // 2. Check if local Bridge is online (quick check with 500ms timeout)
   let bridgeConnected = false;
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 1500);
+    const timeoutId = setTimeout(() => controller.abort(), 500);
     const res = await fetch(`${BRIDGE_URL}/status`, { signal: controller.signal });
     clearTimeout(timeoutId);
     if (res.ok) {
@@ -168,36 +195,60 @@ export async function sendWhatsAppGroupPackage(
         const data = await res.json();
         const urlToOpen =
           groupLink.trim() || data.webVerifyUrl || "https://web.whatsapp.com";
-        window.open(urlToOpen, "_blank");
+        if (params.preOpenedWindow && !params.preOpenedWindow.closed) {
+          params.preOpenedWindow.location.href = urlToOpen;
+        } else {
+          window.open(urlToOpen, "_blank");
+        }
         return {
           success: true,
           bridgeSent: true,
           message: "تم إرسال حزمة المعاملة والمستندات لمجموعة الواتساب بنجاح 📲",
+          whatsappUrl: urlToOpen,
         };
       }
     } catch (e) {
-      console.warn("Bridge send failed, falling back to manual:", e);
+      console.warn("Bridge send failed, falling back to direct link:", e);
     }
   }
 
-  // Fallback: Download documents and open WhatsApp link or Web
+  // 3. Fallback: Download documents immediately
   if (params.ticketDocId || params.ticketDocUrl) {
     triggerDownload(params.ticketDocId, params.ticketDocUrl, "تذكرة_الطيران.pdf");
   }
   if (params.hasHosting && (params.hostDocId || params.hostDocUrl)) {
     setTimeout(() => {
       triggerDownload(params.hostDocId, params.hostDocUrl, "هوية_المستضيف.jpg");
-    }, 300);
+    }, 200);
   }
 
-  setTimeout(() => {
-    const url = groupLink.trim() || "https://web.whatsapp.com";
-    window.open(url, "_blank");
-  }, 600);
+  // 4. Construct WhatsApp URL:
+  // If a group link was provided (e.g. https://chat.whatsapp.com/...), use it.
+  // Otherwise, open WhatsApp Web with pre-filled message text.
+  let targetUrl = groupLink.trim();
+  if (!targetUrl) {
+    targetUrl = `https://web.whatsapp.com/send?text=${encodeURIComponent(messageText)}`;
+  }
+
+  if (params.preOpenedWindow && !params.preOpenedWindow.closed) {
+    params.preOpenedWindow.location.href = targetUrl;
+  } else {
+    try {
+      const opened = window.open(targetUrl, "_blank");
+      if (!opened) {
+        // In case popup was blocked, redirect current tab or fallback
+        console.warn("Popup blocked by browser");
+      }
+    } catch (e) {
+      console.warn("window.open failed:", e);
+    }
+  }
 
   return {
     success: true,
     bridgeSent: false,
-    message: "تم نسخ رسالة المعاملة وجاري فتح الواتساب 📲",
+    message: "تم نسخ رسالة المعاملة وتجهيزها وفتح الواتساب 📲",
+    whatsappUrl: targetUrl,
   };
 }
+
