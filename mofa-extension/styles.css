@@ -236,9 +236,12 @@ span[data-valmsg-for="NationalityId"] {
   }
   @page {
     size: A4 portrait;
-    margin: 0;
+    margin: 0.6cm 0.6cm !important;
   }
   html, body {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
     background: #ffffff !important;
@@ -252,15 +255,33 @@ span[data-valmsg-for="NationalityId"] {
   .pre-footer,
   .page-footer,
   #mofa-ai-widget,
-  .scroll-to-top {
+  .scroll-to-top,
+  .cookiealert {
     display: none !important;
     visibility: hidden !important;
   }
-  .responsive-container,
-  .evisa-container {
+  .container, .page-container, .page-content, .portlet, .portlet-body, .row, [class*="col-"],
+  .responsive-container, .evisa-container, [id*="Visa" i], [id*="print" i] {
     width: 100% !important;
-    max-width: 21cm !important;
+    max-width: 100% !important;
+    min-width: 100% !important;
     margin: 0 auto !important;
+    padding: 0 !important;
+    border: none !important;
     box-shadow: none !important;
+    float: none !important;
+  }
+  table, .table {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 100% !important;
+    margin: 0 auto !important;
+    table-layout: auto !important;
+  }
+  td, th {
+    padding-top: 6px !important;
+    padding-bottom: 6px !important;
+    font-size: 14px !important;
+    line-height: 1.4 !important;
   }
 }

@@ -407,14 +407,18 @@
     }
   }
 
-  // 7. تحسين وتنسيق التأشيرة للطباعة (مطابق تماماً لـ visa.py)
+  // 7. تحسين وتنسيق التأشيرة للطباعة بملء كامل صفحة A4 (بدون أي هوامش فارغة)
   function applyPagePrintDecorations() {
     try {
-      // 1. إخفاء إشعارات الكوكيز والنسخة التجريبية
-      document.querySelectorAll("div, header").forEach((el) => {
+      // 1. إخفاء إشعارات الكوكيز والنسخة التجريبية والشريط العلوي والفوتر
+      document.querySelectorAll("div, header, footer, nav, .page-header, .page-footer, .pre-footer").forEach((el) => {
         const txt = el.innerText || "";
-        if ((txt.includes("ملفات الارتباط") || txt.includes("النسخة التجريبية")) && txt.length < 300) {
-          el.style.display = "none";
+        if (
+          ((txt.includes("ملفات الارتباط") || txt.includes("النسخة التجريبية")) && txt.length < 300) ||
+          el.classList.contains("cookiealert") ||
+          el.classList.contains("banner-beta")
+        ) {
+          el.style.setProperty("display", "none", "important");
         }
       });
 
@@ -426,7 +430,109 @@
           el.style.setProperty("font-weight", "bold", "important");
         }
       });
-    } catch (e) {}
+
+      // 3. توسيع كافة الحاويات والجداول لتملأ عرض الصفحة بالكامل (100%)
+      const expandSelectors = [
+        "body",
+        ".container",
+        ".page-container",
+        ".page-content",
+        ".portlet",
+        ".portlet-body",
+        ".row",
+        "[class*='col-']",
+        "table",
+        ".table",
+        "[id*='print' i]",
+        "[id*='visa' i]",
+        ".responsive-container",
+        ".evisa-container",
+      ];
+      document.querySelectorAll(expandSelectors.join(", ")).forEach((el) => {
+        el.style.setProperty("width", "100%", "important");
+        el.style.setProperty("max-width", "100%", "important");
+        el.style.setProperty("min-width", "100%", "important");
+        el.style.setProperty("margin-left", "0", "important");
+        el.style.setProperty("margin-right", "0", "important");
+        el.style.setProperty("padding-left", "0", "important");
+        el.style.setProperty("padding-right", "0", "important");
+        el.style.setProperty("box-sizing", "border-box", "important");
+      });
+
+      // إلغاء إزاحات البوتستراب col-*-offset
+      document.querySelectorAll("[class*='offset']").forEach((el) => {
+        el.style.setProperty("margin-left", "0", "important");
+        el.style.setProperty("margin-right", "0", "important");
+      });
+
+      // 4. ضبط حجم وتنسيق خلايا الجداول لملء الصفحة برحابة
+      document.querySelectorAll("td, th").forEach((cell) => {
+        cell.style.setProperty("padding-top", "6px", "important");
+        cell.style.setProperty("padding-bottom", "6px", "important");
+        cell.style.setProperty("font-size", "14px", "important");
+      });
+
+      // 5. حقن كود CSS قوي ومخصص للطباعة
+      let dynamicPrintStyle = document.getElementById("mofa-print-fullscreen-style");
+      if (!dynamicPrintStyle) {
+        dynamicPrintStyle = document.createElement("style");
+        dynamicPrintStyle.id = "mofa-print-fullscreen-style";
+        document.head.appendChild(dynamicPrintStyle);
+      }
+
+      dynamicPrintStyle.innerHTML = `
+        @page {
+          size: A4 portrait;
+          margin: 0.6cm 0.6cm !important;
+        }
+        @media print {
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+          }
+          html, body {
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #ffffff !important;
+          }
+          .container, .page-container, .page-content, .portlet, .portlet-body, .row, [class*="col-"],
+          .evisa-container, .responsive-container, [id*="Visa" i], [id*="print" i] {
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: 100% !important;
+            margin: 0 auto !important;
+            padding: 0 !important;
+            border: none !important;
+            box-shadow: none !important;
+            float: none !important;
+          }
+          table, .table {
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: 100% !important;
+            margin: 0 auto !important;
+            table-layout: auto !important;
+          }
+          td, th {
+            padding-top: 6px !important;
+            padding-bottom: 6px !important;
+            font-size: 14px !important;
+            line-height: 1.4 !important;
+          }
+          .hidden-print, .page-header, .page-head, .page-header-top, .page-header-menu,
+          .pre-footer, .page-footer, #mofa-ai-widget, .scroll-to-top, .cookiealert, .banner-beta {
+            display: none !important;
+            visibility: hidden !important;
+          }
+        }
+      `;
+    } catch (e) {
+      console.warn("Error in applyPagePrintDecorations:", e);
+    }
   }
 
   // 8. إنشاء واجهة المساعد العائم
