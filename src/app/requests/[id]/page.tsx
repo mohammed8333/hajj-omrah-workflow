@@ -404,15 +404,35 @@ export default function RequestDetailPage({
             visaIssueDate: new Date().toISOString().split("T")[0],
           });
 
-          // 2. If visa HTML was sent, save it as a Visa document
-          if (visaHtml) {
-            const blob = new Blob([visaHtml], { type: "text/html;charset=utf-8" });
-            const file = new File(
+          // 2. حفظ وتخزين التأشيرة كملف رسمي PDF حقيقي
+          let pdfFile: File | null = null;
+          const { visaPdfBase64, visaHtml } = event.data;
+
+          if (visaPdfBase64) {
+            // تحويل الـ Base64 الناتج من Chrome CDP Page.printToPDF مباشرة إلى ملف PDF أصلي
+            const byteCharacters = atob(visaPdfBase64);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+              byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            const blob = new Blob([byteArray], { type: "application/pdf" });
+            pdfFile = new File(
               [blob],
-              `visa_${targetTraveler.passportNumber || targetTraveler.id}.html`,
+              `Visa_${targetTraveler.passportNumber || targetTraveler.id}.pdf`,
+              { type: "application/pdf" }
+            );
+          } else if (visaHtml) {
+            const blob = new Blob([visaHtml], { type: "text/html;charset=utf-8" });
+            pdfFile = new File(
+              [blob],
+              `Visa_${targetTraveler.passportNumber || targetTraveler.id}.html`,
               { type: "text/html" }
             );
-            await api.documents.upload(request.id, file, "Visa", targetTraveler.id);
+          }
+
+          if (pdfFile) {
+            await api.documents.upload(request.id, pdfFile, "Visa", targetTraveler.id);
           }
 
           // 3. Reload request to reflect new visa info

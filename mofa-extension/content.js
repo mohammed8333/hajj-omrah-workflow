@@ -403,10 +403,7 @@
       document.body.appendChild(widget);
 
       document.getElementById("mofa-close-btn").onclick = () => widget.remove();
-      document.getElementById("mofa-print-pdf-btn").onclick = () => {
-        applyPagePrintDecorations();
-        window.print();
-      };
+      document.getElementById("mofa-print-pdf-btn").onclick = () => triggerDownloadPdf(context, visaInfo);
       document.getElementById("mofa-save-system-btn").onclick = () => sendVisaToSystem(context, visaInfo);
 
     } else {
@@ -487,8 +484,60 @@
     }
   }
 
-  // 9. إرسال التأشيرة الملتقطة للنافذة الرئيسية (النظام)
-  function sendVisaToSystem(context, visaInfo) {
+  function downloadBase64Pdf(base64Data, fileName) {
+    const linkSource = `data:application/pdf;base64,${base64Data}`;
+    const downloadLink = document.createElement("a");
+    downloadLink.href = linkSource;
+    downloadLink.download = fileName;
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+  }
+
+  function triggerDownloadPdf(context, visaInfo) {
+    applyPagePrintDecorations();
+    const btn = document.getElementById("mofa-print-pdf-btn");
+    if (btn) btn.innerHTML = "<span>⏳ جاري إعداد PDF...</span>";
+
+    try {
+      chrome.runtime.sendMessage({ action: "GENERATE_PDF" }, (response) => {
+        if (btn) btn.innerHTML = "<span>🖨️ طباعة / حفظ PDF</span>";
+        if (response && response.success && response.base64Pdf) {
+          const pNum = (context && context.passport) || (visaInfo && visaInfo.visaNumber) || "visa";
+          downloadBase64Pdf(response.base64Pdf, `Visa_${pNum}.pdf`);
+        } else {
+          window.print();
+        }
+      });
+    } catch (e) {
+      if (btn) btn.innerHTML = "<span>🖨️ طباعة / حفظ PDF</span>";
+      window.print();
+    }
+  }
+
+  // 9. إرسال التأشيرة الملتقطة للنافذة الرئيسية (النظام) كملف PDF رسمي
+  async function sendVisaToSystem(context, visaInfo) {
+    const saveBtn = document.getElementById("mofa-save-system-btn");
+    if (saveBtn) {
+      saveBtn.innerHTML = "<span>⏳ جاري توليد ملف الـ PDF وحفظه بالنظام...</span>";
+      saveBtn.style.background = "#0284c7";
+    }
+
+    applyPagePrintDecorations();
+
+    // نطلب توليد PDF رسمي عالي الدقة عبر الـ Service Worker (CDP Page.printToPDF)
+    let pdfBase64 = null;
+    try {
+      const response = await new Promise((resolve) => {
+        chrome.runtime.sendMessage({ action: "GENERATE_PDF" }, (res) => resolve(res));
+      });
+      if (response && response.success && response.base64Pdf) {
+        pdfBase64 = response.base64Pdf;
+      }
+    } catch (e) {
+      console.warn("[MOFA AI] CDP PDF generation failed:", e);
+    }
+
     const payload = {
       source: "MOFA_VISA_EXTENSION",
       type: "VISA_CAPTURED",
@@ -496,6 +545,7 @@
       reqId: context ? context.reqId : "",
       passportNumber: context ? context.passport : "",
       visaNumber: visaInfo ? visaInfo.visaNumber : "",
+      visaPdfBase64: pdfBase64, // ملف الـ PDF الرسمي عالي الدقة
       visaHtml: visaInfo ? visaInfo.html : getCleanVisaHtml(),
       timestamp: Date.now(),
     };
@@ -510,9 +560,8 @@
       localStorage.setItem("mofa_last_captured_visa", JSON.stringify(payload));
     } catch (e) {}
 
-    const saveBtn = document.getElementById("mofa-save-system-btn");
     if (saveBtn) {
-      saveBtn.innerHTML = "<span>✓ تم ربط التأشيرة بنجاح بالمعاملة!</span>";
+      saveBtn.innerHTML = "<span>✓ تم ربط ملف التأشيرة (PDF) بنجاح بالمعاملة!</span>";
       saveBtn.style.background = "#059669";
     }
 
@@ -520,7 +569,7 @@
       try {
         window.close();
       } catch (e) {}
-    }, 1800);
+    }, 1500);
   }
 
   // 10. بدء التشغيل التلقائي
