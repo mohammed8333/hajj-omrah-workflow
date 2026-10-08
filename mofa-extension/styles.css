@@ -1,0 +1,266 @@
+/* ========================================================
+   إخفاء أخطاء التحقق غير المرغوبة على حقول المسافر نهائياً
+   ======================================================== */
+label[for="NationalityId"],
+label#NationalityId-error,
+#NationalityId-error,
+label.error[for="NationalityId"],
+.col-md-3 label.error,
+span[data-valmsg-for="NationalityId"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  height: 0 !important;
+  width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  position: absolute !important;
+  left: -9999px !important;
+  pointer-events: none !important;
+}
+
+/* ========================================================
+   واجهة المساعد العائم الذكي (MOFA AI Floating Widget)
+   ======================================================== */
+#mofa-ai-widget {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 2147483647;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Tahoma, Arial, sans-serif;
+  direction: rtl;
+  text-align: right;
+  width: 380px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
+  background: #ffffff;
+  border: 1px solid #059669;
+  border-radius: 16px;
+  box-shadow: 0 12px 36px -4px rgba(0, 0, 0, 0.25), 0 4px 12px rgba(5, 150, 105, 0.15);
+  overflow-y: auto;
+  color: #1f2937;
+  font-size: 13px;
+  line-height: 1.5;
+  transition: all 0.2s ease;
+}
+
+#mofa-ai-widget * {
+  box-sizing: border-box;
+}
+
+.mofa-header {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  color: #ffffff;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-radius: 15px 15px 0 0;
+}
+
+.mofa-header-title {
+  font-weight: 800;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mofa-badge {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-weight: 700;
+}
+
+.mofa-close-btn {
+  background: none;
+  border: none;
+  color: #ffffff;
+  opacity: 0.8;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: opacity 0.2s;
+}
+
+.mofa-close-btn:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.mofa-body {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mofa-info-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mofa-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+
+.mofa-info-label {
+  color: #64748b;
+  font-weight: 600;
+}
+
+.mofa-info-value {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.mofa-captcha-box {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mofa-captcha-status {
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mofa-captcha-display {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+
+.mofa-captcha-val {
+  font-family: monospace;
+  font-size: 20px;
+  letter-spacing: 4px;
+  font-weight: 800;
+  color: #059669;
+}
+
+.mofa-btn {
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.2s;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.mofa-btn-primary {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  color: #ffffff;
+}
+
+.mofa-btn-primary:hover {
+  background: linear-gradient(135deg, #047857 0%, #065f46 100%);
+  transform: translateY(-1px);
+}
+
+.mofa-btn-secondary {
+  background: #f1f5f9;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+}
+
+.mofa-btn-secondary:hover {
+  background: #e2e8f0;
+}
+
+.mofa-btn-capture {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: #ffffff;
+  padding: 12px 16px;
+  font-size: 14px;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+  animation: pulse-capture 2s infinite;
+}
+
+.mofa-btn-print {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  color: #ffffff;
+}
+
+@keyframes pulse-capture {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+  100% { transform: scale(1); }
+}
+
+/* ========================================================
+   تنسيقات الطباعة الدقيقة (Exact PDF Print Styling)
+   ======================================================== */
+@media print {
+  * {
+    -webkit-print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+  .banner-beta,
+  .hidden-print,
+  .page-header,
+  .page-head,
+  .page-header-top,
+  .page-header-menu,
+  .pre-footer,
+  .page-footer,
+  #mofa-ai-widget,
+  .scroll-to-top {
+    display: none !important;
+    visibility: hidden !important;
+  }
+  .responsive-container,
+  .evisa-container {
+    width: 100% !important;
+    max-width: 21cm !important;
+    margin: 0 auto !important;
+    box-shadow: none !important;
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "مساعد استعلام تأشيرات الخارجية بالذكاء الاصطناعي (MOFA AI)",
+  "version": "2.0.0",
+  "description": "استعلام آلي بالذكاء الاصطناعي (Gemini Vision) لحل الكابتشا واستخراج وحفظ تأشيرات منصة التأشيرات السعودية بنقرة واحدة",
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "host_permissions": [
+    "*://visa.mofa.gov.sa/*",
+    "*://*.visa.mofa.gov.sa/*",
+    "*://ksavisa.sa/*",
+    "*://*.ksavisa.sa/*",
+    "https://generativelanguage.googleapis.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "*://visa.mofa.gov.sa/*",
+        "*://*.visa.mofa.gov.sa/*",
+        "*://ksavisa.sa/*",
+        "*://*.ksavisa.sa/*"
+      ],
+      "js": ["content.js"],
+      "css": ["styles.css"],
+      "run_at": "document_end"
+    }
+  ]
+}
