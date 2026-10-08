@@ -169,16 +169,89 @@
     return true;
   }
 
-  // 4. حل الكابتشا عبر الذكاء الاصطناعي (Google Gemini Vision API)
+  // فحص دقيق وشامل لما إذا كانت الكابتشا موجودة وظاهرة في الصفحة
+  function getCaptchaElements() {
+    const input = document.querySelector(
+      "#Captcha, #txtCaptcha, input[name='Captcha'], input[name*='captcha' i]"
+    );
+    const img = document.querySelector(
+      "#imgCaptcha, #CaptchaImage, img[src*='Captcha'], img[src*='captcha'], [id*='captcha' i] img"
+    );
+
+    const isVisible = (el) => {
+      if (!el) return false;
+      try {
+        const style = window.getComputedStyle(el);
+        if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") {
+          return false;
+        }
+        return el.offsetWidth > 0 || el.offsetHeight > 0 || el.getClientRects().length > 0;
+      } catch (e) {
+        return true;
+      }
+    };
+
+    const hasInput = input && isVisible(input);
+    const hasImg = img && isVisible(img);
+
+    return {
+      exists: !!(hasInput || hasImg),
+      input: hasInput ? input : null,
+      img: hasImg ? img : (img || null),
+    };
+  }
+
+  // الضغط على زر الاستعلام المعتمد
+  function submitSearchForm() {
+    if (ctx) applyFormFill(ctx);
+    const submitBtn = document.querySelector(
+      "#btnSubmit, input[type='submit'], button[type='submit'], #btnSearch, .btn-submit"
+    );
+    if (submitBtn) {
+      console.log("🇸🇦 [MOFA AI] Submitting search form via button click:", submitBtn);
+      submitBtn.click();
+    } else {
+      const form = document.querySelector("form");
+      if (form) {
+        console.log("🇸🇦 [MOFA AI] Submitting search form directly...");
+        form.submit();
+      }
+    }
+  }
+
+  // 4. معالجة الكابتشا بذكاء (التحقق من وجودها أولاً: لو مش موجودة يكمل علطول، ولو موجودة يحلها ويكمل)
   async function solveCaptchaWithAi() {
+    const captchaInfo = getCaptchaElements();
+
+    // حالة: لا توجد كابتشا في الصفحة نهائياً -> إكمال فوري!
+    if (!captchaInfo.exists) {
+      console.log("🇸🇦 [MOFA AI] No captcha required/visible on this page. Proceeding directly...");
+      updateWidgetCaptchaStatus("✓ لا توجد كابتشا مطلوبة - تم التجاوز بنجاح", "#059669");
+      const digitsRow = document.getElementById("mofa-captcha-digits-row");
+      if (digitsRow) digitsRow.style.display = "none";
+
+      if (ctx && ctx.autoSubmit) {
+        setTimeout(submitSearchForm, 400);
+      }
+      return;
+    }
+
     if (isSolvingCaptcha) return;
-    const captchaImg = document.querySelector("#imgCaptcha, img[src*='Captcha'], img[src*='captcha'], #CaptchaImage");
-    if (!captchaImg || !captchaImg.complete || captchaImg.naturalWidth === 0) {
+
+    const captchaImg = captchaInfo.img;
+    if (!captchaImg) {
+      updateWidgetCaptchaStatus("⚠️ الكابتشا مطلوبة ولكن لم تظهر صورتها بعد", "#d97706");
+      return;
+    }
+
+    if (!captchaImg.complete || captchaImg.naturalWidth === 0) {
+      captchaImg.onload = () => solveCaptchaWithAi();
+      setTimeout(solveCaptchaWithAi, 600);
       return;
     }
 
     isSolvingCaptcha = true;
-    updateWidgetCaptchaStatus("جاري القراءة بالذكاء الاصطناعي (Gemini)...", "#0284c7");
+    updateWidgetCaptchaStatus("جاري قراءة الكابتشا بواسطة Gemini AI...", "#0284c7");
 
     try {
       // تحويل الصورة إلى base64
@@ -232,7 +305,10 @@
         console.log("🇸🇦 [MOFA AI] Captcha solved by Gemini:", digitsOnly);
         lastSolvedCaptcha = digitsOnly;
 
-        const pageCaptchaInput = document.querySelector("#Captcha, input[name='Captcha'], input[name*='captcha' i]");
+        const pageCaptchaInput =
+          captchaInfo.input ||
+          document.querySelector("#Captcha, input[name='Captcha'], input[name*='captcha' i]");
+
         if (pageCaptchaInput) {
           pageCaptchaInput.value = digitsOnly;
           pageCaptchaInput.dispatchEvent(new Event("input", { bubbles: true }));
@@ -241,15 +317,12 @@
 
         updateWidgetCaptchaStatus(`✓ نجح الذكاء الاصطناعي: ${digitsOnly}`, "#059669", digitsOnly);
 
-        // إذا كان الاستعلام التلقائي مفعلاً، يتم الضغط على استعلام
+        // إذا كان الاستعلام التلقائي مفعلاً، يتم الضغط على استعلام فوراً
         if (ctx && ctx.autoSubmit) {
           setTimeout(() => {
-            const submitBtn = document.getElementById("btnSubmit");
-            if (submitBtn) {
-              console.log("🇸🇦 [MOFA AI] Auto-submitting search...");
-              submitBtn.click();
-            }
-          }, 600);
+            console.log("🇸🇦 [MOFA AI] Auto-submitting search with solved captcha...");
+            submitSearchForm();
+          }, 500);
         }
       } else {
         updateWidgetCaptchaStatus("⚠️ تعذر التعرف بدقة، انقر لإعادة المحاولة", "#d97706");
@@ -437,11 +510,11 @@
           </div>
 
           <!-- بطاقة الكابتشا الذكية -->
-          <div class="mofa-captcha-box">
+          <div class="mofa-captcha-box" id="mofa-captcha-container">
             <div class="mofa-captcha-status" id="mofa-ai-captcha-status" style="color:#0284c7;">
-              <span>🤖 جاري قراءة الكابتشا بواسطة Gemini AI...</span>
+              <span>🔍 جاري فحص وجود الكابتشا...</span>
             </div>
-            <div class="mofa-captcha-display">
+            <div class="mofa-captcha-display" id="mofa-captcha-digits-row">
               <span style="font-size:12px; color:#64748b; font-weight:600;">رمز الكابتشا:</span>
               <span id="mofa-ai-captcha-val" class="mofa-captcha-val">${lastSolvedCaptcha || "------"}</span>
               <button id="mofa-retry-ai-btn" type="button" style="background:#e2e8f0; border:none; border-radius:6px; padding:4px 8px; font-size:11px; cursor:pointer;" title="إعادة المحاولة">
@@ -585,9 +658,24 @@
       }
       renderWidget(ctx, null);
 
-      // تشغيل حل الكابتشا بالذكاء الاصطناعي فور جهوزية الصورة
-      setTimeout(solveCaptchaWithAi, 800);
-      setTimeout(solveCaptchaWithAi, 2000);
+      // فحص الكابتشا الذكي:
+      // إذا لم تكن موجودة نهائياً يتم الاستعلام مباشرة فوراً
+      // وإذا كانت موجودة يتم قراءتها بالذكاء الاصطناعي وكتابتها ثم الاستعلام
+      setTimeout(() => {
+        const captchaInfo = getCaptchaElements();
+        if (!captchaInfo.exists) {
+          console.log("🇸🇦 [MOFA AI] No captcha required/visible on this page. Auto-submitting directly...");
+          updateWidgetCaptchaStatus("✓ لا توجد كابتشا مطلوبة - استعلام فوري", "#059669");
+          const digitsRow = document.getElementById("mofa-captcha-digits-row");
+          if (digitsRow) digitsRow.style.display = "none";
+
+          if (ctx && ctx.autoSubmit) {
+            setTimeout(submitSearchForm, 400);
+          }
+        } else {
+          solveCaptchaWithAi();
+        }
+      }, 700);
     }
   }
 
