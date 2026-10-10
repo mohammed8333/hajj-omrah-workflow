@@ -1012,6 +1012,55 @@ export const supabaseService = {
       return { message: "تم اعتماد رقم نسك وتحويل المعاملة للوكيل السعودي بنجاح" };
     },
 
+    revertNusukApproval: async (
+      id: string,
+      currentUser?: User,
+      reason?: string
+    ): Promise<{ message: string }> => {
+      const client = getClient();
+      const now = new Date().toISOString();
+
+      let prevNusuk = "";
+      let prevStatus = "ReadyForSaudiAgent";
+      try {
+        const { data: req } = await client
+          .from("group_requests")
+          .select("nusuk_group_number, status")
+          .eq("id", id)
+          .single();
+        if (req) {
+          prevNusuk = req.nusuk_group_number || "";
+          prevStatus = req.status || "ReadyForSaudiAgent";
+        }
+      } catch (_) {}
+
+      await client
+        .from("group_requests")
+        .update({
+          nusuk_group_number: null,
+          status: "UnderReview",
+          updated_at: now,
+        })
+        .eq("id", id);
+
+      try {
+        await client.from("status_histories").insert({
+          id: `sh-${Date.now()}`,
+          group_request_id: id,
+          from_status: prevStatus,
+          to_status: "UnderReview",
+          changed_by_id: currentUser?.id || "admin",
+          changed_by_name: currentUser?.fullName || "المدير",
+          note: reason
+            ? `تم التراجع عن اعتماد رقم نسك (${prevNusuk}) بواسطة المدير (${currentUser?.fullName || "Admin"}). السبب: ${reason}`
+            : `تم التراجع عن اعتماد رقم نسك (${prevNusuk}) وإعادة المعاملة لقيد المراجعة بواسطة المدير (${currentUser?.fullName || "Admin"})`,
+          created_at: now,
+        });
+      } catch (_) {}
+
+      return { message: "تم التراجع عن اعتماد رقم نسك بنجاح" };
+    },
+
     sendToAgent: async (id: string, agentId?: string, note?: string, currentUser?: User) => {
       return supabaseService.requests.transition(id, "ReadyForSaudiAgent", note || "إحالة للوكيل السعودي", currentUser);
     },

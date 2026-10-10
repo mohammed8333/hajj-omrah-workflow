@@ -264,6 +264,23 @@ export const api = {
       return res;
     },
 
+    revertNusukApproval: async (
+      id: string,
+      reason?: string
+    ): Promise<{ message: string }> => {
+      const current = await api.auth.getMe();
+      let res: { message: string };
+      if (isSupabaseConfigured()) {
+        res = await supabaseService.requests.revertNusukApproval(id, current, reason);
+      } else {
+        await delay();
+        localDB.revertNusukApproval(id, current, reason);
+        res = { message: "تم التراجع عن اعتماد رقم نسك بنجاح" };
+      }
+      syncMutation("group_requests", "revertNusukApproval", id);
+      return res;
+    },
+
     sendToAgent: async (
       id: string,
       agentId?: string,

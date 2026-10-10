@@ -1454,6 +1454,44 @@ class LocalDatabaseEngine {
     );
   }
 
+  public revertNusukApproval(
+    id: string,
+    currentUser?: User,
+    reason?: string
+  ) {
+    const req = this.requests.find((r) => r.id === id);
+    if (!req) throw new Error("المعاملة غير موجودة");
+
+    const prev = req.status;
+    const prevNusuk = req.nusukGroupNumber || "";
+
+    req.nusukGroupNumber = undefined;
+    req.status = "UnderReview";
+    req.updatedAt = new Date().toISOString();
+
+    if (!req.statusHistories) req.statusHistories = [];
+    req.statusHistories.unshift({
+      id: "sh-" + Date.now(),
+      groupRequestId: req.id,
+      fromStatus: prev,
+      toStatus: "UnderReview",
+      changedById: currentUser?.id || "admin",
+      changedByName: currentUser?.fullName || "المدير",
+      note: reason
+        ? `تم التراجع عن اعتماد رقم نسك (${prevNusuk}) بواسطة المدير (${currentUser?.fullName || "Admin"}). السبب: ${reason}`
+        : `تم التراجع عن اعتماد رقم نسك (${prevNusuk}) وإعادة المعاملة لقيد المراجعة بواسطة المدير (${currentUser?.fullName || "Admin"})`,
+      createdAt: new Date().toISOString(),
+    });
+
+    this.persistRequests();
+    this.logAction(
+      currentUser || null,
+      `التراجع عن اعتماد رقم نسك (${prevNusuk}) وإعادة المعاملة لقيد المراجعة: ${req.groupName}`,
+      "GroupRequest",
+      req.id
+    );
+  }
+
   public sendToAgent(
     id: string,
     saudiAgentId?: string,
