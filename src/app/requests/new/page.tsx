@@ -560,20 +560,17 @@ export default function UnifiedNewRequestPage() {
       return;
     }
 
-    // التحقق من رقم هاتف كل مسافر (إجباري، 11 رقماً ويبدأ بـ 010 أو 011 أو 012 أو 015)
+    // التحقق من رقم هاتف كل مسافر (اختياري، وإن وُجد يجب أن يكون 11 رقماً ويبدأ بـ 010 أو 011 أو 012 أو 015)
     for (let i = 0; i < travelers.length; i++) {
       const t = travelers[i];
       const travelerLabel = t.fullName?.trim() || `المسافر #${i + 1}`;
-      if (!t.phoneNumber || !t.phoneNumber.trim()) {
-        setError(`رقم تليفون ${travelerLabel} إجباري للمتابعة.`);
-        window.scrollTo({ top: 0, behavior: "smooth" });
-        return;
-      }
-      const travelerValidation = validateTravelerPhone(t.phoneNumber);
-      if (!travelerValidation.isValid) {
-        setError(`رقم هاتف ${travelerLabel} غير صحيح: ${travelerValidation.error}`);
-        window.scrollTo({ top: 0, behavior: "smooth" });
-        return;
+      if (t.phoneNumber && t.phoneNumber.trim()) {
+        const travelerValidation = validateTravelerPhone(t.phoneNumber);
+        if (!travelerValidation.isValid) {
+          setError(`رقم هاتف ${travelerLabel} غير صحيح: ${travelerValidation.error}`);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          return;
+        }
       }
     }
 
@@ -612,9 +609,10 @@ export default function UnifiedNewRequestPage() {
         ? groupName.trim()
         : (officialCandidate || (travelers[0]?.fullName?.trim() ? `مجموعة ${travelers[0].fullName.trim()}` : `طلب جديد ${new Date().toLocaleDateString("ar-SA")}`));
 
+      const firstWithPhone = travelers.find((t) => t.phoneNumber && t.phoneNumber.trim());
       const contactPhone =
         formattedHostPhone ||
-        (travelers[0]?.phoneNumber ? validateTravelerPhone(travelers[0].phoneNumber).formatted : "") ||
+        (firstWithPhone?.phoneNumber ? validateTravelerPhone(firstWithPhone.phoneNumber).formatted : "") ||
         "";
 
       // 1. Create Request
@@ -1164,16 +1162,15 @@ export default function UnifiedNewRequestPage() {
                 {/* رقم التليفون */}
                 <div>
                   <label className="block text-[11px] font-bold text-gray-700 mb-1">
-                    رقم هاتف المسافر:
+                    رقم هاتف المسافر (اختياري):
                   </label>
                   <div className="relative">
                     <input
                       type="tel"
                       dir="ltr"
-                      required
                       value={traveler.phoneNumber || ""}
                       onChange={(e) => updateTravelerField(traveler.id, "phoneNumber", e.target.value)}
-                      placeholder="اكتب رقم المسافر"
+                      placeholder="010xxxxxxxx (اختياري)"
                       className="w-full text-xs py-2.5 px-3 bg-white border border-gray-300 focus:border-blue-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-mono font-bold text-right shadow-2xs"
                     />
                     <Phone className="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />

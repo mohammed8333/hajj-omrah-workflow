@@ -1220,7 +1220,7 @@ export const supabaseService = {
       const payload: any = {};
       if (data.fullName !== undefined) payload.full_name = data.fullName.trim();
       if (data.passportNumber !== undefined) payload.passport_number = data.passportNumber.trim();
-      if (data.phoneNumber !== undefined) payload.phone_number = data.phoneNumber.trim();
+      if (data.phoneNumber !== undefined) payload.phone_number = data.phoneNumber.trim() || null;
       if (data.nationality !== undefined) payload.nationality = data.nationality.trim();
       if (data.dateOfBirth !== undefined) payload.date_of_birth = data.dateOfBirth.trim();
 

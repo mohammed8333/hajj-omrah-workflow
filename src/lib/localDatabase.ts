@@ -1854,7 +1854,7 @@ class LocalDatabaseEngine {
       if (trv) {
         if (data.fullName !== undefined) trv.fullName = data.fullName;
         if (data.passportNumber !== undefined) trv.passportNumber = data.passportNumber;
-        if (data.phoneNumber !== undefined) trv.phoneNumber = data.phoneNumber;
+        if (data.phoneNumber !== undefined) trv.phoneNumber = data.phoneNumber?.trim() || undefined;
         if (data.nationality !== undefined) trv.nationality = data.nationality;
         if (data.dateOfBirth !== undefined) trv.dateOfBirth = data.dateOfBirth;
         if (data.expiryDate !== undefined) trv.expiryDate = data.expiryDate;

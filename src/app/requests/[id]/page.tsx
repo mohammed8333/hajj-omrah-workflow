@@ -79,6 +79,19 @@ import { sendWhatsAppGroupPackage } from "@/lib/whatsappGroupSend";
 import { checkPassportValidity, findDuplicatePassportOrId } from "@/lib/passportValidation";
 import { useRealtimeSync } from "@/lib/realtimeSync";
 
+function checkHasNusuk(nusuk?: string | null): boolean {
+  const clean = nusuk?.trim();
+  return Boolean(
+    clean &&
+    clean !== "" &&
+    clean !== "-" &&
+    clean !== "لم يُسجل بعد" &&
+    clean !== "لم يسجل بعد" &&
+    clean.toLowerCase() !== "null" &&
+    clean.toLowerCase() !== "undefined"
+  );
+}
+
 export default function RequestDetailPage({
   requestId: propRequestId,
   params,
@@ -166,6 +179,10 @@ export default function RequestDetailPage({
   const [editTravelerNotes, setEditTravelerNotes] = useState("");
   const [isMrzScanningTravelerId, setIsMrzScanningTravelerId] = useState<string | null>(null);
   const [isScanningHostIdDoc, setIsScanningHostIdDoc] = useState(false);
+
+  // Quick Edit Traveler Phone Modal State
+  const [quickPhoneTraveler, setQuickPhoneTraveler] = useState<Traveler | null>(null);
+  const [quickPhoneInput, setQuickPhoneInput] = useState("");
 
   // WhatsApp Modal State
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
@@ -570,21 +587,30 @@ export default function RequestDetailPage({
       }
       formattedPhone = pVal.formatted;
     } else if (phoneNumber !== undefined) {
-      formattedPhone = undefined;
+      formattedPhone = "";
     }
 
     try {
       setActionLoading(true);
       setError(null);
       const current = request?.travelers.find((t) => t.id === travelerId);
+      const isLockedByNusukForSender = role === "Sender" && checkHasNusuk(request?.nusukGroupNumber);
+
+      const payloadName = isLockedByNusukForSender ? (current?.fullName || fullName.trim()) : fullName.trim();
+      const payloadPassport = isLockedByNusukForSender ? current?.passportNumber : (passportNumber?.trim() || current?.passportNumber);
+      const payloadNationality = isLockedByNusukForSender ? current?.nationality : (nationality?.trim() || current?.nationality);
+      const payloadBirthDate = isLockedByNusukForSender ? current?.dateOfBirth : (dateOfBirth?.trim() || current?.dateOfBirth);
+      const payloadExpiryDate = isLockedByNusukForSender ? current?.expiryDate : (expiryDate !== undefined ? expiryDate?.trim() : current?.expiryDate);
+      const payloadAffiliation = isLockedByNusukForSender ? current?.affiliation : (affiliation !== undefined ? affiliation.trim() : current?.affiliation);
+
       await api.travelers.update(travelerId, {
-        fullName: fullName.trim(),
-        passportNumber: passportNumber?.trim() || current?.passportNumber,
-        phoneNumber: phoneNumber !== undefined ? formattedPhone : current?.phoneNumber,
-        nationality: nationality?.trim() || current?.nationality,
-        dateOfBirth: dateOfBirth?.trim() || current?.dateOfBirth,
-        expiryDate: expiryDate !== undefined ? expiryDate?.trim() : current?.expiryDate,
-        affiliation: affiliation !== undefined ? affiliation.trim() : current?.affiliation,
+        fullName: payloadName,
+        passportNumber: payloadPassport,
+        phoneNumber: phoneNumber !== undefined ? (formattedPhone || "") : current?.phoneNumber,
+        nationality: payloadNationality,
+        dateOfBirth: payloadBirthDate,
+        expiryDate: payloadExpiryDate,
+        affiliation: payloadAffiliation,
         notes: notes !== undefined ? notes.trim() : current?.notes,
       });
       setSuccess("تم تحديث بيانات المسافر بنجاح.");
@@ -593,6 +619,43 @@ export default function RequestDetailPage({
     } catch (err: unknown) {
       if (err instanceof Error) setError(err.message);
       else setError("فشل تحديث بيانات المسافر.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const openQuickPhoneModal = (traveler: Traveler) => {
+    setQuickPhoneTraveler(traveler);
+    setQuickPhoneInput(traveler.phoneNumber || "");
+  };
+
+  const handleSaveQuickPhone = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickPhoneTraveler) return;
+
+    let formattedPhone: string | undefined = undefined;
+    if (quickPhoneInput.trim()) {
+      const pVal = validateTravelerPhone(quickPhoneInput);
+      if (!pVal.isValid) {
+        setError(pVal.error || "رقم المسافر غير صحيح");
+        return;
+      }
+      formattedPhone = pVal.formatted;
+    }
+
+    try {
+      setActionLoading(true);
+      setError(null);
+      await api.travelers.update(quickPhoneTraveler.id, {
+        phoneNumber: formattedPhone || "",
+      });
+      setSuccess(`تم تحديث رقم هاتف المسافر (${quickPhoneTraveler.fullName}) بنجاح ✅`);
+      setQuickPhoneTraveler(null);
+      setQuickPhoneInput("");
+      await loadRequest(false);
+    } catch (err: unknown) {
+      if (err instanceof Error) setError(err.message);
+      else setError("فشل تحديث رقم هاتف المسافر.");
     } finally {
       setActionLoading(false);
     }
@@ -897,6 +960,14 @@ export default function RequestDetailPage({
 
   const handleAddTraveler = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (role === "Sender" && checkHasNusuk(request?.nusukGroupNumber)) {
+      await alert({
+        title: "غير مسموح",
+        message: "لا يمكن للمرسل إضافة مسافرين بعد اعتماد رقم نسك للمجموعة.",
+        variant: "warning",
+      });
+      return;
+    }
     if (!newTravelerName.trim()) {
       await alert({
         title: "تنبيه",
@@ -1914,15 +1985,7 @@ export default function RequestDetailPage({
   }
 
   const cleanNusuk = request.nusukGroupNumber?.trim();
-  const hasNusukGroupNumber = Boolean(
-    cleanNusuk &&
-    cleanNusuk !== "" &&
-    cleanNusuk !== "-" &&
-    cleanNusuk !== "لم يُسجل بعد" &&
-    cleanNusuk !== "لم يسجل بعد" &&
-    cleanNusuk.toLowerCase() !== "null" &&
-    cleanNusuk.toLowerCase() !== "undefined"
-  );
+  const hasNusukGroupNumber = checkHasNusuk(request.nusukGroupNumber);
 
   const canSenderEditWithoutNusuk =
     role === "Sender" &&
@@ -1955,12 +2018,13 @@ export default function RequestDetailPage({
     canEditDocs ||
     hasItemsNeedingCorrection;
 
+  // Sender can only add travelers BEFORE Nusuk. After Nusuk, Sender cannot add travelers.
   const canAddTraveler =
     role === "Admin" ||
     (role === "Sender" &&
+      !hasNusukGroupNumber &&
       request.status !== "Cancelled" &&
-      request.status !== "Archived") ||
-    canEditAnyData;
+      request.status !== "Archived");
 
   const isAdmin = role === "Admin";
   const isSafaEmployee = role === "SafaEmployee";
@@ -1969,12 +2033,24 @@ export default function RequestDetailPage({
 
   const isSafaReviewer = role === "SafaEmployee" || role === "Admin";
   const isAgent = role === "SaudiAgent" || role === "Admin";
-  const canEditTraveler =
+
+  // Traveler phone can be edited by Sender at ANY time (before Nusuk and after Nusuk), as well as Admin/Safa/Agent
+  const canEditTravelerPhone =
     role === "Admin" ||
-    canSenderEditWithoutNusuk ||
-    canEditAnyData ||
     role === "SafaEmployee" ||
-    role === "SaudiAgent";
+    role === "SaudiAgent" ||
+    (role === "Sender" &&
+      request.status !== "Cancelled" &&
+      request.status !== "Archived");
+
+  // Full traveler data (name, passport, birth date) is only editable before Nusuk for Sender, or by Admin/Safa/Agent
+  const canEditFullTravelerData =
+    role === "Admin" ||
+    role === "SafaEmployee" ||
+    role === "SaudiAgent" ||
+    canSenderEditWithoutNusuk;
+
+  const canEditTraveler = canEditTravelerPhone;
 
   const hostDoc =
     (request.hostingInfo?.hostIdDocumentId
@@ -3607,73 +3683,122 @@ export default function RequestDetailPage({
                 </span>
                 {editingTravelerId === traveler.id ? (
                   <div className="flex flex-wrap items-center gap-2 bg-emerald-50/50 p-2.5 rounded-xl border border-emerald-200">
+                    {!canEditFullTravelerData && isSender && hasNusukGroupNumber && (
+                      <div className="w-full text-xs bg-amber-50 text-amber-800 border border-amber-200 rounded-lg p-2 font-medium flex items-center gap-1.5 mb-1">
+                        <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                        <span>تم اعتماد رقم نسك للمجموعة: البيانات الرسمية مقفلة، ويُسمح لك بتعديل رقم هاتف المسافر فقط.</span>
+                      </div>
+                    )}
                     <div className="flex items-center gap-1.5">
                       <input
                         type="text"
+                        disabled={!canEditFullTravelerData}
                         value={editTravelerName}
                         onChange={(e) => setEditTravelerName(e.target.value)}
                         placeholder="اسم المسافر بالعربية *"
-                        className="text-xs px-2.5 py-1.5 border border-emerald-400 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 font-bold bg-white"
+                        title={!canEditFullTravelerData ? "الاسم مقفل بعد اعتماد رقم نسك" : undefined}
+                        className={`text-xs px-2.5 py-1.5 border rounded-lg font-bold ${
+                          !canEditFullTravelerData
+                            ? "bg-gray-100 text-gray-500 cursor-not-allowed border-gray-200"
+                            : "border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white"
+                        }`}
                       />
-                      <button
-                        type="button"
-                        onClick={handleTranslateEditName}
-                        disabled={actionLoading || !editTravelerName.trim()}
-                        className="px-2 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer border border-blue-200"
-                        title="ترجمة الاسم المكتوب فوراً بدقة عبر Google Translate"
-                      >
-                        <Languages className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">ترجمة جوجل</span>
-                      </button>
+                      {canEditFullTravelerData && (
+                        <button
+                          type="button"
+                          onClick={handleTranslateEditName}
+                          disabled={actionLoading || !editTravelerName.trim()}
+                          className="px-2 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer border border-blue-200"
+                          title="ترجمة الاسم المكتوب فوراً بدقة عبر Google Translate"
+                        >
+                          <Languages className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">ترجمة جوجل</span>
+                        </button>
+                      )}
                     </div>
 
                     <input
                       type="text"
+                      disabled={!canEditFullTravelerData}
                       value={editTravelerPassport}
                       onChange={(e) => setEditTravelerPassport(e.target.value.toUpperCase())}
                       placeholder="رقم الجواز"
-                      className="text-xs px-2.5 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono bg-white w-28"
+                      title={!canEditFullTravelerData ? "رقم الجواز مقفل بعد اعتماد رقم نسك" : undefined}
+                      className={`text-xs px-2.5 py-1.5 border rounded-lg font-mono w-28 ${
+                        !canEditFullTravelerData
+                          ? "bg-gray-100 text-gray-500 cursor-not-allowed border-gray-200"
+                          : "border-gray-300 focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white"
+                      }`}
                     />
 
                     <input
                       type="tel"
                       dir="ltr"
+                      autoFocus={!canEditFullTravelerData}
                       value={editTravelerPhone}
                       onChange={(e) => setEditTravelerPhone(e.target.value)}
-                      placeholder="010xxxxxxxx"
-                      className="text-xs px-2.5 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono bg-white w-36 text-right"
+                      placeholder="رقم الهاتف 010..."
+                      className={`text-xs px-2.5 py-1.5 rounded-lg focus:outline-none font-mono font-bold text-right ${
+                        !canEditFullTravelerData
+                          ? "border-2 border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-50/40 w-44"
+                          : "border border-gray-300 focus:ring-1 focus:ring-emerald-500 bg-white w-36"
+                      }`}
                     />
 
                     <input
                       type="text"
+                      disabled={!canEditFullTravelerData}
                       value={editTravelerNationality}
                       onChange={(e) => setEditTravelerNationality(e.target.value)}
                       placeholder="الجنسية"
-                      className="text-xs px-2.5 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white w-24"
+                      title={!canEditFullTravelerData ? "الجنسية مقفلة بعد اعتماد رقم نسك" : undefined}
+                      className={`text-xs px-2.5 py-1.5 border rounded-lg w-24 ${
+                        !canEditFullTravelerData
+                          ? "bg-gray-100 text-gray-500 cursor-not-allowed border-gray-200"
+                          : "border-gray-300 focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white"
+                      }`}
                     />
 
                     <input
                       type="text"
+                      disabled={!canEditFullTravelerData}
                       value={editTravelerBirthDate}
                       onChange={(e) => setEditTravelerBirthDate(e.target.value)}
                       placeholder="تاريخ الميلاد (YYYY-MM-DD)"
-                      className="text-xs px-2.5 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono bg-white w-36"
+                      title={!canEditFullTravelerData ? "تاريخ الميلاد مقفل بعد اعتماد رقم نسك" : undefined}
+                      className={`text-xs px-2.5 py-1.5 border rounded-lg font-mono w-36 ${
+                        !canEditFullTravelerData
+                          ? "bg-gray-100 text-gray-500 cursor-not-allowed border-gray-200"
+                          : "border-gray-300 focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white"
+                      }`}
                     />
 
                     <input
                       type="text"
+                      disabled={!canEditFullTravelerData}
                       value={editTravelerExpiryDate}
                       onChange={(e) => setEditTravelerExpiryDate(e.target.value)}
                       placeholder="انتهاء الجواز (YYYY-MM-DD)"
-                      className="text-xs px-2.5 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono bg-white w-36"
+                      title={!canEditFullTravelerData ? "تاريخ انتهاء الجواز مقفل بعد اعتماد رقم نسك" : undefined}
+                      className={`text-xs px-2.5 py-1.5 border rounded-lg font-mono w-36 ${
+                        !canEditFullTravelerData
+                          ? "bg-gray-100 text-gray-500 cursor-not-allowed border-gray-200"
+                          : "border-gray-300 focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white"
+                      }`}
                     />
 
                     <input
                       type="text"
+                      disabled={!canEditFullTravelerData}
                       value={editTravelerAffiliation}
                       onChange={(e) => setEditTravelerAffiliation(e.target.value)}
                       placeholder="التبعية / المندوب"
-                      className="text-xs px-2.5 py-1.5 border border-purple-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500 font-bold text-purple-900 bg-purple-50/40 w-36"
+                      title={!canEditFullTravelerData ? "التبعية مقفلة بعد اعتماد رقم نسك" : undefined}
+                      className={`text-xs px-2.5 py-1.5 border rounded-lg font-bold w-36 ${
+                        !canEditFullTravelerData
+                          ? "bg-gray-100 text-gray-500 cursor-not-allowed border-gray-200"
+                          : "border-purple-300 focus:outline-none focus:ring-1 focus:ring-purple-500 text-purple-900 bg-purple-50/40"
+                      }`}
                     />
 
                     <input
@@ -3700,7 +3825,7 @@ export default function RequestDetailPage({
                             editTravelerNotes
                           )
                         }
-                        disabled={actionLoading || !editTravelerName.trim()}
+                        disabled={actionLoading || (!editTravelerName.trim() && canEditFullTravelerData)}
                         className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-xs cursor-pointer"
                       >
                         <Check className="w-3.5 h-3.5" />
@@ -3737,7 +3862,11 @@ export default function RequestDetailPage({
                             setEditTravelerNotes(traveler.notes || "");
                           }}
                           className="text-gray-400 hover:text-blue-600 p-1 rounded hover:bg-blue-50 transition-colors cursor-pointer"
-                          title="تعديل بيانات المسافر ورقم الهاتف"
+                          title={
+                            isSender && hasNusukGroupNumber
+                              ? "تعديل رقم هاتف المسافر (البيانات الرسمية مقفلة بعد نسك)"
+                              : "تعديل بيانات المسافر ورقم الهاتف"
+                          }
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
@@ -3770,22 +3899,27 @@ export default function RequestDetailPage({
                           >
                             <Phone className="w-3 h-3 shrink-0" />
                           </a>
+                          {canEditTravelerPhone && (
+                            <>
+                              <span className="text-emerald-300">|</span>
+                              <button
+                                type="button"
+                                onClick={() => openQuickPhoneModal(traveler)}
+                                className="p-0.5 text-emerald-700 hover:text-blue-700 rounded hover:bg-emerald-100 transition-colors cursor-pointer"
+                                title="تعديل رقم هاتف المسافر"
+                              >
+                                <Edit2 className="w-3 h-3 shrink-0" />
+                              </button>
+                            </>
+                          )}
                         </div>
                       ) : (
-                        canEditTraveler && (
+                        canEditTravelerPhone && (
                           <button
                             type="button"
-                            onClick={() => {
-                              setEditingTravelerId(traveler.id);
-                              setEditTravelerName(traveler.fullName);
-                              setEditTravelerPassport(traveler.passportNumber || "");
-                              setEditTravelerPhone("");
-                              setEditTravelerNationality(traveler.nationality || "");
-                              setEditTravelerBirthDate(traveler.dateOfBirth || "");
-                              setEditTravelerExpiryDate(traveler.expiryDate || "");
-                            }}
+                            onClick={() => openQuickPhoneModal(traveler)}
                             className="inline-flex items-center gap-1 text-sky-700 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 px-2 py-0.5 rounded-md border border-sky-200 transition-colors cursor-pointer font-medium text-[11px]"
-                            title="إضافة رقم هاتف المسافر (يمكن إدخاله بواسطة المرسل، المدير، الوكيل، أو موظف صفا)"
+                            title="إضافة رقم هاتف المسافر (متاح في أي وقت قبل أو بعد نسك)"
                           >
                             <Phone className="w-3 h-3 text-sky-600" />
                             <span>+ إضافة هاتف</span>
@@ -5441,6 +5575,90 @@ export default function RequestDetailPage({
                       <span>حفظ بيانات ومستند المستضيف</span>
                     </>
                   )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Edit Traveler Phone Modal */}
+      {quickPhoneTraveler && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-100 text-right space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2 text-emerald-800">
+                <Phone className="w-5 h-5 text-emerald-600" />
+                <h3 className="text-base font-bold text-gray-900">
+                  تعديل رقم هاتف المسافر
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setQuickPhoneTraveler(null)}
+                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs space-y-1">
+              <div className="font-bold text-gray-900 text-sm">
+                {quickPhoneTraveler.fullName}
+              </div>
+              {quickPhoneTraveler.passportNumber && (
+                <div className="text-gray-500 font-mono">
+                  رقم الجواز: {quickPhoneTraveler.passportNumber}
+                </div>
+              )}
+              {hasNusukGroupNumber && (
+                <div className="text-emerald-700 font-medium text-[11px] pt-1">
+                  ✓ متاح للمرسل تعديل رقم الهاتف في أي وقت قبل أو بعد اعتماد نسك
+                </div>
+              )}
+            </div>
+
+            <form onSubmit={handleSaveQuickPhone} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  رقم هاتف المسافر (موبايل مصري):
+                </label>
+                <div className="relative">
+                  <input
+                    type="tel"
+                    dir="ltr"
+                    autoFocus
+                    value={quickPhoneInput}
+                    onChange={(e) => setQuickPhoneInput(e.target.value)}
+                    placeholder="010xxxxxxxx أو اترك فارغاً للحذف"
+                    className="w-full text-sm py-2.5 px-3 bg-white border border-gray-300 focus:border-emerald-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 font-mono font-bold text-right shadow-2xs"
+                  />
+                  <Phone className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+                <p className="text-[11px] text-gray-400 mt-1">
+                  يجب أن يتكون من 11 رقماً ويبدأ بـ 010 أو 011 أو 012 أو 015
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setQuickPhoneTraveler(null)}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-xl text-xs font-medium hover:bg-gray-50 cursor-pointer"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionLoading}
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
+                >
+                  {actionLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Check className="w-4 h-4" />
+                  )}
+                  <span>حفظ رقم الهاتف</span>
                 </button>
               </div>
             </form>
