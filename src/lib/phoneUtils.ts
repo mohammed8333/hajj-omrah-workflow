@@ -7,7 +7,7 @@
 export interface NormalizedPhone {
   raw: string;
   cleanDigits: string;
-  whatsappDigits: string;
+  internationalDigits: string;
   displayFormatted: string;
   country: "SA" | "EG" | "OTHER";
 }
@@ -17,7 +17,7 @@ export interface PhoneValidationResult {
   error?: string;
   formatted: string;
   cleanDigits: string;
-  whatsappDigits: string;
+  internationalDigits: string;
 }
 
 /**
@@ -32,7 +32,7 @@ export function validateHostPhone(rawPhone?: string): PhoneValidationResult {
       error: "يرجى إدخال رقم المستضيف.",
       formatted: "",
       cleanDigits: "",
-      whatsappDigits: "",
+      internationalDigits: "",
     };
   }
 
@@ -58,19 +58,19 @@ export function validateHostPhone(rawPhone?: string): PhoneValidationResult {
       error: "رقم المستضيف يجب أن يتكون من 10 أرقام ويبدأ بـ 05 (أو يبدأ بـ +966)",
       formatted: raw,
       cleanDigits: digits,
-      whatsappDigits: digits,
+      internationalDigits: digits,
     };
   }
 
   const withoutZero = digits.substring(1); // 5xxxxxxxx
   const formatted = `+966${withoutZero}`;
-  const whatsappDigits = `966${withoutZero}`;
+  const internationalDigits = `966${withoutZero}`;
 
   return {
     isValid: true,
     formatted,
     cleanDigits: digits,
-    whatsappDigits,
+    internationalDigits,
   };
 }
 
@@ -86,7 +86,7 @@ export function validateTravelerPhone(rawPhone?: string): PhoneValidationResult 
       error: "يرجى إدخال رقم هاتف المسافر.",
       formatted: "",
       cleanDigits: "",
-      whatsappDigits: "",
+      internationalDigits: "",
     };
   }
 
@@ -125,19 +125,19 @@ export function validateTravelerPhone(rawPhone?: string): PhoneValidationResult 
       error: "رقم المسافر يجب أن يتكون من 11 رقماً ويبدأ بـ 010 أو 011 أو 012 أو 015 (أو يبدأ بـ +20)",
       formatted: raw,
       cleanDigits: digits,
-      whatsappDigits: digits,
+      internationalDigits: digits,
     };
   }
 
   const withoutZero = digits.substring(1); // 1xxxxxxxxx
   const formatted = `+20${withoutZero}`;
-  const whatsappDigits = `20${withoutZero}`;
+  const internationalDigits = `20${withoutZero}`;
 
   return {
     isValid: true,
     formatted,
     cleanDigits: digits,
-    whatsappDigits,
+    internationalDigits,
   };
 }
 
@@ -146,7 +146,7 @@ export function normalizePhone(rawPhone?: string): NormalizedPhone {
     return {
       raw: "",
       cleanDigits: "",
-      whatsappDigits: "",
+      internationalDigits: "",
       displayFormatted: "",
       country: "OTHER",
     };
@@ -171,7 +171,7 @@ export function normalizePhone(rawPhone?: string): NormalizedPhone {
     return {
       raw,
       cleanDigits: digits,
-      whatsappDigits: wa,
+      internationalDigits: wa,
       displayFormatted: "+20" + digits.substring(1),
       country: "EG",
     };
@@ -189,7 +189,7 @@ export function normalizePhone(rawPhone?: string): NormalizedPhone {
     return {
       raw,
       cleanDigits: "0" + digits,
-      whatsappDigits: wa,
+      internationalDigits: wa,
       displayFormatted: "+20" + digits,
       country: "EG",
     };
@@ -200,7 +200,7 @@ export function normalizePhone(rawPhone?: string): NormalizedPhone {
     return {
       raw,
       cleanDigits: "0" + digits.substring(2),
-      whatsappDigits: digits,
+      internationalDigits: digits,
       displayFormatted: "+20" + digits.substring(2),
       country: "EG",
     };
@@ -212,7 +212,7 @@ export function normalizePhone(rawPhone?: string): NormalizedPhone {
     return {
       raw,
       cleanDigits: digits,
-      whatsappDigits: wa,
+      internationalDigits: wa,
       displayFormatted: "+966" + digits.substring(1),
       country: "SA",
     };
@@ -224,7 +224,7 @@ export function normalizePhone(rawPhone?: string): NormalizedPhone {
     return {
       raw,
       cleanDigits: "0" + digits,
-      whatsappDigits: wa,
+      internationalDigits: wa,
       displayFormatted: "+966" + digits,
       country: "SA",
     };
@@ -235,7 +235,7 @@ export function normalizePhone(rawPhone?: string): NormalizedPhone {
     return {
       raw,
       cleanDigits: "0" + digits.substring(3),
-      whatsappDigits: digits,
+      internationalDigits: digits,
       displayFormatted: "+966" + digits.substring(3),
       country: "SA",
     };
@@ -247,7 +247,7 @@ export function normalizePhone(rawPhone?: string): NormalizedPhone {
     return {
       raw,
       cleanDigits: digits,
-      whatsappDigits: wa,
+      internationalDigits: wa,
       displayFormatted: "+966" + digits.substring(1),
       country: "SA",
     };
@@ -257,23 +257,16 @@ export function normalizePhone(rawPhone?: string): NormalizedPhone {
   return {
     raw,
     cleanDigits: digits,
-    whatsappDigits: digits,
+    internationalDigits: digits,
     displayFormatted: digits ? (raw.startsWith("+") ? raw : `+${digits}`) : "",
     country: "OTHER",
   };
 }
 
-export function getWhatsAppUrl(phone: string, message?: string): string {
-  const norm = normalizePhone(phone);
-  if (!norm.whatsappDigits) return "";
-  const textParam = message ? `?text=${encodeURIComponent(message)}` : "";
-  return `https://wa.me/${norm.whatsappDigits}${textParam}`;
-}
-
 export function getTelUrl(phone: string): string {
   const norm = normalizePhone(phone);
-  if (!norm.whatsappDigits) return "";
-  return `tel:+${norm.whatsappDigits}`;
+  if (!norm.internationalDigits) return "";
+  return `tel:+${norm.internationalDigits}`;
 }
 
 /**

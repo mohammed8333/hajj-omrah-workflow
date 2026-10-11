@@ -23,7 +23,6 @@ import {
   Calendar,
   User,
   Clock,
-  MessageSquare,
   IdCard,
   Download,
   Eye,
@@ -38,8 +37,6 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useDialog } from "@/lib/dialog-context";
-import { getWhatsAppUrl } from "@/lib/phoneUtils";
-import { WhatsAppModal } from "@/components/ui/WhatsAppModal";
 import { NusukApprovalModal } from "@/components/requests/NusukApprovalModal";
 import { notificationsService } from "@/lib/notificationsService";
 import { downloadFile, printPdfDocumentUrl } from "@/lib/fileDownload";
@@ -208,7 +205,6 @@ export default function RequestsListPage() {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [mobileCardTab, setMobileCardTab] = useState<Record<string, "host" | "travelers">>({});
   const [nusukModalRequest, setNusukModalRequest] = useState<GroupRequestSummary | null>(null);
-  const [whatsAppModalRequest, setWhatsAppModalRequest] = useState<GroupRequestSummary | null>(null);
   const [docPreviewModal, setDocPreviewModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -723,51 +719,6 @@ export default function RequestsListPage() {
       await loadRequests();
     } catch (err: unknown) {
       if (err instanceof Error) await alert({ title: "خطأ", message: err.message, variant: "danger" });
-    }
-  };
-
-  // فتح محادثة واتساب مع المستضيف برسالة الاستضافة المعتمدة
-  const handleOpenHostWhatsApp = (
-    r: GroupRequestSummary,
-    e: React.MouseEvent
-  ) => {
-    e.stopPropagation();
-    const phone = (r.hostPhone || (r.hasHosting ? r.contactPhone : "") || "").trim();
-    if (!phone) return;
-
-    // اسم المستضيف الأول فقط
-    const hostFirstName = r.hostName?.trim().split(/\s+/)[0] || "";
-    const salutation = hostFirstName
-      ? `السلام عليكم يا أستاذ ${hostFirstName}`
-      : "السلام عليكم يا أستاذ";
-
-    // اسم الشخص اللي عامل login وضغط علي الزر
-    const currentUserName = user?.fullName?.trim() || user?.username || "ممثل شركة إيواء";
-
-    // تكرار السيد ورقم الجواز إذا كان فيه أكثر من مسافر
-    const travelers =
-      r.travelersList && r.travelersList.length > 0
-        ? r.travelersList
-        : [{ fullName: r.groupName || "المعتمر", passportNumber: "" }];
-
-    const travelersLines = travelers
-      .map(
-        (t) =>
-          `السيد ${t.fullName?.trim() || "المعتمر"}\nرقم جواز ${t.passportNumber?.trim() || ""}`.trim()
-      )
-      .join("\n");
-
-    const message = `${salutation}
-مع حضرتك ${currentUserName}
-من شركة إيواء للعمرة 
-ارجو قبول استضافة 
-${travelersLines}
-علما بان المعتمر المذكور تحت مسئولية حضرتك حتى خروجه من المملكة .
-وشكرا`;
-
-    const whatsappUrl = getWhatsAppUrl(phone, message);
-    if (whatsappUrl) {
-      window.open(whatsappUrl, "_blank");
     }
   };
 
@@ -2981,16 +2932,7 @@ ${travelersLines}
         </div>
       )}
 
-      {/* Smart WhatsApp Integration Modal */}
-      {whatsAppModalRequest && (
-        <WhatsAppModal
-          isOpen={!!whatsAppModalRequest}
-          onClose={() => setWhatsAppModalRequest(null)}
-          request={whatsAppModalRequest}
-        />
-      )}
-
-      {/* Nusuk Approval & WhatsApp Auto-Send Modal */}
+      {/* Nusuk Approval Modal */}
       <NusukApprovalModal
         isOpen={Boolean(nusukModalRequest)}
         onClose={() => setNusukModalRequest(null)}

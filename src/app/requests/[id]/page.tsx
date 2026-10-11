@@ -55,8 +55,6 @@ import {
   Undo2,
   Upload,
   Ticket,
-  MessageSquare,
-  MessageCircle,
   Plus,
   UserPlus,
   UserMinus,
@@ -71,11 +69,9 @@ import { scanFlightTicket, calculateAirportArrivalTime } from "@/lib/flightTicke
 import { getGeminiApiKey, setGeminiApiKey } from "@/lib/geminiVision";
 import { useDialog } from "@/lib/dialog-context";
 import { FileDropArea } from "@/components/ui/FileDropArea";
-import { getWhatsAppUrl, getTelUrl, normalizePhone, validateHostPhone, validateTravelerPhone } from "@/lib/phoneUtils";
-import { WhatsAppModal } from "@/components/ui/WhatsAppModal";
+import { getTelUrl, normalizePhone, validateHostPhone, validateTravelerPhone } from "@/lib/phoneUtils";
 import { formatOfficialGroupName, resolveSenderCode } from "@/lib/groupNaming";
 import { downloadFile, printPdfDocumentUrl } from "@/lib/fileDownload";
-import { sendWhatsAppGroupPackage } from "@/lib/whatsappGroupSend";
 import { checkPassportValidity, findDuplicatePassportOrId } from "@/lib/passportValidation";
 import { useRealtimeSync } from "@/lib/realtimeSync";
 
@@ -128,11 +124,7 @@ export default function RequestDetailPage({
   const [editingNusuk, setEditingNusuk] = useState(false);
   const [nusukSaved, setNusukSaved] = useState(false);
   const [nusukSuccessMsg, setNusukSuccessMsg] = useState<string | null>(null);
-  const [nusukWaMsg, setNusukWaMsg] = useState<string | null>(null);
-  const [nusukWaLink, setNusukWaLink] = useState("");
-  const [nusukGeneratedWaUrl, setNusukGeneratedWaUrl] = useState<string | null>(null);
   const [nusukSaving, setNusukSaving] = useState(false);
-  const [nusukSendingWa, setNusukSendingWa] = useState(false);
 
   // Correction Request Modal
   const [showCorrectionModal, setShowCorrectionModal] = useState(false);
@@ -183,9 +175,6 @@ export default function RequestDetailPage({
   // Quick Edit Traveler Phone Modal State
   const [quickPhoneTraveler, setQuickPhoneTraveler] = useState<Traveler | null>(null);
   const [quickPhoneInput, setQuickPhoneInput] = useState("");
-
-  // WhatsApp Modal State
-  const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
 
   // Host Info Edit State
   const [editingHostInfo, setEditingHostInfo] = useState(false);
@@ -1655,7 +1644,7 @@ export default function RequestDetailPage({
         request.status = "ReadyForSaudiAgent";
       }
       setNusukSaved(true);
-      setNusukSuccessMsg("تم اعتماد وحفظ رقم نسك واسم المجموعة بنجاح ✓ يمكنك الآن الضغط على زر إرسال واتساب أدناه.");
+      setNusukSuccessMsg("تم اعتماد وحفظ رقم نسك واسم المجموعة بنجاح ✓");
       await loadRequest(false);
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -1666,106 +1655,7 @@ export default function RequestDetailPage({
     }
   };
 
-  // 2. إرسال حزمة المعاملة لمجموعة الواتساب (يحفظ تلقائياً إذا لم يكن محفوظاً)
-  const handleSendNusukWhatsApp = async () => {
-    if (!nusukInput.trim()) {
-      await alert({
-        title: "تنبيه",
-        message: "يرجى إدخال رقم مجموعة نسك أولاً.",
-        variant: "warning",
-      });
-      return;
-    }
-    if (!nusukGroupName.trim()) {
-      await alert({
-        title: "تنبيه",
-        message: "يرجى إدخال اسم المجموعة أولاً.",
-        variant: "warning",
-      });
-      return;
-    }
-
-    // 🌟 فتح نافذة فارغة فورياً بشكل متزامن قبل أي استدعاء غير متزامن لتجاوز مانع النوافذ المنبثقة تماماً
-    let waWindow: Window | null = null;
-    try {
-      waWindow = window.open("about:blank", "_blank");
-      if (waWindow) {
-        waWindow.document.write(
-          '<html dir="rtl"><head><title>جاري فتح الواتساب...</title></head><body style="font-family:system-ui,-apple-system,sans-serif;background:#f0fdf4;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;"><div style="text-align:center;padding:24px;background:#fff;border-radius:16px;box-shadow:0 4px 16px rgba(0,0,0,0.1);max-width:360px;"><h3 style="color:#059669;margin:0 0 8px 0;font-size:18px;">جاري تجهيز حزمة الواتساب... 📲</h3><p style="color:#6b7280;font-size:13px;margin:0;">سيتم فتح الواتساب فوراً، يرجى الانتظار ثوانٍ معدودة...</p></div></body></html>'
-        );
-      }
-    } catch (popupErr) {
-      console.warn("Pre-opening window warning:", popupErr);
-    }
-
-    try {
-      setNusukSendingWa(true);
-      setError(null);
-      setNusukWaMsg(null);
-
-      // إذا لم يكن قد تم الحفظ بعد، نحفظ أولاً
-      if (!nusukSaved) {
-        await api.requests.safaComplete(
-          requestId,
-          nusukInput.trim(),
-          nusukNote.trim() || undefined,
-          nusukGroupName.trim()
-        );
-        if (request) {
-          request.groupName = nusukGroupName.trim();
-          request.nusukGroupNumber = nusukInput.trim();
-          request.status = "ReadyForSaudiAgent";
-        }
-        setNusukSaved(true);
-        await loadRequest(false);
-      }
-
-      // إرسال الحزمة لمجموعة الواتساب
-      const ticketDoc =
-        (request?.flightTicketDocumentId
-          ? request?.groupDocuments?.find((d) => d.id === request.flightTicketDocumentId)
-          : undefined) ||
-        request?.flightTicketDocument ||
-        request?.groupDocuments?.filter((d) => d.documentType === "FlightTicket").slice(-1)[0] ||
-        request?.travelers?.[0]?.documents?.find((d) => d.documentType === "FlightTicket");
-
-      const hostDoc =
-        (request?.hostingInfo?.hostIdDocumentId
-          ? request?.groupDocuments?.find((d) => d.id === request.hostingInfo.hostIdDocumentId)
-          : undefined) ||
-        request?.hostingInfo?.hostIdDocument ||
-        request?.groupDocuments?.filter((d) => d.documentType === "HostId").slice(-1)[0];
-
-      const sendRes = await sendWhatsAppGroupPackage({
-        nusukNumber: nusukInput.trim(),
-        hasHosting: Boolean(request?.hasHosting),
-        hostPhone: request?.hostingInfo?.hostPhone || request?.contactPhone,
-        contactPhone: request?.contactPhone,
-        ticketDocId: ticketDoc?.id,
-        hostDocId: hostDoc?.id,
-        preOpenedWindow: waWindow,
-        customGroupLink: nusukWaLink.trim() || undefined,
-      });
-
-      setNusukGeneratedWaUrl(sendRes.whatsappUrl);
-      setNusukWaMsg("تم نسخ رسالة المعاملة وتجهيزها وفتح الواتساب بنجاح 📲🕋");
-      await loadRequest(false);
-    } catch (waErr: unknown) {
-      if (waWindow && !waWindow.closed) {
-        waWindow.close();
-      }
-      console.warn("WhatsApp group auto-send error:", waErr);
-      await alert({
-        title: "تنبيه في إرسال الواتساب",
-        message: (waErr instanceof Error ? waErr.message : "تعذر إرسال الحزمة لمجموعة الواتساب تلقائياً."),
-        variant: "warning",
-      });
-    } finally {
-      setNusukSendingWa(false);
-    }
-  };
-
-  const handleCompleteSafa = handleSendNusukWhatsApp;
+  const handleCompleteSafa = handleSaveNusukOnly;
 
   const handleSaveNusukNumber = async (val?: string) => {
     const num = val !== undefined ? val : nusukInput;
@@ -2442,11 +2332,6 @@ export default function RequestDetailPage({
                   setNusukInput(request.nusukGroupNumber || "");
                   setNusukSaved(false);
                   setNusukSuccessMsg(null);
-                  setNusukWaMsg(null);
-                  if (typeof window !== "undefined") {
-                    setNusukWaLink(localStorage.getItem("safa_whatsapp_target_link") || "");
-                  }
-                  setNusukGeneratedWaUrl(null);
                   setShowNusukModal(true);
                 }}
                 disabled={actionLoading}
@@ -2471,11 +2356,6 @@ export default function RequestDetailPage({
                 setNusukInput(request.nusukGroupNumber || "");
                 setNusukSaved(false);
                 setNusukSuccessMsg(null);
-                setNusukWaMsg(null);
-                if (typeof window !== "undefined") {
-                  setNusukWaLink(localStorage.getItem("safa_whatsapp_target_link") || "");
-                }
-                setNusukGeneratedWaUrl(null);
                 setShowNusukModal(true);
               }}
               disabled={actionLoading}
@@ -3074,25 +2954,15 @@ export default function RequestDetailPage({
               <div className="bg-gray-50 p-3 rounded-xl">
                 <span className="text-gray-400 block mb-0.5">رقم هاتف المستضيف:</span>
                 {(request.hostingInfo?.hostPhone || request.contactPhone) ? (
-                  <div className="inline-flex items-center gap-2 mt-1 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
-                    <a
-                      href={getWhatsAppUrl(request.hostingInfo?.hostPhone || request.contactPhone || "")}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-emerald-800 hover:text-emerald-950 font-bold font-mono text-sm hover:underline"
-                      title="مراسلة المستضيف عبر واتساب"
-                      dir="ltr"
-                    >
-                      <MessageSquare className="w-4 h-4 fill-emerald-600 text-emerald-600 shrink-0" />
-                      <span>
-                        {normalizePhone(request.hostingInfo?.hostPhone || request.contactPhone).displayFormatted ||
-                          (request.hostingInfo?.hostPhone || request.contactPhone)}
-                      </span>
-                    </a>
-                    <span className="text-emerald-300">|</span>
+                  <div className="inline-flex items-center gap-2 mt-1 bg-gray-50 border border-gray-200 px-2.5 py-1 rounded-lg">
+                    <span className="font-bold font-mono text-gray-800 text-sm" dir="ltr">
+                      {normalizePhone(request.hostingInfo?.hostPhone || request.contactPhone).displayFormatted ||
+                        (request.hostingInfo?.hostPhone || request.contactPhone)}
+                    </span>
+                    <span className="text-gray-300">|</span>
                     <a
                       href={getTelUrl(request.hostingInfo?.hostPhone || request.contactPhone || "")}
-                      className="p-1 text-emerald-700 hover:text-emerald-900 rounded hover:bg-emerald-100 transition-colors"
+                      className="p-1 text-sky-700 hover:text-sky-900 rounded hover:bg-sky-50 transition-colors"
                       title="اتصال هاتفي بالمستضيف"
                     >
                       <Phone className="w-3.5 h-3.5 shrink-0" />
@@ -3941,33 +3811,25 @@ export default function RequestDetailPage({
                         </span>
                       )}
                       {traveler.phoneNumber ? (
-                        <div className="inline-flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg">
-                          <a
-                            href={getWhatsAppUrl(traveler.phoneNumber)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-emerald-800 hover:text-emerald-950 font-mono font-bold hover:underline"
-                            title="مراسلة المسافر عبر واتساب"
-                            dir="ltr"
-                          >
-                            <MessageSquare className="w-3.5 h-3.5 fill-emerald-600 text-emerald-600 shrink-0" />
-                            <span>{normalizePhone(traveler.phoneNumber).displayFormatted || traveler.phoneNumber}</span>
-                          </a>
-                          <span className="text-emerald-300">|</span>
+                        <div className="inline-flex items-center gap-1.5 bg-gray-50 border border-gray-200 px-2 py-0.5 rounded-lg">
+                          <span className="font-mono font-bold text-gray-800 text-xs" dir="ltr">
+                            {normalizePhone(traveler.phoneNumber).displayFormatted || traveler.phoneNumber}
+                          </span>
+                          <span className="text-gray-300">|</span>
                           <a
                             href={getTelUrl(traveler.phoneNumber)}
-                            className="p-0.5 text-emerald-700 hover:text-emerald-900 rounded hover:bg-emerald-100 transition-colors"
+                            className="p-0.5 text-sky-700 hover:text-sky-900 rounded hover:bg-sky-50 transition-colors"
                             title="اتصال هاتفي بالمسافر"
                           >
                             <Phone className="w-3 h-3 shrink-0" />
                           </a>
                           {canEditTravelerPhone && (
                             <>
-                              <span className="text-emerald-300">|</span>
+                              <span className="text-gray-300">|</span>
                               <button
                                 type="button"
                                 onClick={() => openQuickPhoneModal(traveler)}
-                                className="p-0.5 text-emerald-700 hover:text-blue-700 rounded hover:bg-emerald-100 transition-colors cursor-pointer"
+                                className="p-0.5 text-gray-600 hover:text-blue-700 rounded hover:bg-gray-100 transition-colors cursor-pointer"
                                 title="تعديل رقم هاتف المسافر"
                               >
                                 <Edit2 className="w-3 h-3 shrink-0" />
@@ -4444,7 +4306,7 @@ export default function RequestDetailPage({
             </div>
 
             <p className="text-xs text-gray-500">
-              أدخل رقم مجموعة نسك المعتمد لتثبيته، ثم يمكنك حفظه أو إرسال الحزمة فوراً لمجموعة الواتساب 📲.
+              أدخل رقم مجموعة نسك المعتمد واسم المجموعة لتثبيتهما واعتماد المعاملة.
             </p>
 
             <div>
@@ -4458,7 +4320,6 @@ export default function RequestDetailPage({
                   setNusukInput(e.target.value);
                   setNusukSaved(false);
                   setNusukSuccessMsg(null);
-                  setNusukWaMsg(null);
                 }}
                 placeholder="مثال: NUSUK-109283"
                 className="w-full px-3 py-2 text-sm rounded-xl border border-gray-300 font-mono focus:outline-hidden focus:ring-2 focus:ring-teal-500"
@@ -4485,7 +4346,6 @@ export default function RequestDetailPage({
                           setNusukGroupName(suggestedName);
                           setNusukSaved(false);
                           setNusukSuccessMsg(null);
-                          setNusukWaMsg(null);
                         }}
                         className="text-[11px] font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 px-2 py-0.5 rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
                         title="تطبيق التسمية المعتمدة تلقائياً بنقرة واحدة"
@@ -4513,7 +4373,6 @@ export default function RequestDetailPage({
                   setNusukGroupName(e.target.value);
                   setNusukSaved(false);
                   setNusukSuccessMsg(null);
-                  setNusukWaMsg(null);
                 }}
                 placeholder="أدخل اسم المجموعة المعتمد..."
                 className="w-full px-3 py-2 text-sm rounded-xl border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-teal-500 font-medium text-gray-900"
@@ -4537,53 +4396,10 @@ export default function RequestDetailPage({
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">
-                رابط مجموعة الواتساب (اختياري)
-              </label>
-              <input
-                type="text"
-                value={nusukWaLink}
-                onChange={(e) => {
-                  setNusukWaLink(e.target.value);
-                  if (typeof window !== "undefined") {
-                    localStorage.setItem("safa_whatsapp_target_link", e.target.value.trim());
-                  }
-                }}
-                placeholder="مثال: https://chat.whatsapp.com/..."
-                className="w-full px-3 py-2 text-xs rounded-xl border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-teal-500 font-mono"
-              />
-              <p className="text-[11px] text-gray-400 mt-1">
-                إذا لم تضع رابط مجموعة، سيتم فتح محادثة الواتساب مع تجهيز نص الرسالة وتنزيل المستندات تلقائياً.
-              </p>
-            </div>
-
             {nusukSuccessMsg && (
               <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs font-bold flex items-center gap-2">
                 <Check className="w-4 h-4 text-emerald-600 shrink-0" />
                 <span>{nusukSuccessMsg}</span>
-              </div>
-            )}
-
-            {nusukWaMsg && (
-              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 text-xs font-bold space-y-2">
-                <div className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>{nusukWaMsg}</span>
-                </div>
-                {nusukGeneratedWaUrl && (
-                  <div className="flex items-center gap-2 pt-1">
-                    <a
-                      href={nusukGeneratedWaUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-xs cursor-pointer"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      <span>فتح محادثة الواتساب الآن ↗</span>
-                    </a>
-                  </div>
-                )}
               </div>
             )}
 
@@ -4592,7 +4408,7 @@ export default function RequestDetailPage({
                 <button
                   type="button"
                   onClick={() => setShowNusukModal(false)}
-                  disabled={nusukSaving || nusukSendingWa}
+                  disabled={nusukSaving}
                   className="px-3.5 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl cursor-pointer transition-colors"
                 >
                   {nusukSaved ? "إغلاق النافذة" : "إلغاء"}
@@ -4601,7 +4417,7 @@ export default function RequestDetailPage({
                   <button
                     type="button"
                     onClick={handleRevertNusukApproval}
-                    disabled={actionLoading || nusukSaving || nusukSendingWa}
+                    disabled={actionLoading || nusukSaving}
                     className="px-3 py-2 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl cursor-pointer flex items-center gap-1.5 transition-colors"
                     title="تراجع المسؤول عن اعتماد رقم نسك وإلغاء الاعتماد"
                   >
@@ -4611,43 +4427,26 @@ export default function RequestDetailPage({
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleSaveNusukOnly}
-                  disabled={nusukSaving || nusukSendingWa || !nusukInput.trim() || !nusukGroupName.trim()}
-                  className={`px-3.5 py-2 text-xs font-bold rounded-xl shadow-xs cursor-pointer flex items-center gap-1.5 transition-all ${
-                    nusukSaved
-                      ? "bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200"
-                      : "bg-teal-600 hover:bg-teal-700 text-white"
-                  }`}
-                  title="اعتماد وحفظ رقم نسك مع البقاء في نفس الصفحة"
-                >
-                  {nusukSaving ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : nusukSaved ? (
-                    <Check className="w-3.5 h-3.5 text-emerald-600" />
-                  ) : (
-                    <Save className="w-3.5 h-3.5" />
-                  )}
-                  <span>{nusukSaved ? "تم الحفظ ✓" : "اعتماد وحفظ"}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleSendNusukWhatsApp}
-                  disabled={nusukSaving || nusukSendingWa || !nusukInput.trim() || !nusukGroupName.trim()}
-                  className="px-3.5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed text-white rounded-xl shadow-xs cursor-pointer flex items-center gap-1.5 transition-all"
-                  title="إرسال المعاملة إلى مجموعة الواتساب"
-                >
-                  {nusukSendingWa ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <Send className="w-3.5 h-3.5" />
-                  )}
-                  <span>إرسال واتساب 📲</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={handleSaveNusukOnly}
+                disabled={nusukSaving || !nusukInput.trim() || !nusukGroupName.trim()}
+                className={`px-4 py-2 text-xs font-bold rounded-xl shadow-xs cursor-pointer flex items-center gap-1.5 transition-all ${
+                  nusukSaved
+                    ? "bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200"
+                    : "bg-teal-600 hover:bg-teal-700 text-white"
+                }`}
+                title="اعتماد وحفظ رقم نسك مع البقاء في نفس الصفحة"
+              >
+                {nusukSaving ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : nusukSaved ? (
+                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                ) : (
+                  <Save className="w-3.5 h-3.5" />
+                )}
+                <span>{nusukSaved ? "تم الحفظ ✓" : "اعتماد وحفظ"}</span>
+              </button>
             </div>
           </div>
         </div>
@@ -5065,14 +4864,6 @@ export default function RequestDetailPage({
         </div>
       )}
 
-      {/* --- MODAL 7: Smart WhatsApp Integration Modal --- */}
-      {showWhatsAppModal && request && (
-        <WhatsAppModal
-          isOpen={showWhatsAppModal}
-          onClose={() => setShowWhatsAppModal(false)}
-          request={request}
-        />
-      )}
 
       {/* --- MODAL 8: Add New Traveler to Group --- */}
       {showAddTravelerModal && (

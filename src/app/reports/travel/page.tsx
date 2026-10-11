@@ -21,7 +21,6 @@ import {
   Clock,
   Building2,
   AlertCircle,
-  MessageCircle,
   ShieldAlert,
 } from "lucide-react";
 import Link from "next/link";
@@ -30,7 +29,7 @@ import {
   TravelReportExportRow,
 } from "@/lib/excelExport";
 import { normalizeArabicText } from "@/lib/searchUtils";
-import { extractEgyptianPhoneNumber, getWhatsAppUrl, normalizePhone } from "@/lib/phoneUtils";
+import { extractEgyptianPhoneNumber, normalizePhone } from "@/lib/phoneUtils";
 import { getTravelArchiveCategory } from "@/lib/travelArchiveUtils";
 
 export interface TravelPilgrimItem {
@@ -803,15 +802,6 @@ export default function TravelReportPage() {
                             <span className="font-mono text-gray-800 font-bold text-xs" dir="ltr">
                               {p.egyptianPhone}
                             </span>
-                            <a
-                              href={getWhatsAppUrl(p.egyptianPhone, `السلام عليكم يا ${p.fullName}`)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="p-1 rounded-md text-emerald-600 hover:bg-emerald-50 transition-colors"
-                              title="محادثة واتساب مباشرة"
-                            >
-                              <MessageCircle className="w-3.5 h-3.5" />
-                            </a>
                             <a
                               href={`tel:${p.egyptianPhone}`}
                               className="p-1 rounded-md text-sky-600 hover:bg-sky-50 transition-colors"

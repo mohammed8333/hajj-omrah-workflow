@@ -33,7 +33,7 @@ import {
   TravelReportExportRow,
 } from "@/lib/excelExport";
 import { normalizeArabicText } from "@/lib/searchUtils";
-import { getWhatsAppUrl, normalizePhone, extractEgyptianPhoneNumber } from "@/lib/phoneUtils";
+import { normalizePhone, extractEgyptianPhoneNumber } from "@/lib/phoneUtils";
 import { getTravelArchiveCategory } from "@/lib/travelArchiveUtils";
 
 export interface PilgrimReportItem {
