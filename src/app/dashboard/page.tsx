@@ -1592,18 +1592,22 @@ export default function DashboardPage() {
                             {r.arrivalAirport || "مطار جدة"}
                           </span>
                         </div>
-                        <div className="flex items-center justify-between gap-1 mt-0.5">
-                          <div className="font-mono font-bold text-gray-900 text-xs truncate">
-                            {r.flightNumber || r.airline || "تذكرة مشتركة"}
-                          </div>
-                          <div className="font-mono font-bold text-gray-700 text-[10px] flex items-center gap-0.5" dir="ltr">
-                            <Clock className="w-2.5 h-2.5 text-sky-600 shrink-0" />
-                            <span>{r.saudiArrivalTime || "--:--"}</span>
-                          </div>
+                        <div className="font-mono font-bold text-gray-900 text-xs truncate mt-0.5">
+                          {r.flightNumber || r.airline || "تذكرة مشتركة"}
                         </div>
                         <div className="text-[10px] font-bold text-gray-800 flex items-center gap-1">
                           <Calendar className="w-3 h-3 text-sky-600 shrink-0" />
                           <span className="truncate">{formatDayMonth(r.departureDate || r.travelDate)}</span>
+                        </div>
+                        <div className="pt-1 mt-0.5 border-t border-sky-200/60 flex items-center justify-between text-[10px]">
+                          <div className="flex items-center gap-0.5">
+                            <span className="text-[9px] text-gray-500 font-bold">إقلاع:</span>
+                            <span className="font-mono font-bold text-gray-800" dir="ltr">{r.flightDepartureTime || "--:--"}</span>
+                          </div>
+                          <div className="flex items-center gap-0.5">
+                            <span className="text-[9px] text-sky-700 font-bold">وصول:</span>
+                            <span className="font-mono font-bold text-sky-800" dir="ltr">{r.saudiArrivalTime || "--:--"}</span>
+                          </div>
                         </div>
                       </div>
 
@@ -1618,18 +1622,22 @@ export default function DashboardPage() {
                             {r.returnDepartureAirport || (r.destination?.includes("المدينة") ? "مطار المدينة" : "مطار جدة")}
                           </span>
                         </div>
-                        <div className="flex items-center justify-between gap-1 mt-0.5">
-                          <div className="font-mono font-bold text-gray-900 text-xs truncate">
-                            {r.returnFlightNumber || r.flightNumber || "رحلة العودة"}
-                          </div>
-                          <div className="font-mono font-bold text-gray-700 text-[10px] flex items-center gap-0.5" dir="ltr">
-                            <Clock className="w-2.5 h-2.5 text-indigo-600 shrink-0" />
-                            <span>{r.returnFlightDepartureTime || "--:--"}</span>
-                          </div>
+                        <div className="font-mono font-bold text-gray-900 text-xs truncate mt-0.5">
+                          {r.returnFlightNumber || r.flightNumber || "رحلة العودة"}
                         </div>
                         <div className="text-[10px] font-bold text-gray-800 flex items-center gap-1">
                           <Calendar className="w-3 h-3 text-indigo-600 shrink-0" />
                           <span className="truncate">{r.returnDate ? formatDayMonth(r.returnDate) : "لم يُحدد"}</span>
+                        </div>
+                        <div className="pt-1 mt-0.5 border-t border-indigo-200/60 flex items-center justify-between text-[10px]">
+                          <div className="flex items-center gap-0.5">
+                            <span className="text-[9px] text-gray-500 font-bold">إقلاع:</span>
+                            <span className="font-mono font-bold text-gray-800" dir="ltr">{r.returnFlightDepartureTime || "--:--"}</span>
+                          </div>
+                          <div className="flex items-center gap-0.5">
+                            <span className="text-[9px] text-indigo-700 font-bold">وصول:</span>
+                            <span className="font-mono font-bold text-indigo-800" dir="ltr">{(r as any).returnArrivalTime || "--:--"}</span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -2456,10 +2464,20 @@ export default function DashboardPage() {
                               <span className="bg-sky-100/70 text-sky-800 px-1.5 py-0.5 rounded font-bold">
                                 {r.arrivalAirport || "مطار جدة"}
                               </span>
-                              <span className="flex items-center gap-1 font-mono text-gray-600 font-bold" dir="ltr">
-                                <Clock className="w-3 h-3 text-sky-600 shrink-0" />
-                                {r.saudiArrivalTime || "--:--"}
-                              </span>
+                            </div>
+                            <div className="pt-1 border-t border-gray-100/80 space-y-0.5 text-[10px]">
+                              <div className="flex items-center justify-between gap-1 text-gray-600">
+                                <span className="text-[9px] text-gray-500 font-bold">إقلاع:</span>
+                                <span className="font-mono font-bold text-gray-800" dir="ltr">
+                                  {r.flightDepartureTime || "--:--"}
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between gap-1 text-gray-600">
+                                <span className="text-[9px] text-sky-700 font-bold">وصول:</span>
+                                <span className="font-mono font-bold text-sky-800" dir="ltr">
+                                  {r.saudiArrivalTime || "--:--"}
+                                </span>
+                              </div>
                             </div>
                           </div>
                         </td>
@@ -2479,10 +2497,20 @@ export default function DashboardPage() {
                               <span className="bg-indigo-100/70 text-indigo-800 px-1.5 py-0.5 rounded font-bold">
                                 {r.returnDepartureAirport || (r.destination?.includes("المدينة") ? "مطار المدينة" : "مطار جدة")}
                               </span>
-                              <span className="flex items-center gap-1 font-mono text-gray-600 font-bold" dir="ltr">
-                                <Clock className="w-3 h-3 text-indigo-600 shrink-0" />
-                                {r.returnFlightDepartureTime || "--:--"}
-                              </span>
+                            </div>
+                            <div className="pt-1 border-t border-gray-100/80 space-y-0.5 text-[10px]">
+                              <div className="flex items-center justify-between gap-1 text-gray-600">
+                                <span className="text-[9px] text-gray-500 font-bold">إقلاع:</span>
+                                <span className="font-mono font-bold text-gray-800" dir="ltr">
+                                  {r.returnFlightDepartureTime || "--:--"}
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between gap-1 text-gray-600">
+                                <span className="text-[9px] text-indigo-700 font-bold">وصول:</span>
+                                <span className="font-mono font-bold text-indigo-800" dir="ltr">
+                                  {(r as any).returnArrivalTime || "--:--"}
+                                </span>
+                              </div>
                             </div>
                           </div>
                         </td>
